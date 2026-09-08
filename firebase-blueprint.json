@@ -1,0 +1,86 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "User account profile document stored upon registration or login",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "The unique Firebase Auth UID of the user"
+        },
+        "email": {
+          "type": "string",
+          "description": "The email address of the authenticated user"
+        },
+        "displayName": {
+          "type": "string",
+          "description": "User display name"
+        },
+        "photoURL": {
+          "type": "string",
+          "description": "URL of user avatar"
+        },
+        "role": {
+          "type": "string",
+          "description": "User role in NexStudio"
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Timestamp string or server timestamp"
+        }
+      },
+      "required": ["userId", "email", "displayName"]
+    },
+    "Project": {
+      "title": "Project",
+      "description": "Creative projects, repositories or studio showcases",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier of the project"
+        },
+        "ownerId": {
+          "type": "string",
+          "description": "Firebase Auth UID of the owner"
+        },
+        "title": {
+          "type": "string",
+          "description": "Title of the project or studio file"
+        },
+        "description": {
+          "type": "string",
+          "description": "Short summary or description"
+        },
+        "category": {
+          "type": "string",
+          "description": "Category: web, 3d, mobile, motion, design"
+        },
+        "thumbnail": {
+          "type": "string",
+          "description": "Cover image URL"
+        },
+        "isPublic": {
+          "type": "boolean",
+          "description": "Public visibility flag"
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Creation timestamp"
+        }
+      },
+      "required": ["id", "ownerId", "title"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "UserProfile",
+      "description": "Private user profiles accessed and managed by the owner"
+    },
+    "/projects/{projectId}": {
+      "schema": "Project",
+      "description": "Creative showcases and project files"
+    }
+  }
+}
