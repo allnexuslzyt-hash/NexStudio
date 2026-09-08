@@ -3,26 +3,38 @@ import {
   User, 
   signInWithPopup, 
   signOut as fbSignOut, 
-  onAuthStateChanged 
+  onAuthStateChanged,
+  updateProfile as fbUpdateProfile
 } from 'firebase/auth';
 import { 
   doc, 
   getDoc, 
   setDoc, 
+  deleteDoc,
   serverTimestamp 
 } from 'firebase/firestore';
 import { auth, db, googleProvider, handleFirestoreError, OperationType, testConnection } from '../lib/firebase';
 import { UserProfile } from '../types';
 
+export const ADMIN_EMAILS = ['allnexuslzyt@gmail.com'];
+
+export const isSuperAdminEmail = (email?: string | null): boolean => {
+  if (!email) return false;
+  return ADMIN_EMAILS.includes(email.toLowerCase().trim());
+};
+
 interface AuthContextType {
   user: User | null;
   profile: UserProfile | null;
+  isAdmin: boolean;
   loading: boolean;
   authError: string | null;
   signInWithGoogle: () => Promise<void>;
   signOut: () => Promise<void>;
   clearAuthError: () => void;
   updateBio: (bio: string) => Promise<void>;
+  updateProfileData: (data: { displayName?: string; username?: string; photoURL?: string }) => Promise<void>;
+  deleteAccount: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -39,11 +51,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   const syncUserProfile = async (firebaseUser: User) => {
+    const isSuperAdmin = isSuperAdminEmail(firebaseUser.email);
     const userDocRef = doc(db, 'users', firebaseUser.uid);
     try {
       const docSnap = await getDoc(userDocRef);
       if (docSnap.exists()) {
         const data = docSnap.data() as UserProfile;
+        if (isSuperAdmin && data.role !== 'SuperAdmin') {
+          data.role = 'SuperAdmin';
+          await setDoc(userDocRef, { role: 'SuperAdmin' }, { merge: true });
+        }
         setProfile(data);
       } else {
         const newProfile: UserProfile = {
@@ -51,8 +68,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           email: firebaseUser.email || '',
           displayName: firebaseUser.displayName || 'Usuario NexStudio',
           photoURL: firebaseUser.photoURL || `https://api.dicebear.com/7.x/identicon/svg?seed=${firebaseUser.uid}`,
-          role: 'Creador Digital',
-          bio: 'Diseñador y desarrollador en NexStudio.',
+          role: isSuperAdmin ? 'SuperAdmin' : 'Creador Digital',
+          bio: isSuperAdmin ? 'Super Administrador del Sistema NexStudio.' : 'Diseñador y desarrollador en NexStudio.',
           createdAt: new Date().toISOString(),
           lastLogin: new Date().toISOString(),
         };
@@ -67,8 +84,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         email: firebaseUser.email || '',
         displayName: firebaseUser.displayName || 'Usuario NexStudio',
         photoURL: firebaseUser.photoURL || `https://api.dicebear.com/7.x/identicon/svg?seed=${firebaseUser.uid}`,
-        role: 'Creador Digital',
-        bio: 'Miembro verificado de NexStudio',
+        role: isSuperAdmin ? 'SuperAdmin' : 'Creador Digital',
+        bio: isSuperAdmin ? 'Super Administrador del Sistema NexStudio.' : 'Miembro verificado de NexStudio',
         createdAt: new Date().toISOString(),
       });
       handleFirestoreError(err, OperationType.GET, `users/${firebaseUser.uid}`);
@@ -139,17 +156,85 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  const updateProfileData = async (data: { displayName?: string; username?: string; photoURL?: string }) => {
+    if (!user) return;
+    const userDocRef = doc(db, 'users', user.uid);
+    try {
+      // Update Firebase Auth current user if displayName or photoURL changed
+      if (data.displayName || data.photoURL) {
+        await fbUpdateProfile(user, {
+          displayName: data.displayName ?? user.displayName,
+          photoURL: data.photoURL ?? user.photoURL,
+        });
+      }
+
+      // Update Firestore document
+      const updatePayload: Record<string, any> = {};
+      if (data.displayName !== undefined) updatePayload.displayName = data.displayName;
+      if (data.username !== undefined) updatePayload.username = data.username;
+      if (data.photoURL !== undefined) updatePayload.photoURL = data.photoURL;
+
+      await setDoc(userDocRef, updatePayload, { merge: true });
+
+      // Update local profile state
+      setProfile((prev) => {
+        if (!prev) return null;
+        return {
+          ...prev,
+          ...updatePayload,
+        };
+      });
+    } catch (err) {
+      console.error('Error actualizando perfil:', err);
+      handleFirestoreError(err, OperationType.UPDATE, `users/${user.uid}`);
+      throw err;
+    }
+  };
+
+  const deleteAccount = async () => {
+    if (!user) return;
+    try {
+      // Delete user document in Firestore
+      try {
+        const userDocRef = doc(db, 'users', user.uid);
+        await deleteDoc(userDocRef);
+      } catch (err) {
+        console.warn('Could not delete user doc from firestore:', err);
+      }
+      // Delete user auth account
+      try {
+        await user.delete();
+      } catch (err: any) {
+        // If requires-recent-login or similar, sign out
+        console.warn('User auth delete error, falling back to signOut:', err);
+      }
+      await signOut();
+    } catch (err) {
+      console.error('Error al eliminar cuenta:', err);
+      throw err;
+    }
+  };
+
+  const isAdmin = Boolean(
+    isSuperAdminEmail(user?.email) || 
+    profile?.role === 'SuperAdmin' || 
+    profile?.role === 'Admin'
+  );
+
   return (
     <AuthContext.Provider
       value={{
         user,
         profile,
+        isAdmin,
         loading,
         authError,
         signInWithGoogle,
         signOut,
         clearAuthError: () => setAuthError(null),
         updateBio,
+        updateProfileData,
+        deleteAccount,
       }}
     >
       {children}

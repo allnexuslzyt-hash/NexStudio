@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
 import { AuthProvider, useAuth } from './context/AuthContext';
+import { SettingsProvider } from './context/SettingsContext';
+import { AdminProvider, useAdmin } from './context/AdminContext';
 import { Navbar } from './components/Navbar';
 import { Footer } from './components/Footer';
 import { TermsModal } from './components/TermsModal';
@@ -8,19 +10,32 @@ import { SignInPromptBanner } from './components/SignInPromptBanner';
 import { CatalogView } from './components/CatalogView';
 import { BlankPageView } from './components/BlankPageView';
 import { HelpPageView } from './components/HelpPageView';
+import { SettingsModal } from './components/SettingsModal';
+import { GlobalBanner } from './components/GlobalBanner';
+import { MaintenanceScreen } from './components/MaintenanceScreen';
+import { AdminCommandCenter } from './components/AdminCommandCenter';
 import { motion } from 'motion/react';
 import { Boxes } from 'lucide-react';
 
 const WorkspaceContent: React.FC = () => {
   const { user } = useAuth();
+  const { siteSettings, isAdmin } = useAdmin();
   const [activeView, setActiveView] = useState<string>('workspace');
   const [isTermsOpen, setIsTermsOpen] = useState<boolean>(false);
 
   // Vistas de página blanca requeridas por el usuario hasta que defina contenido
   const isBlankView = ['proyectos', 'creaciones', 'herramientas'].includes(activeView);
 
+  // Si el interruptor de cierre global (Kill Switch) está activo y el usuario no es admin, bloquear inmediatamente
+  if (siteSettings.maintenanceMode && !isAdmin) {
+    return <MaintenanceScreen onOpenAdminPanel={() => setActiveView('admin')} />;
+  }
+
   return (
     <div className="w-full min-h-screen flex flex-col bg-white text-slate-900 selection:bg-indigo-600 selection:text-white">
+      {/* Aviso / Banner Global en la parte superior del sitio */}
+      <GlobalBanner />
+
       {/* 100% Viewport Header */}
       <Navbar
         activeView={activeView}
@@ -32,7 +47,10 @@ const WorkspaceContent: React.FC = () => {
 
       {/* Main Content Area */}
       <main className="w-full flex-1 flex flex-col items-center justify-center p-4 sm:p-8 relative overflow-hidden bg-white">
-        {activeView === 'ayuda' ? (
+        {activeView === 'admin' ? (
+          /* Centro de Mando de Administrador (Exclusivo allnexuslzyt@gmail.com / SuperAdmin) */
+          <AdminCommandCenter onBack={() => setActiveView('workspace')} />
+        ) : activeView === 'ayuda' ? (
           /* Centro de Ayuda completo con buscador en tiempo real, categorías, FAQs, guías y contacto */
           <HelpPageView onBack={() => setActiveView('workspace')} />
         ) : isBlankView ? (
@@ -96,6 +114,9 @@ const WorkspaceContent: React.FC = () => {
       {/* Full-width Footer with Términos y Condiciones */}
       <Footer onOpenTerms={() => setIsTermsOpen(true)} />
 
+      {/* Modal de Configuración y Personalización */}
+      <SettingsModal />
+
       {/* Modal de Términos y Condiciones bajo demanda */}
       <TermsModal
         isOpen={isTermsOpen}
@@ -111,7 +132,12 @@ const WorkspaceContent: React.FC = () => {
 export default function App() {
   return (
     <AuthProvider>
-      <WorkspaceContent />
+      <AdminProvider>
+        <SettingsProvider>
+          <WorkspaceContent />
+        </SettingsProvider>
+      </AdminProvider>
     </AuthProvider>
   );
 }
+

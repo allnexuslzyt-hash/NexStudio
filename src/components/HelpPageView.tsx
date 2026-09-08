@@ -20,10 +20,9 @@ import {
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   HELP_CATEGORIES, 
-  FAQ_ITEMS, 
-  GUIDE_ARTICLES, 
   GuideArticle 
 } from '../data/helpData';
+import { useAdmin } from '../context/AdminContext';
 import { HelpArticleModal } from './HelpArticleModal';
 import { HelpSupportModal } from './HelpSupportModal';
 
@@ -32,6 +31,7 @@ interface HelpPageViewProps {
 }
 
 export const HelpPageView: React.FC<HelpPageViewProps> = ({ onBack }) => {
+  const { dynamicFaqs, dynamicGuides } = useAdmin();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [openFaqIds, setOpenFaqIds] = useState<Set<string>>(new Set(['faq-1']));
@@ -70,7 +70,7 @@ export const HelpPageView: React.FC<HelpPageViewProps> = ({ onBack }) => {
   // Dynamic real-time filtering for FAQs
   const filteredFaqs = useMemo(() => {
     const q = searchQuery.toLowerCase().trim();
-    return FAQ_ITEMS.filter((faq) => {
+    return dynamicFaqs.filter((faq) => {
       // Category check
       if (selectedCategory !== 'all' && faq.categoryId !== selectedCategory) {
         return false;
@@ -85,12 +85,12 @@ export const HelpPageView: React.FC<HelpPageViewProps> = ({ onBack }) => {
         : false;
       return matchQuestion || matchSummary || matchTips || matchBullets;
     });
-  }, [searchQuery, selectedCategory]);
+  }, [searchQuery, selectedCategory, dynamicFaqs]);
 
   // Dynamic real-time filtering for Guide Articles
   const filteredGuides = useMemo(() => {
     const q = searchQuery.toLowerCase().trim();
-    return GUIDE_ARTICLES.filter((guide) => {
+    return dynamicGuides.filter((guide) => {
       // Category check
       if (selectedCategory !== 'all' && guide.categoryId !== selectedCategory) {
         return false;
@@ -107,7 +107,7 @@ export const HelpPageView: React.FC<HelpPageViewProps> = ({ onBack }) => {
       );
       return matchTitle || matchSummary || matchSections;
     });
-  }, [searchQuery, selectedCategory]);
+  }, [searchQuery, selectedCategory, dynamicGuides]);
 
   const hasAnyResults = filteredFaqs.length > 0 || filteredGuides.length > 0;
 
