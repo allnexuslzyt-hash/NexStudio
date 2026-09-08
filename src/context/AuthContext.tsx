@@ -99,13 +99,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
     } catch (err: any) {
       console.error('Error al iniciar sesión con Google:', err);
+      // Si el usuario cerró la ventana emergente voluntariamente, no mostrar mensaje de error
+      if (err.code === 'auth/popup-closed-by-user' || err.code === 'auth/cancelled-popup-request') {
+        return;
+      }
       let message = 'No se pudo completar el inicio de sesión con Google.';
       if (err.code === 'auth/popup-blocked') {
         message = 'La ventana emergente de Google fue bloqueada por tu navegador. Permite los popups para continuar.';
-      } else if (err.code === 'auth/popup-closed-by-user') {
-        message = 'La ventana de autenticación fue cerrada antes de completar el registro.';
-      } else if (err.code === 'auth/cancelled-popup-request') {
-        message = 'Solicitud de autenticación cancelada.';
       } else if (err.message) {
         message = err.message;
       }

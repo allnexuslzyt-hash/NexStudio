@@ -50,13 +50,13 @@ export const DropdownMenu: React.FC<DropdownMenuProps> = ({
         id={`dropdown-btn-${label.toLowerCase().replace(/\s+/g, '-')}`}
         onClick={() => setIsOpen(!isOpen)}
         aria-expanded={isOpen}
-        className="flex items-center gap-2 px-3.5 py-2 text-sm font-medium text-slate-300 hover:text-white rounded-lg hover:bg-slate-800/60 transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-500/40 min-h-[44px]"
+        className="flex items-center gap-2 px-3.5 py-2 text-sm font-medium text-slate-700 hover:text-slate-900 rounded-lg hover:bg-slate-100 transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-500/30 min-h-[44px]"
       >
-        {icon && <span className="text-indigo-400">{icon}</span>}
+        {icon && <span className="text-indigo-600">{icon}</span>}
         <span>{label}</span>
         <ChevronDown
-          className={`w-4 h-4 text-slate-400 transition-transform duration-200 ${
-            isOpen ? 'rotate-180 text-indigo-400' : ''
+          className={`w-4 h-4 text-slate-500 transition-transform duration-200 ${
+            isOpen ? 'rotate-180 text-indigo-600' : ''
           }`}
         />
       </button>
@@ -65,7 +65,7 @@ export const DropdownMenu: React.FC<DropdownMenuProps> = ({
         <div
           className={`absolute ${
             align === 'right' ? 'right-0' : 'left-0'
-          } mt-2 w-72 origin-top-right rounded-xl bg-slate-900/95 backdrop-blur-2xl border border-slate-800 shadow-2xl shadow-indigo-950/40 focus:outline-none z-50 p-2 divide-y divide-slate-800/60 animate-in fade-in zoom-in-95 duration-150`}
+          } mt-2 w-72 origin-top-right rounded-xl bg-white border border-slate-200 shadow-xl focus:outline-none z-50 p-2 divide-y divide-slate-100 animate-in fade-in zoom-in-95 duration-150`}
         >
           <div className="py-1">
             {items.map((item) => (
@@ -76,26 +76,26 @@ export const DropdownMenu: React.FC<DropdownMenuProps> = ({
                   item.onClick();
                   setIsOpen(false);
                 }}
-                className="w-full text-left px-3 py-2.5 rounded-lg flex items-start gap-3 hover:bg-slate-800/80 transition-colors group text-sm min-h-[44px]"
+                className="w-full text-left px-3 py-2.5 rounded-lg flex items-start gap-3 hover:bg-slate-50 transition-colors group text-sm min-h-[44px]"
               >
                 {item.icon && (
-                  <span className="p-1.5 rounded-md bg-slate-800 text-indigo-400 group-hover:bg-indigo-600/20 group-hover:text-indigo-300 transition-colors mt-0.5">
+                  <span className="p-1.5 rounded-md bg-slate-100 text-indigo-600 group-hover:bg-indigo-50 group-hover:text-indigo-700 transition-colors mt-0.5">
                     {item.icon}
                   </span>
                 )}
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center justify-between">
-                    <span className="font-medium text-slate-200 group-hover:text-white truncate">
+                    <span className="font-medium text-slate-800 group-hover:text-slate-900 truncate">
                       {item.label}
                     </span>
                     {item.badge && (
-                      <span className="text-[10px] uppercase tracking-wider font-semibold px-1.5 py-0.5 rounded bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
+                      <span className="text-[10px] uppercase tracking-wider font-semibold px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-700 border border-indigo-200">
                         {item.badge}
                       </span>
                     )}
                   </div>
                   {item.description && (
-                    <p className="text-xs text-slate-400 line-clamp-1 mt-0.5">
+                    <p className="text-xs text-slate-500 line-clamp-1 mt-0.5">
                       {item.description}
                     </p>
                   )}
