@@ -14,11 +14,12 @@ import { SettingsModal } from './components/SettingsModal';
 import { GlobalBanner } from './components/GlobalBanner';
 import { MaintenanceScreen } from './components/MaintenanceScreen';
 import { AdminCommandCenter } from './components/AdminCommandCenter';
+import { UnauthorizedDomainModal } from './components/UnauthorizedDomainModal';
 import { motion } from 'motion/react';
 import { Boxes } from 'lucide-react';
 
 const WorkspaceContent: React.FC = () => {
-  const { user } = useAuth();
+  const { user, unauthorizedDomain, setUnauthorizedDomain } = useAuth();
   const { siteSettings, isAdmin } = useAdmin();
   const [activeView, setActiveView] = useState<string>('workspace');
   const [isTermsOpen, setIsTermsOpen] = useState<boolean>(false);
@@ -28,7 +29,16 @@ const WorkspaceContent: React.FC = () => {
 
   // Si el interruptor de cierre global (Kill Switch) está activo y el usuario no es admin, bloquear inmediatamente
   if (siteSettings.maintenanceMode && !isAdmin) {
-    return <MaintenanceScreen onOpenAdminPanel={() => setActiveView('admin')} />;
+    return (
+      <>
+        <MaintenanceScreen onOpenAdminPanel={() => setActiveView('admin')} />
+        <UnauthorizedDomainModal
+          domain={unauthorizedDomain || ''}
+          isOpen={Boolean(unauthorizedDomain)}
+          onClose={() => setUnauthorizedDomain(null)}
+        />
+      </>
+    );
   }
 
   return (
@@ -125,6 +135,13 @@ const WorkspaceContent: React.FC = () => {
 
       {/* Modal Obligatorio de Primera Visita (Cookies, Privacidad y Términos) */}
       <FirstTimeConsentModal />
+
+      {/* Modal Informativo y de Acceso Inmediato por auth/unauthorized-domain */}
+      <UnauthorizedDomainModal
+        domain={unauthorizedDomain || ''}
+        isOpen={Boolean(unauthorizedDomain)}
+        onClose={() => setUnauthorizedDomain(null)}
+      />
     </div>
   );
 };

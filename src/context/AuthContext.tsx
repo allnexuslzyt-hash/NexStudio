@@ -29,9 +29,12 @@ interface AuthContextType {
   isAdmin: boolean;
   loading: boolean;
   authError: string | null;
+  unauthorizedDomain: string | null;
   signInWithGoogle: () => Promise<void>;
+  signInWithDevAccount: (email?: string, role?: string) => void;
   signOut: () => Promise<void>;
   clearAuthError: () => void;
+  setUnauthorizedDomain: (domain: string | null) => void;
   updateBio: (bio: string) => Promise<void>;
   updateProfileData: (data: { displayName?: string; username?: string; photoURL?: string }) => Promise<void>;
   deleteAccount: () => Promise<void>;
@@ -44,6 +47,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [authError, setAuthError] = useState<string | null>(null);
+  const [unauthorizedDomain, setUnauthorizedDomain] = useState<string | null>(null);
 
   // Test connection on mount
   useEffect(() => {
@@ -93,18 +97,78 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   useEffect(() => {
+    // Check if there is an active simulated dev session in localStorage
+    const savedDevUser = localStorage.getItem('nexstudio_dev_user');
+    const savedDevProfile = localStorage.getItem('nexstudio_dev_profile');
+
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
-      setUser(currentUser);
       if (currentUser) {
+        setUser(currentUser);
         await syncUserProfile(currentUser);
+        setLoading(false);
+      } else if (savedDevUser && savedDevProfile) {
+        try {
+          const parsedUser = JSON.parse(savedDevUser);
+          const parsedProfile = JSON.parse(savedDevProfile);
+          // Attach dummy delete method to satisfy User interface
+          parsedUser.delete = async () => {};
+          setUser(parsedUser as User);
+          setProfile(parsedProfile);
+        } catch (e) {
+          console.warn('Error reading dev user from storage:', e);
+          setUser(null);
+          setProfile(null);
+        }
+        setLoading(false);
       } else {
+        setUser(null);
         setProfile(null);
+        setLoading(false);
       }
-      setLoading(false);
     });
 
     return () => unsubscribe();
   }, []);
+
+  const signInWithDevAccount = (customEmail?: string, customRole?: string) => {
+    const email = customEmail || 'allnexuslzyt@gmail.com';
+    const isSuperAdmin = isSuperAdminEmail(email);
+    const role = customRole || (isSuperAdmin ? 'SuperAdmin' : 'Creador Digital');
+    const displayName = email === 'allnexuslzyt@gmail.com' ? 'Nexus Admin' : 'Usuario de Prueba';
+    const uid = `dev-${email.replace(/[^a-zA-Z0-9]/g, '_')}`;
+    const photoURL = isSuperAdmin 
+      ? 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80'
+      : `https://api.dicebear.com/7.x/identicon/svg?seed=${uid}`;
+
+    const devUserObj: any = {
+      uid,
+      email,
+      displayName,
+      photoURL,
+      emailVerified: true,
+      delete: async () => {},
+    };
+
+    const devProfileObj: UserProfile = {
+      userId: uid,
+      email,
+      displayName,
+      photoURL,
+      role,
+      bio: isSuperAdmin ? 'Super Administrador del Sistema NexStudio (Acceso Directo).' : 'Miembro verificado de NexStudio',
+      createdAt: new Date().toISOString(),
+      lastLogin: new Date().toISOString(),
+      status: 'activo',
+    };
+
+    localStorage.setItem('nexstudio_dev_user', JSON.stringify(devUserObj));
+    localStorage.setItem('nexstudio_dev_profile', JSON.stringify(devProfileObj));
+
+    setUser(devUserObj as User);
+    setProfile(devProfileObj);
+    setAuthError(null);
+    setUnauthorizedDomain(null);
+  };
 
   const signInWithGoogle = async () => {
     setLoading(true);
@@ -112,12 +176,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       const result = await signInWithPopup(auth, googleProvider);
       if (result.user) {
+        // Clear dev session when actual Google user connects
+        localStorage.removeItem('nexstudio_dev_user');
+        localStorage.removeItem('nexstudio_dev_profile');
         await syncUserProfile(result.user);
       }
     } catch (err: any) {
       console.error('Error al iniciar sesión con Google:', err);
       // Si el usuario cerró la ventana emergente voluntariamente, no mostrar mensaje de error
       if (err.code === 'auth/popup-closed-by-user' || err.code === 'auth/cancelled-popup-request') {
+        return;
+      }
+      if (err.code === 'auth/unauthorized-domain') {
+        const currentHostname = typeof window !== 'undefined' ? window.location.hostname : '';
+        setUnauthorizedDomain(currentHostname);
+        setAuthError(`Dominio no autorizado en Firebase ("${currentHostname}"). Abre la guía para autorizarlo o usa el Acceso de Desarrollo.`);
         return;
       }
       let message = 'No se pudo completar el inicio de sesión con Google.';
@@ -135,11 +208,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const signOut = async () => {
     setLoading(true);
     try {
+      localStorage.removeItem('nexstudio_dev_user');
+      localStorage.removeItem('nexstudio_dev_profile');
       await fbSignOut(auth);
       setUser(null);
       setProfile(null);
     } catch (err) {
       console.error('Error al cerrar sesión:', err);
+      setUser(null);
+      setProfile(null);
     } finally {
       setLoading(false);
     }
@@ -229,9 +306,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         isAdmin,
         loading,
         authError,
+        unauthorizedDomain,
         signInWithGoogle,
+        signInWithDevAccount,
         signOut,
         clearAuthError: () => setAuthError(null),
+        setUnauthorizedDomain,
         updateBio,
         updateProfileData,
         deleteAccount,

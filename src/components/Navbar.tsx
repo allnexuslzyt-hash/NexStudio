@@ -35,7 +35,18 @@ export const Navbar: React.FC<NavbarProps> = ({
   activeView = 'workspace',
   onSelectView,
 }) => {
-  const { user, profile, loading, signInWithGoogle, signOut, authError, isAdmin } = useAuth();
+  const { 
+    user, 
+    profile, 
+    loading, 
+    signInWithGoogle, 
+    signOut, 
+    authError, 
+    isAdmin, 
+    unauthorizedDomain, 
+    setUnauthorizedDomain, 
+    clearAuthError 
+  } = useAuth();
   const { siteSettings } = useAdmin();
   const { openSettings } = useSettings();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -489,15 +500,26 @@ export const Navbar: React.FC<NavbarProps> = ({
 
       {/* Auth Error Banner */}
       {authError && (
-        <div className="w-full bg-rose-50 border-b border-rose-200 px-4 py-2 text-center text-xs text-rose-700 flex items-center justify-center gap-3">
-          <span>{authError}</span>
-          <button 
-            type="button" 
-            onClick={() => useAuth().clearAuthError()}
-            className="underline hover:text-rose-900 font-medium cursor-pointer"
-          >
-            Cerrar
-          </button>
+        <div className="w-full bg-rose-50 border-b border-rose-200 px-4 py-2.5 text-center text-xs text-rose-800 flex flex-wrap items-center justify-center gap-3">
+          <span className="font-medium">{authError}</span>
+          <div className="flex items-center gap-2">
+            {(unauthorizedDomain || authError.toLowerCase().includes('unauthorized-domain')) && (
+              <button
+                type="button"
+                onClick={() => setUnauthorizedDomain(typeof window !== 'undefined' ? window.location.hostname : '')}
+                className="px-2.5 py-1 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-[11px] shadow-xs cursor-pointer transition-colors"
+              >
+                Ver Solución &amp; Acceso Directo
+              </button>
+            )}
+            <button 
+              type="button" 
+              onClick={() => clearAuthError()}
+              className="text-rose-600 hover:text-rose-900 font-medium cursor-pointer underline text-[11px]"
+            >
+              Cerrar
+            </button>
+          </div>
         </div>
       )}
     </header>
