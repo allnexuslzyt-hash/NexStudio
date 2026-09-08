@@ -2,5 +2,7 @@
   "name": "NexStudio",
   "description": "Plataforma de estudio digital y lienzo de trabajo con autenticación de Firebase y Google, optimizada para pantalla completa.",
   "requestFramePermissions": [],
-  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
 }
