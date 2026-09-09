@@ -27,6 +27,13 @@ service cloud.firestore {
       return isSignedIn() && request.auth.uid == userId;
     }
 
+    function isAdmin() {
+      return isSignedIn() && (
+        request.auth.token.email == 'allnexuslzyt@gmail.com' ||
+        (request.auth.token.email != null && request.auth.token.email.lower() == 'allnexuslzyt@gmail.com')
+      );
+    }
+
     // User Profile Validation
     function isValidUserProfile(data) {
       return data.userId is string &&
@@ -35,6 +42,19 @@ service cloud.firestore {
              data.email.size() <= 256 &&
              data.displayName is string &&
              data.displayName.size() <= 120;
+    }
+
+    // Support Ticket Validation
+    function isValidTicket(data) {
+      return data.id is string &&
+             data.id.size() <= 128 &&
+             data.subject is string &&
+             data.subject.size() > 0 &&
+             data.subject.size() <= 200 &&
+             data.contactEmail is string &&
+             data.contactEmail.size() <= 256 &&
+             data.priority is string &&
+             data.status is string;
     }
 
     // Project Validation
@@ -53,9 +73,20 @@ service cloud.firestore {
 
     // Users Collection
     match /users/{userId} {
-      allow get: if isOwner(userId);
-      allow create: if isOwner(userId) && isValidId(userId) && isValidUserProfile(incoming()) && incoming().userId == request.auth.uid;
-      allow update: if isOwner(userId) && isValidUserProfile(incoming()) && incoming().userId == request.auth.uid;
+      allow get: if isOwner(userId) || isAdmin();
+      allow list: if isAdmin();
+      allow create: if (isOwner(userId) && isValidId(userId) && isValidUserProfile(incoming()) && incoming().userId == request.auth.uid) || isAdmin();
+      allow update: if (isOwner(userId) && isValidUserProfile(incoming()) && incoming().userId == request.auth.uid) || isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    // Support Tickets Collection
+    match /support_tickets/{ticketId} {
+      allow get: if isAdmin() || (isSignedIn() && (resource.data.userId == request.auth.uid || resource.data.contactEmail == request.auth.token.email));
+      allow list: if isAdmin() || (isSignedIn() && (resource.data.userId == request.auth.uid || resource.data.contactEmail == request.auth.token.email));
+      allow create: if isValidId(ticketId) && isValidTicket(incoming());
+      allow update: if isAdmin() || (isSignedIn() && (resource.data.userId == request.auth.uid || resource.data.contactEmail == request.auth.token.email));
+      allow delete: if isAdmin();
     }
 
     // Projects Collection

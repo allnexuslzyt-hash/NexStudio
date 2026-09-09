@@ -37,17 +37,22 @@ import {
   Radio,
   Sliders,
   Sparkles,
-  Info
+  Info,
+  MessageSquare,
+  Headphones,
+  Send
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { ManagedUser, UserRole, UserStatus, ContentReport, GlobalBannerConfig, BannerType } from '../types';
+import { ManagedUser, UserRole, UserStatus, ContentReport, GlobalBannerConfig, BannerType, SupportTicket } from '../types';
 import { FAQItem, GuideArticle } from '../data/helpData';
+import { useSupport } from '../context/SupportContext';
+import { validateUsername, validateDisplayName } from '../utils/usernameValidation';
 
 interface AdminCommandCenterProps {
   onBack: () => void;
 }
 
-type AdminTab = 'dashboard' | 'users' | 'moderation' | 'settings';
+type AdminTab = 'dashboard' | 'users' | 'tickets' | 'moderation' | 'settings';
 
 export const AdminCommandCenter: React.FC<AdminCommandCenterProps> = ({ onBack }) => {
   const { 
@@ -56,6 +61,7 @@ export const AdminCommandCenter: React.FC<AdminCommandCenterProps> = ({ onBack }
     updateGlobalBanner, 
     updateSiteSettings,
     users, 
+    updateUserNames,
     changeUserRole, 
     banOrSuspendUser, 
     resetUserPassword, 
@@ -78,6 +84,15 @@ export const AdminCommandCenter: React.FC<AdminCommandCenterProps> = ({ onBack }
     isAdmin 
   } = useAdmin();
 
+  const {
+    tickets,
+    claimTicket,
+    closeTicket,
+    reopenTicket,
+    deleteTicket,
+    addMessageToTicket
+  } = useSupport();
+
   const { user } = useAuth();
   const [activeTab, setActiveTab] = useState<AdminTab>('dashboard');
   const [notificationToast, setNotificationToast] = useState<string | null>(null);
@@ -91,6 +106,24 @@ export const AdminCommandCenter: React.FC<AdminCommandCenterProps> = ({ onBack }
   const [searchUserQuery, setSearchUserQuery] = useState('');
   const [roleFilter, setRoleFilter] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<string>('all');
+
+  // User Name / Display Name Edit Modal
+  const [selectedUserForEdit, setSelectedUserForEdit] = useState<ManagedUser | null>(null);
+  const [editDisplayName, setEditDisplayName] = useState('');
+  const [editUsername, setEditUsername] = useState('');
+  const [editUserError, setEditUserError] = useState<string | null>(null);
+  const [isSavingUserNames, setIsSavingUserNames] = useState(false);
+
+  // Tickets state
+  const [ticketStatusFilter, setTicketStatusFilter] = useState<'all' | 'abierto' | 'en_proceso' | 'cerrado'>('all');
+  const [ticketSearch, setTicketSearch] = useState('');
+  const [activeAdminChatTicketId, setActiveAdminChatTicketId] = useState<string | null>(null);
+  const [adminChatReply, setAdminChatReply] = useState('');
+
+  const activeAdminChatTicket = useMemo(() => {
+    if (!activeAdminChatTicketId) return null;
+    return tickets.find(t => t.id === activeAdminChatTicketId) || null;
+  }, [tickets, activeAdminChatTicketId]);
 
   // Modals state
   const [selectedUserForRole, setSelectedUserForRole] = useState<ManagedUser | null>(null);
@@ -135,18 +168,35 @@ export const AdminCommandCenter: React.FC<AdminCommandCenterProps> = ({ onBack }
     });
   }, [users, searchUserQuery, roleFilter, statusFilter]);
 
+  // Filtered tickets
+  const filteredTickets = useMemo(() => {
+    return tickets.filter((t) => {
+      const q = ticketSearch.toLowerCase().trim();
+      const matchSearch = 
+        !q ||
+        t.subject.toLowerCase().includes(q) ||
+        t.contactEmail.toLowerCase().includes(q) ||
+        t.userName.toLowerCase().includes(q);
+
+      const matchStatus = ticketStatusFilter === 'all' || t.status === ticketStatusFilter;
+      return matchSearch && matchStatus;
+    });
+  }, [tickets, ticketSearch, ticketStatusFilter]);
+
   // Activity stats calculation
   const stats = useMemo(() => {
     const totalUsers = users.length;
     const activeToday = users.filter(u => u.status === 'activo').length;
     const pendingReports = reports.filter(r => r.status === 'pending').length;
+    const openTickets = tickets.filter(t => t.status === 'abierto').length;
     return {
       totalUsers,
       activeToday,
       pendingReports,
+      openTickets,
       onlineStatus: siteSettings.maintenanceMode ? 'Cerrado' : 'En Línea'
     };
-  }, [users, reports, siteSettings.maintenanceMode]);
+  }, [users, reports, tickets, siteSettings.maintenanceMode]);
 
   return (
     <div className="w-full max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8 space-y-6">
@@ -259,6 +309,24 @@ export const AdminCommandCenter: React.FC<AdminCommandCenterProps> = ({ onBack }
           <span className="ml-1 px-1.5 py-0.2 rounded-full text-[10px] bg-slate-200 text-slate-700">
             {users.length}
           </span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setActiveTab('tickets')}
+          className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-semibold transition-all cursor-pointer whitespace-nowrap ${
+            activeTab === 'tickets' 
+              ? 'bg-white text-slate-900 shadow-xs' 
+              : 'text-slate-600 hover:text-slate-900'
+          }`}
+        >
+          <Headphones className="w-4 h-4" />
+          <span>Tickets de Soporte</span>
+          {tickets.filter(t => t.status === 'abierto').length > 0 && (
+            <span className="ml-1 px-1.5 py-0.2 rounded-full text-[10px] bg-rose-500 text-white font-bold animate-pulse">
+              {tickets.filter(t => t.status === 'abierto').length}
+            </span>
+          )}
         </button>
 
         <button
@@ -589,6 +657,21 @@ export const AdminCommandCenter: React.FC<AdminCommandCenterProps> = ({ onBack }
 
                         {/* Actions */}
                         <td className="py-3 px-4 text-right space-x-1 whitespace-nowrap">
+                          {/* Editar Nombre Visible y Usuario */}
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setSelectedUserForEdit(u);
+                              setEditDisplayName(u.displayName);
+                              setEditUsername(u.username);
+                              setEditUserError(null);
+                            }}
+                            className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-600 hover:text-indigo-600 transition-colors cursor-pointer"
+                            title="Editar Nombre Visible y Nombre de Usuario"
+                          >
+                            <Edit3 className="w-3.5 h-3.5" />
+                          </button>
+
                           {/* Cambiar Rol */}
                           <button
                             type="button"
@@ -651,6 +734,232 @@ export const AdminCommandCenter: React.FC<AdminCommandCenterProps> = ({ onBack }
                 )}
               </tbody>
             </table>
+          </div>
+        </div>
+      )}
+
+      {/* TAB: GESTIÓN DE TICKETS DE SOPORTE */}
+      {activeTab === 'tickets' && (
+        <div className="space-y-6">
+          {/* Header & Metric Counters */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="p-4 rounded-2xl bg-white border border-slate-200 shadow-xs">
+              <span className="text-xs font-medium text-slate-500 block">Total Tickets</span>
+              <span className="text-2xl font-bold text-slate-900 mt-1 block">{tickets.length}</span>
+              <span className="text-[11px] text-slate-400 mt-1 block">Histórico en plataforma</span>
+            </div>
+
+            <div className="p-4 rounded-2xl bg-amber-50/60 border border-amber-200/80 shadow-xs">
+              <span className="text-xs font-semibold text-amber-700 block">Abiertos / Sin Reclamar</span>
+              <span className="text-2xl font-bold text-amber-900 mt-1 block">
+                {tickets.filter(t => t.status === 'abierto').length}
+              </span>
+              <span className="text-[11px] text-amber-600 mt-1 block">Esperando que un admin los reclame</span>
+            </div>
+
+            <div className="p-4 rounded-2xl bg-indigo-50/60 border border-indigo-200/80 shadow-xs">
+              <span className="text-xs font-semibold text-indigo-700 block">En Proceso / Atendiendo</span>
+              <span className="text-2xl font-bold text-indigo-900 mt-1 block">
+                {tickets.filter(t => t.status === 'en_proceso').length}
+              </span>
+              <span className="text-[11px] text-indigo-600 mt-1 block">En conversación con el usuario</span>
+            </div>
+
+            <div className="p-4 rounded-2xl bg-emerald-50/60 border border-emerald-200/80 shadow-xs">
+              <span className="text-xs font-semibold text-emerald-700 block">Cerrados / Resueltos</span>
+              <span className="text-2xl font-bold text-emerald-900 mt-1 block">
+                {tickets.filter(t => t.status === 'cerrado').length}
+              </span>
+              <span className="text-[11px] text-emerald-600 mt-1 block">Casos finalizados</span>
+            </div>
+          </div>
+
+          {/* Filter and Search Bar */}
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-3 p-4 rounded-2xl bg-white border border-slate-200 shadow-xs">
+            <div className="flex items-center gap-1.5 p-1 bg-slate-100 rounded-xl w-full sm:w-auto overflow-x-auto">
+              {(['all', 'abierto', 'en_proceso', 'cerrado'] as const).map((st) => (
+                <button
+                  key={st}
+                  type="button"
+                  onClick={() => setTicketStatusFilter(st)}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer whitespace-nowrap ${
+                    ticketStatusFilter === st
+                      ? 'bg-white text-slate-900 shadow-xs'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  {st === 'all' && 'Todos los Tickets'}
+                  {st === 'abierto' && 'Abiertos'}
+                  {st === 'en_proceso' && 'En Proceso'}
+                  {st === 'cerrado' && 'Cerrados'}
+                </button>
+              ))}
+            </div>
+
+            <div className="relative w-full sm:w-72">
+              <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+              <input
+                type="text"
+                placeholder="Buscar por motivo, email o usuario..."
+                value={ticketSearch}
+                onChange={(e) => setTicketSearch(e.target.value)}
+                className="w-full pl-9 pr-3 py-1.5 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-900 focus:outline-none focus:border-indigo-500"
+              />
+            </div>
+          </div>
+
+          {/* Tickets List */}
+          <div className="space-y-3">
+            {filteredTickets.length === 0 ? (
+              <div className="py-12 px-4 rounded-2xl bg-white border border-slate-200 text-center shadow-xs">
+                <Headphones className="w-8 h-8 text-slate-300 mx-auto mb-2" />
+                <h4 className="text-sm font-bold text-slate-700">No hay tickets de soporte</h4>
+                <p className="text-xs text-slate-400 mt-1 max-w-md mx-auto">
+                  {tickets.length === 0
+                    ? 'No se ha abierto ningún ticket de soporte aún. Los usuarios pueden abrirlos desde el enlace del pie de página.'
+                    : 'Ningún ticket coincide con los filtros aplicados.'}
+                </p>
+              </div>
+            ) : (
+              filteredTickets.map((t) => {
+                const isUnclaimed = !t.claimedBy;
+                return (
+                  <div
+                    key={t.id}
+                    className="p-5 rounded-2xl bg-white border border-slate-200 shadow-xs hover:border-slate-300 transition-all flex flex-col md:flex-row items-start md:items-center justify-between gap-4"
+                  >
+                    <div className="space-y-1.5 flex-1 min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="font-bold text-sm text-slate-900 truncate">
+                          {t.subject}
+                        </span>
+
+                        {/* Priority Badge */}
+                        <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider ${
+                          t.priority === 'urgente'
+                            ? 'bg-rose-100 text-rose-700 border border-rose-200'
+                            : t.priority === 'alta'
+                            ? 'bg-amber-100 text-amber-700 border border-amber-200'
+                            : t.priority === 'media'
+                            ? 'bg-blue-100 text-blue-700 border border-blue-200'
+                            : 'bg-slate-100 text-slate-600 border border-slate-200'
+                        }`}>
+                          {t.priority}
+                        </span>
+
+                        {/* Status Badge */}
+                        <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider ${
+                          t.status === 'abierto'
+                            ? 'bg-amber-50 text-amber-700 border border-amber-200'
+                            : t.status === 'en_proceso'
+                            ? 'bg-indigo-50 text-indigo-700 border border-indigo-200'
+                            : 'bg-slate-100 text-slate-600 border border-slate-200'
+                        }`}>
+                          {t.status === 'abierto' ? 'Esperando Reclamo' : t.status === 'en_proceso' ? 'En Proceso' : 'Cerrado'}
+                        </span>
+                      </div>
+
+                      {/* Details row */}
+                      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-500">
+                        <span>
+                          De: <strong className="text-slate-700 font-semibold">{t.userName}</strong> ({t.contactEmail})
+                        </span>
+                        <span>•</span>
+                        <span>Creado: {new Date(t.createdAt).toLocaleString()}</span>
+                        <span>•</span>
+                        <span>
+                          {t.claimedByName ? (
+                            <span className="text-indigo-600 font-medium">Reclamado por: {t.claimedByName}</span>
+                          ) : (
+                            <span className="text-amber-600 font-medium">Sin reclamar</span>
+                          )}
+                        </span>
+                        <span>•</span>
+                        <span>{t.messages.length} mensaje(s)</span>
+                      </div>
+
+                      {/* Latest message preview */}
+                      {t.messages.length > 0 && (
+                        <p className="text-xs text-slate-600 bg-slate-50 p-2.5 rounded-xl border border-slate-100 line-clamp-2">
+                          <strong className="text-slate-800 font-semibold">
+                            {t.messages[t.messages.length - 1].senderRole === 'staff' ? 'Soporte' : t.userName}:
+                          </strong>{' '}
+                          {t.messages[t.messages.length - 1].text}
+                        </p>
+                      )}
+                    </div>
+
+                    {/* Actions buttons */}
+                    <div className="flex items-center gap-2 shrink-0 self-end md:self-center">
+                      {isUnclaimed && t.status !== 'cerrado' && (
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            try {
+                              await claimTicket(t.id);
+                              showToast('Ticket reclamado exitosamente. Abriendo chat...');
+                              setActiveAdminChatTicketId(t.id);
+                            } catch (e) {
+                              showToast('Error al reclamar el ticket');
+                            }
+                          }}
+                          className="px-3 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold transition-colors cursor-pointer shadow-xs"
+                        >
+                          Reclamar Ticket
+                        </button>
+                      )}
+
+                      <button
+                        type="button"
+                        onClick={() => setActiveAdminChatTicketId(t.id)}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold transition-colors cursor-pointer shadow-xs"
+                      >
+                        <MessageSquare className="w-3.5 h-3.5" />
+                        <span>Abrir Chat</span>
+                      </button>
+
+                      {t.status !== 'cerrado' ? (
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            await closeTicket(t.id);
+                            showToast('Ticket marcado como cerrado');
+                          }}
+                          className="px-3 py-1.5 rounded-xl border border-slate-200 text-slate-700 hover:bg-slate-50 text-xs font-medium transition-colors cursor-pointer"
+                        >
+                          Cerrar Ticket
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            await reopenTicket(t.id);
+                            showToast('Ticket reabierto');
+                          }}
+                          className="px-3 py-1.5 rounded-xl border border-slate-200 text-slate-700 hover:bg-slate-50 text-xs font-medium transition-colors cursor-pointer"
+                        >
+                          Reabrir
+                        </button>
+                      )}
+
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          if (confirm('¿Estás seguro de eliminar definitivamente este ticket?')) {
+                            await deleteTicket(t.id);
+                            showToast('Ticket eliminado');
+                          }
+                        }}
+                        className="p-2 rounded-xl text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
+                        title="Eliminar Ticket"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+                );
+              })
+            )}
           </div>
         </div>
       )}
@@ -1437,6 +1746,314 @@ export const AdminCommandCenter: React.FC<AdminCommandCenterProps> = ({ onBack }
                     Registrar
                   </button>
                 </div>
+              </form>
+            </motion.div>
+          </div>
+        )}
+
+        {/* MODAL: EDITAR NOMBRE DE USUARIO Y NOMBRE VISIBLE */}
+        {selectedUserForEdit && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-200"
+            >
+              <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-lg bg-indigo-50 flex items-center justify-center text-indigo-600">
+                    <Edit3 className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-bold text-slate-900">
+                      Editar Identidad de Usuario
+                    </h3>
+                    <p className="text-[11px] text-slate-500">{selectedUserForEdit.email}</p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setSelectedUserForEdit(null)}
+                  className="text-slate-400 hover:text-slate-600 text-xs cursor-pointer"
+                >
+                  Cerrar
+                </button>
+              </div>
+
+              <form
+                onSubmit={async (e) => {
+                  e.preventDefault();
+                  setEditUserError(null);
+
+                  const nameValidation = validateDisplayName(editDisplayName);
+                  if (!nameValidation.isValid) {
+                    setEditUserError(nameValidation.error || 'Nombre visible inválido');
+                    return;
+                  }
+
+                  const usernameValidation = validateUsername(editUsername);
+                  if (!usernameValidation.isValid) {
+                    setEditUserError(usernameValidation.error || 'Nombre de usuario inválido');
+                    return;
+                  }
+
+                  setIsSavingUserNames(true);
+                  try {
+                    await updateUserNames(selectedUserForEdit.id, editDisplayName, editUsername);
+                    showToast(`Identidad de ${editDisplayName} actualizada exitosamente`);
+                    setSelectedUserForEdit(null);
+                  } catch (err: any) {
+                    setEditUserError(err?.message || 'Error al guardar cambios');
+                  } finally {
+                    setIsSavingUserNames(false);
+                  }
+                }}
+                className="space-y-4 pt-4"
+              >
+                {editUserError && (
+                  <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-xs text-rose-700 flex items-start gap-2">
+                    <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                    <span>{editUserError}</span>
+                  </div>
+                )}
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                    Nombre Visible:
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={editDisplayName}
+                    onChange={(e) => setEditDisplayName(e.target.value)}
+                    placeholder="ej. Mateo Fernandez"
+                    className="w-full p-2.5 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-900 focus:outline-none focus:border-indigo-500"
+                  />
+                  <p className="text-[10px] text-slate-400 mt-1">
+                    Solo letras y espacios (sin números, símbolos ni términos reservados).
+                  </p>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                    Nombre de Usuario (@alias):
+                  </label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs font-semibold">@</span>
+                    <input
+                      type="text"
+                      required
+                      value={editUsername}
+                      onChange={(e) => setEditUsername(e.target.value.toLowerCase().replace(/\s+/g, ''))}
+                      placeholder="mateodev"
+                      className="w-full pl-7 pr-3 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-900 font-medium focus:outline-none focus:border-indigo-500"
+                    />
+                  </div>
+                  <p className="text-[10px] text-slate-400 mt-1">
+                    Solo letras sin espacios, números ni símbolos. No se permite contenido alusivo a marcas reservadas.
+                  </p>
+                </div>
+
+                <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+                  <button
+                    type="button"
+                    onClick={() => setSelectedUserForEdit(null)}
+                    className="px-3.5 py-2 rounded-xl border border-slate-200 text-xs text-slate-700 hover:bg-slate-50 cursor-pointer"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={isSavingUserNames}
+                    className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold transition-colors cursor-pointer disabled:opacity-50"
+                  >
+                    {isSavingUserNames ? 'Guardando...' : 'Guardar Cambios'}
+                  </button>
+                </div>
+              </form>
+            </motion.div>
+          </div>
+        )}
+
+        {/* MODAL: CHAT EN VIVO DE ATENCIÓN DE TICKET DE SOPORTE */}
+        {activeAdminChatTicket && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/60 backdrop-blur-xs">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="bg-white rounded-2xl max-w-2xl w-full h-[600px] max-h-[90vh] shadow-2xl border border-slate-200 flex flex-col overflow-hidden"
+            >
+              {/* Header */}
+              <div className="p-4 bg-slate-900 text-white flex items-center justify-between shrink-0">
+                <div className="space-y-0.5">
+                  <div className="flex items-center gap-2">
+                    <Headphones className="w-4 h-4 text-indigo-400" />
+                    <h3 className="text-sm font-bold text-white truncate max-w-[280px] sm:max-w-md">
+                      {activeAdminChatTicket.subject}
+                    </h3>
+                    <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
+                      activeAdminChatTicket.priority === 'urgente'
+                        ? 'bg-rose-500/20 text-rose-300 border border-rose-500/30'
+                        : activeAdminChatTicket.priority === 'alta'
+                        ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
+                        : 'bg-indigo-500/20 text-indigo-300 border border-indigo-500/30'
+                    }`}>
+                      {activeAdminChatTicket.priority}
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-slate-300">
+                    Usuario: <strong>{activeAdminChatTicket.userName}</strong> ({activeAdminChatTicket.contactEmail})
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-1.5">
+                  {!activeAdminChatTicket.claimedBy && (
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        await claimTicket(activeAdminChatTicket.id);
+                        showToast('Has reclamado este ticket');
+                      }}
+                      className="px-2.5 py-1 rounded-lg bg-amber-500 hover:bg-amber-600 text-white text-[11px] font-bold cursor-pointer"
+                    >
+                      Reclamar
+                    </button>
+                  )}
+
+                  {activeAdminChatTicket.status !== 'cerrado' ? (
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        await closeTicket(activeAdminChatTicket.id);
+                        showToast('Ticket cerrado');
+                      }}
+                      className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-[11px] font-medium cursor-pointer"
+                    >
+                      Cerrar Caso
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        await reopenTicket(activeAdminChatTicket.id);
+                        showToast('Ticket reabierto');
+                      }}
+                      className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-[11px] font-medium cursor-pointer"
+                    >
+                      Reabrir Caso
+                    </button>
+                  )}
+
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      if (confirm('¿Eliminar este ticket definitivamente?')) {
+                        const id = activeAdminChatTicket.id;
+                        setActiveAdminChatTicketId(null);
+                        await deleteTicket(id);
+                        showToast('Ticket eliminado');
+                      }
+                    }}
+                    className="p-1.5 rounded-lg text-slate-400 hover:text-rose-400 hover:bg-slate-800 cursor-pointer"
+                    title="Eliminar Ticket"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setActiveAdminChatTicketId(null)}
+                    className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 cursor-pointer ml-1"
+                    title="Cerrar Ventana"
+                  >
+                    <XCircle className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+
+              {/* Status Banner */}
+              <div className="px-4 py-2 bg-slate-50 border-b border-slate-200 flex items-center justify-between text-[11px] text-slate-500">
+                <span>
+                  Estado:{' '}
+                  <strong className="text-slate-800 uppercase">
+                    {activeAdminChatTicket.status === 'abierto'
+                      ? 'Abierto (Esperando atención)'
+                      : activeAdminChatTicket.status === 'en_proceso'
+                      ? 'En Proceso'
+                      : 'Cerrado'}
+                  </strong>
+                </span>
+                <span>
+                  {activeAdminChatTicket.claimedByName ? (
+                    <span>Reclamado por: <strong className="text-indigo-600">{activeAdminChatTicket.claimedByName}</strong></span>
+                  ) : (
+                    <span className="text-amber-600 font-medium">Disponible para cualquier moderador/admin</span>
+                  )}
+                </span>
+              </div>
+
+              {/* Chat messages */}
+              <div className="flex-1 p-4 overflow-y-auto space-y-3 bg-slate-50/50">
+                {activeAdminChatTicket.messages.map((m) => {
+                  const isStaff = m.senderRole === 'staff';
+                  return (
+                    <div
+                      key={m.id}
+                      className={`flex flex-col ${isStaff ? 'items-end' : 'items-start'}`}
+                    >
+                      <div className="flex items-center gap-1.5 mb-1 text-[10px] text-slate-400">
+                        <span className="font-semibold text-slate-600">
+                          {isStaff ? 'Soporte NexStudio' : m.senderName}
+                        </span>
+                        <span>•</span>
+                        <span>{new Date(m.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                      </div>
+                      <div
+                        className={`p-3 rounded-2xl max-w-[82%] text-xs ${
+                          isStaff
+                            ? 'bg-indigo-600 text-white rounded-tr-xs'
+                            : 'bg-white text-slate-800 border border-slate-200 rounded-tl-xs shadow-2xs'
+                        }`}
+                      >
+                        <p className="whitespace-pre-wrap leading-relaxed">{m.text}</p>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Chat Input */}
+              <form
+                onSubmit={async (e) => {
+                  e.preventDefault();
+                  if (!adminChatReply.trim()) return;
+                  const text = adminChatReply;
+                  setAdminChatReply('');
+                  try {
+                    await addMessageToTicket(activeAdminChatTicket.id, text);
+                  } catch (err) {
+                    showToast('Error al enviar mensaje');
+                  }
+                }}
+                className="p-3 bg-white border-t border-slate-200 flex items-center gap-2"
+              >
+                <input
+                  type="text"
+                  value={adminChatReply}
+                  onChange={(e) => setAdminChatReply(e.target.value)}
+                  placeholder="Escribe una respuesta como soporte oficial..."
+                  className="flex-1 px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-900 focus:outline-none focus:border-indigo-500"
+                />
+                <button
+                  type="submit"
+                  disabled={!adminChatReply.trim()}
+                  className="px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer disabled:opacity-40"
+                >
+                  <Send className="w-3.5 h-3.5" />
+                  <span>Responder</span>
+                </button>
               </form>
             </motion.div>
           </div>

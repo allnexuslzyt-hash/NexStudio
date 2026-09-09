@@ -14,6 +14,38 @@ export interface UserProfile {
   status?: UserStatus;
   banReason?: string;
   banDuration?: string;
+  onboardingCompleted?: boolean;
+}
+
+export type TicketPriority = 'baja' | 'media' | 'alta' | 'urgente';
+export type TicketStatus = 'abierto' | 'en_proceso' | 'cerrado';
+
+export interface TicketMessage {
+  id: string;
+  senderId: string;
+  senderEmail: string;
+  senderName: string;
+  senderAvatar?: string;
+  isAdmin: boolean;
+  text: string;
+  timestamp: string;
+}
+
+export interface SupportTicket {
+  id: string;
+  subject: string;
+  contactEmail: string;
+  priority: TicketPriority;
+  status: TicketStatus;
+  userId?: string;
+  userName: string;
+  userAvatar?: string;
+  createdAt: string;
+  updatedAt: string;
+  claimedBy?: string | null;
+  claimedByName?: string | null;
+  claimedByEmail?: string | null;
+  messages: TicketMessage[];
 }
 
 export interface ManagedUser {

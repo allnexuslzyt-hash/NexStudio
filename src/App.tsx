@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { SettingsProvider } from './context/SettingsContext';
 import { AdminProvider, useAdmin } from './context/AdminContext';
+import { SupportProvider } from './context/SupportContext';
 import { Navbar } from './components/Navbar';
 import { Footer } from './components/Footer';
 import { TermsModal } from './components/TermsModal';
@@ -15,6 +16,8 @@ import { GlobalBanner } from './components/GlobalBanner';
 import { MaintenanceScreen } from './components/MaintenanceScreen';
 import { AdminCommandCenter } from './components/AdminCommandCenter';
 import { UnauthorizedDomainModal } from './components/UnauthorizedDomainModal';
+import { OnboardingModal } from './components/OnboardingModal';
+import { SupportChatModal } from './components/SupportChatModal';
 import { motion } from 'motion/react';
 import { Boxes } from 'lucide-react';
 
@@ -136,6 +139,12 @@ const WorkspaceContent: React.FC = () => {
       {/* Modal Obligatorio de Primera Visita (Cookies, Privacidad y Términos) */}
       <FirstTimeConsentModal />
 
+      {/* Modal de Bienvenida / Onboarding inicial (Nombre visible, @usuario estricto y avatar) */}
+      <OnboardingModal />
+
+      {/* Modal de Chat de Soporte Técnico para usuarios */}
+      <SupportChatModal />
+
       {/* Modal Informativo y de Acceso Inmediato por auth/unauthorized-domain */}
       <UnauthorizedDomainModal
         domain={unauthorizedDomain || ''}
@@ -150,9 +159,11 @@ export default function App() {
   return (
     <AuthProvider>
       <AdminProvider>
-        <SettingsProvider>
-          <WorkspaceContent />
-        </SettingsProvider>
+        <SupportProvider>
+          <SettingsProvider>
+            <WorkspaceContent />
+          </SettingsProvider>
+        </SupportProvider>
       </AdminProvider>
     </AuthProvider>
   );

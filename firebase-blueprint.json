@@ -25,12 +25,72 @@
           "type": "string",
           "description": "User role in NexStudio"
         },
+        "username": {
+          "type": "string",
+          "description": "Unique alphanumeric username without symbols or numbers"
+        },
+        "onboardingCompleted": {
+          "type": "boolean",
+          "description": "Flag indicating if user completed initial username/profile onboarding"
+        },
         "createdAt": {
           "type": "string",
           "description": "Timestamp string or server timestamp"
         }
       },
       "required": ["userId", "email", "displayName"]
+    },
+    "SupportTicket": {
+      "title": "SupportTicket",
+      "description": "Customer and community support ticket with real-time messages",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique ticket ID"
+        },
+        "subject": {
+          "type": "string",
+          "description": "Ticket subject or reason"
+        },
+        "contactEmail": {
+          "type": "string",
+          "description": "Contact email of petitioner"
+        },
+        "priority": {
+          "type": "string",
+          "description": "Priority: baja, media, alta, urgente"
+        },
+        "status": {
+          "type": "string",
+          "description": "Status: abierto, en_proceso, cerrado"
+        },
+        "userId": {
+          "type": "string",
+          "description": "UID of creator if authenticated"
+        },
+        "userName": {
+          "type": "string",
+          "description": "Name of petitioner"
+        },
+        "claimedBy": {
+          "type": "string",
+          "description": "UID of admin claiming the ticket"
+        },
+        "claimedByName": {
+          "type": "string",
+          "description": "Display name of admin claiming ticket"
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Creation timestamp"
+        },
+        "updatedAt": {
+          "type": "string",
+          "description": "Last update timestamp"
+        }
+      },
+      "required": ["id", "subject", "contactEmail", "priority", "status"]
     },
     "Project": {
       "title": "Project",
@@ -121,6 +181,10 @@
     "/settings/{settingId}": {
       "schema": "SiteSettings",
       "description": "Global site settings including maintenance mode and global banners"
+    },
+    "/support_tickets/{ticketId}": {
+      "schema": "SupportTicket",
+      "description": "Support tickets and real-time conversation between users and support staff"
     }
   }
 }

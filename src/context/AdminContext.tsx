@@ -10,8 +10,8 @@ import {
 } from '../types';
 import { useAuth, isSuperAdminEmail } from './AuthContext';
 import { FAQ_ITEMS, GUIDE_ARTICLES, FAQItem, GuideArticle } from '../data/helpData';
-import { doc, getDoc, setDoc, onSnapshot } from 'firebase/firestore';
-import { db } from '../lib/firebase';
+import { doc, getDoc, setDoc, deleteDoc, onSnapshot, collection } from 'firebase/firestore';
+import { db, handleFirestoreError, OperationType } from '../lib/firebase';
 
 interface AdminContextType {
   siteSettings: SiteSettings;
@@ -21,6 +21,7 @@ interface AdminContextType {
   
   // Users management
   users: ManagedUser[];
+  updateUserNames: (userId: string, displayName: string, username: string) => Promise<void>;
   changeUserRole: (userId: string, newRole: UserRole) => Promise<void>;
   banOrSuspendUser: (userId: string, status: UserStatus, reason: string, duration?: string) => Promise<void>;
   resetUserPassword: (userId: string) => Promise<{ success: boolean; message: string }>;
@@ -75,127 +76,9 @@ const INITIAL_SITE_SETTINGS: SiteSettings = {
   }
 };
 
-const INITIAL_MANAGED_USERS: ManagedUser[] = [
-  {
-    id: 'usr-admin-1',
-    displayName: 'Nexus LZ (Admin Principal)',
-    username: 'allnexuslz',
-    email: 'allnexuslzyt@gmail.com',
-    avatarUrl: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&auto=format&fit=crop&q=80',
-    role: 'SuperAdmin',
-    createdAt: '2025-01-10T10:00:00Z',
-    lastActive: 'Hace unos instantes',
-    status: 'activo',
-    sanctionsCount: 0
-  },
-  {
-    id: 'usr-2',
-    displayName: 'Elena Rostova',
-    username: 'elena_ux',
-    email: 'elena.rostova@designcorp.io',
-    avatarUrl: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150&auto=format&fit=crop&q=80',
-    role: 'Moderador',
-    createdAt: '2025-02-14T08:30:00Z',
-    lastActive: 'Hace 12 minutos',
-    status: 'activo',
-    sanctionsCount: 0
-  },
-  {
-    id: 'usr-3',
-    displayName: 'Carlos Mendez',
-    username: 'carlos_dev',
-    email: 'carlos.mendez@cloudlab.es',
-    avatarUrl: 'https://images.unsplash.com/photo-1570295999919-56ceb5ecca61?w=150&auto=format&fit=crop&q=80',
-    role: 'Creador Digital',
-    createdAt: '2025-03-01T15:20:00Z',
-    lastActive: 'Hoy, 09:41',
-    status: 'activo',
-    sanctionsCount: 0
-  },
-  {
-    id: 'usr-4',
-    displayName: 'Valeria Gomez',
-    username: 'valeria_motion',
-    email: 'valeria.g@motionstudio.com',
-    avatarUrl: 'https://images.unsplash.com/photo-1580489944761-15a19d654956?w=150&auto=format&fit=crop&q=80',
-    role: 'Creador Digital',
-    createdAt: '2025-03-12T11:15:00Z',
-    lastActive: 'Ayer, 18:20',
-    status: 'activo',
-    sanctionsCount: 1
-  },
-  {
-    id: 'usr-5',
-    displayName: 'Spam Bot 3000',
-    username: 'crypto_free_earn',
-    email: 'bot992@tempmail.xyz',
-    avatarUrl: 'https://api.dicebear.com/7.x/bottts/svg?seed=crypto99',
-    role: 'Usuario',
-    createdAt: '2025-04-02T03:11:00Z',
-    lastActive: 'Hace 3 días',
-    status: 'suspendido',
-    banReason: 'Publicación reiterada de enlaces fraudulentos de criptomonedas',
-    banDuration: '7 días',
-    sanctionsCount: 2
-  },
-  {
-    id: 'usr-6',
-    displayName: 'DarkTroll_99',
-    username: 'dark_troll',
-    email: 'trollmaster@burnermail.org',
-    avatarUrl: 'https://api.dicebear.com/7.x/identicon/svg?seed=darktroll',
-    role: 'Usuario',
-    createdAt: '2025-04-05T22:45:00Z',
-    lastActive: 'Hace 5 días',
-    status: 'baneado',
-    banReason: 'Acoso verbal e incumplimiento grave de las normas comunitarias',
-    banDuration: 'Permanente',
-    sanctionsCount: 3
-  }
-];
+const INITIAL_MANAGED_USERS: ManagedUser[] = [];
 
-const INITIAL_REPORTS: ContentReport[] = [
-  {
-    id: 'rep-101',
-    contentType: 'comentario',
-    contentId: 'comm-9921',
-    contentSnippet: '¡Gana 5000$ al instante trabajando 10 minutos al día desde casa entrando en este enlace sospechoso bit.ly/free-crypto...',
-    authorName: 'Spam Bot 3000',
-    authorEmail: 'bot992@tempmail.xyz',
-    authorAvatar: 'https://api.dicebear.com/7.x/bottts/svg?seed=crypto99',
-    reporterName: 'Carlos Mendez',
-    reason: 'spam',
-    reasonText: 'Comentario de phishing y spam repetitivo en hilo de discusión.',
-    reportedAt: 'Hoy a las 10:14',
-    status: 'pending'
-  },
-  {
-    id: 'rep-102',
-    contentType: 'proyecto',
-    contentId: 'proj-4412',
-    contentSnippet: 'Proyecto titulado "Copia 1:1 de Ilustraciones de Studio Ghibli sin licencia con fines comerciales directos"',
-    authorName: 'DarkTroll_99',
-    authorEmail: 'trollmaster@burnermail.org',
-    reporterName: 'Elena Rostova',
-    reason: 'copyright',
-    reasonText: 'Material con derechos de autor subido sin autorización del creador original.',
-    reportedAt: 'Ayer a las 16:45',
-    status: 'pending'
-  },
-  {
-    id: 'rep-103',
-    contentType: 'comentario',
-    contentId: 'comm-7714',
-    contentSnippet: 'Tu diseño es pésimo, no sirves para nada como desarrollador, retírate.',
-    authorName: 'Usuario Anónimo',
-    authorEmail: 'anon72@mail.com',
-    reporterName: 'Valeria Gomez',
-    reason: 'harassment',
-    reasonText: 'Comportamiento hostil y faltas de respeto continuadas en las creaciones.',
-    reportedAt: 'Hace 2 días',
-    status: 'pending'
-  }
-];
+const INITIAL_REPORTS: ContentReport[] = [];
 
 const INITIAL_AUDIT_LOGS: AuditLogItem[] = [
   {
@@ -259,27 +142,47 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     return INITIAL_SITE_SETTINGS;
   });
 
-  // Managed users state
-  const [users, setUsers] = useState<ManagedUser[]>(() => {
-    try {
-      const saved = localStorage.getItem('nexstudio_managed_users');
-      if (saved) return JSON.parse(saved);
-    } catch (e) {
-      console.error('Error cargando usuarios administrados:', e);
-    }
-    return INITIAL_MANAGED_USERS;
-  });
+  // Managed users state - initialized empty, populated from real Firestore users
+  const [users, setUsers] = useState<ManagedUser[]>([]);
 
-  // Moderation reports state
-  const [reports, setReports] = useState<ContentReport[]>(() => {
-    try {
-      const saved = localStorage.getItem('nexstudio_reports');
-      if (saved) return JSON.parse(saved);
-    } catch (e) {
-      console.error('Error cargando reportes:', e);
-    }
-    return INITIAL_REPORTS;
-  });
+  // Moderation reports state - empty, real reports only
+  const [reports, setReports] = useState<ContentReport[]>([]);
+
+  // Listen to REAL users in Firestore
+  useEffect(() => {
+    if (!isAdmin) return;
+
+    const usersCol = collection(db, 'users');
+    const unsub = onSnapshot(
+      usersCol,
+      (snapshot) => {
+        const realUsers: ManagedUser[] = [];
+        snapshot.forEach((docSnap) => {
+          const d = docSnap.data();
+          realUsers.push({
+            id: docSnap.id,
+            displayName: d.displayName || 'Usuario NexStudio',
+            username: d.username || docSnap.id.substring(0, 8),
+            email: d.email || '',
+            avatarUrl: d.photoURL || `https://api.dicebear.com/7.x/identicon/svg?seed=${docSnap.id}`,
+            role: (d.role as UserRole) || (d.email?.toLowerCase() === 'allnexuslzyt@gmail.com' ? 'SuperAdmin' : 'Usuario'),
+            createdAt: d.createdAt || new Date().toISOString(),
+            lastActive: d.lastLogin ? new Date(d.lastLogin).toLocaleDateString() : 'Activo',
+            status: (d.status as UserStatus) || 'activo',
+            banReason: d.banReason,
+            banDuration: d.banDuration,
+            sanctionsCount: d.sanctionsCount || 0
+          });
+        });
+        setUsers(realUsers);
+      },
+      (err) => {
+        console.warn('Advertencia al consultar usuarios reales de Firestore:', err.message);
+      }
+    );
+
+    return () => unsub();
+  }, [isAdmin]);
 
   // Dynamic FAQs state
   const [dynamicFaqs, setDynamicFaqs] = useState<FAQItem[]>(() => {
@@ -470,8 +373,40 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   };
 
   // User Actions
+  const updateUserNames = async (userId: string, newDisplayName: string, newUsername: string) => {
+    const targetUser = users.find(u => u.id === userId);
+    try {
+      await setDoc(doc(db, 'users', userId), {
+        displayName: newDisplayName.trim(),
+        username: newUsername.trim().toLowerCase()
+      }, { merge: true });
+
+      setUsers(prev => prev.map(u => u.id === userId ? {
+        ...u,
+        displayName: newDisplayName.trim(),
+        username: newUsername.trim().toLowerCase()
+      } : u));
+
+      logAdminAction(
+        'Modificó nombre de usuario y nombre visible',
+        targetUser ? `${targetUser.displayName} -> ${newDisplayName} (@${newUsername})` : userId,
+        'usuarios',
+        `Nuevo nombre visible: "${newDisplayName}", Nuevo @usuario: "@${newUsername.toLowerCase()}"`
+      );
+    } catch (err: any) {
+      console.error('Error actualizando usuario en Firestore:', err);
+      handleFirestoreError(err, OperationType.UPDATE, `users/${userId}`);
+      throw err;
+    }
+  };
+
   const changeUserRole = async (userId: string, newRole: UserRole) => {
     const targetUser = users.find(u => u.id === userId);
+    try {
+      await setDoc(doc(db, 'users', userId), { role: newRole }, { merge: true });
+    } catch (e) {
+      console.warn('Error guardando rol en Firestore:', e);
+    }
     setUsers(prev => prev.map(u => u.id === userId ? { ...u, role: newRole } : u));
     logAdminAction(
       `Cambió rol a ${newRole}`,
@@ -483,6 +418,15 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   const banOrSuspendUser = async (userId: string, status: UserStatus, reason: string, duration: string = 'Permanente') => {
     const targetUser = users.find(u => u.id === userId);
+    try {
+      await setDoc(doc(db, 'users', userId), {
+        status,
+        banReason: reason,
+        banDuration: duration
+      }, { merge: true });
+    } catch (e) {
+      console.warn('Error guardando sanción en Firestore:', e);
+    }
     setUsers(prev => prev.map(u => {
       if (u.id === userId) {
         return {
@@ -521,6 +465,11 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   const deleteManagedUser = async (userId: string) => {
     const targetUser = users.find(u => u.id === userId);
+    try {
+      await deleteDoc(doc(db, 'users', userId));
+    } catch (e) {
+      console.warn('Error eliminando usuario de Firestore:', e);
+    }
     setUsers(prev => prev.filter(u => u.id !== userId));
     logAdminAction(
       'Eliminó cuenta de usuario',
@@ -664,6 +613,7 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         updateGlobalBanner,
         updateSiteSettings,
         users,
+        updateUserNames,
         changeUserRole,
         banOrSuspendUser,
         resetUserPassword,
