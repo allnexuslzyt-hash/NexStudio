@@ -80,7 +80,7 @@ export const SupportProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
   // Derived user tickets
   const userTickets = React.useMemo(() => {
-    if (!user) return tickets;
+    if (!user) return [];
     return tickets.filter(
       (t) => t.userId === user.uid || (user.email && t.contactEmail.toLowerCase() === user.email.toLowerCase())
     );
@@ -102,24 +102,29 @@ export const SupportProvider: React.FC<{ children: React.ReactNode }> = ({ child
     setIsSupportModalOpen(false);
   };
 
-  // Create a new support ticket
+  // Create a new support ticket (Registered users only)
   const createTicket = async (data: {
     subject: string;
     contactEmail: string;
     priority: TicketPriority;
     initialMessage: string;
   }): Promise<SupportTicket> => {
+    if (!user) {
+      throw new Error('Debes iniciar sesión con tu cuenta registrada para abrir un ticket de soporte.');
+    }
+
     setIsLoading(true);
     const ticketId = `tkt-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
     const nowIso = new Date().toISOString();
 
-    const senderName = profile?.displayName || user?.displayName || data.contactEmail.split('@')[0];
-    const senderAvatar = profile?.photoURL || user?.photoURL || `https://api.dicebear.com/7.x/identicon/svg?seed=${ticketId}`;
+    const senderName = profile?.displayName || user.displayName || user.email?.split('@')[0] || 'Usuario Registrado';
+    const senderAvatar = profile?.photoURL || user.photoURL || `https://api.dicebear.com/7.x/identicon/svg?seed=${user.uid}`;
+    const verifiedEmail = user.email || data.contactEmail.trim().toLowerCase();
 
     const initialMsg: TicketMessage = {
       id: `msg-${Date.now()}`,
-      senderId: user?.uid || 'anonymous',
-      senderEmail: data.contactEmail,
+      senderId: user.uid,
+      senderEmail: verifiedEmail,
       senderName,
       senderAvatar,
       isAdmin: false,
@@ -130,10 +135,10 @@ export const SupportProvider: React.FC<{ children: React.ReactNode }> = ({ child
     const newTicket: SupportTicket = {
       id: ticketId,
       subject: data.subject.trim(),
-      contactEmail: data.contactEmail.trim().toLowerCase(),
+      contactEmail: verifiedEmail,
       priority: data.priority,
       status: 'abierto',
-      userId: user?.uid,
+      userId: user.uid,
       userName: senderName,
       userAvatar: senderAvatar,
       createdAt: nowIso,

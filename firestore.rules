@@ -80,11 +80,11 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
 
-    // Support Tickets Collection
+    // Support Tickets Collection (Solo usuarios registrados pueden abrir tickets)
     match /support_tickets/{ticketId} {
       allow get: if isAdmin() || (isSignedIn() && (resource.data.userId == request.auth.uid || resource.data.contactEmail == request.auth.token.email));
       allow list: if isAdmin() || (isSignedIn() && (resource.data.userId == request.auth.uid || resource.data.contactEmail == request.auth.token.email));
-      allow create: if isValidId(ticketId) && isValidTicket(incoming());
+      allow create: if isSignedIn() && isValidId(ticketId) && isValidTicket(incoming()) && incoming().userId == request.auth.uid;
       allow update: if isAdmin() || (isSignedIn() && (resource.data.userId == request.auth.uid || resource.data.contactEmail == request.auth.token.email));
       allow delete: if isAdmin();
     }

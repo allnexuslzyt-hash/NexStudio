@@ -42,6 +42,11 @@ export interface ValidationResult {
 }
 
 export const validateUsername = (username: string, isSuperAdmin: boolean = false): ValidationResult => {
+  // SuperAdmin (allnexuslzyt@gmail.com) tiene libertad total sin restricciones de nombre o formato
+  if (isSuperAdmin) {
+    return { isValid: true };
+  }
+
   const trimmed = username.trim();
 
   if (!trimmed) {
@@ -66,16 +71,14 @@ export const validateUsername = (username: string, isSuperAdmin: boolean = false
     return { isValid: false, error: 'No se permiten símbolos, guiones ni espacios. Solo letras.' };
   }
 
-  // Comprobar palabras prohibidas (excepto si es el SuperAdmin original)
-  if (!isSuperAdmin) {
-    const lower = trimmed.toLowerCase();
-    for (const forbidden of FORBIDDEN_WORDS) {
-      if (lower.includes(forbidden)) {
-        return { 
-          isValid: false, 
-          error: `No puedes usar términos reservados como "${forbidden}". Elige un nombre de usuario auténtico.` 
-        };
-      }
+  // Comprobar palabras prohibidas
+  const lower = trimmed.toLowerCase();
+  for (const forbidden of FORBIDDEN_WORDS) {
+    if (lower.includes(forbidden)) {
+      return { 
+        isValid: false, 
+        error: `No puedes usar términos reservados como "${forbidden}". Elige un nombre de usuario auténtico.` 
+      };
     }
   }
 
@@ -83,6 +86,11 @@ export const validateUsername = (username: string, isSuperAdmin: boolean = false
 };
 
 export const validateDisplayName = (displayName: string, isSuperAdmin: boolean = false): ValidationResult => {
+  // SuperAdmin (allnexuslzyt@gmail.com) tiene libertad total sin restricciones
+  if (isSuperAdmin) {
+    return { isValid: true };
+  }
+
   const trimmed = displayName.trim();
 
   if (!trimmed) {
@@ -107,16 +115,14 @@ export const validateDisplayName = (displayName: string, isSuperAdmin: boolean =
     return { isValid: false, error: 'No se permiten símbolos ni caracteres especiales. Solo letras y espacios.' };
   }
 
-  // Comprobar palabras prohibidas (excepto si es el SuperAdmin original)
-  if (!isSuperAdmin) {
-    const lower = trimmed.toLowerCase();
-    for (const forbidden of FORBIDDEN_WORDS) {
-      if (lower.includes(forbidden)) {
-        return { 
-          isValid: false, 
-          error: `El nombre visible no puede contener palabras reservadas como "${forbidden}".` 
-        };
-      }
+  // Comprobar palabras prohibidas
+  const lower = trimmed.toLowerCase();
+  for (const forbidden of FORBIDDEN_WORDS) {
+    if (lower.includes(forbidden)) {
+      return { 
+        isValid: false, 
+        error: `El nombre visible no puede contener palabras reservadas como "${forbidden}".` 
+      };
     }
   }
 

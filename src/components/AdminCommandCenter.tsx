@@ -1786,13 +1786,14 @@ export const AdminCommandCenter: React.FC<AdminCommandCenterProps> = ({ onBack }
                   e.preventDefault();
                   setEditUserError(null);
 
-                  const nameValidation = validateDisplayName(editDisplayName);
+                  const isTargetSuperAdmin = selectedUserForEdit.email === 'allnexuslzyt@gmail.com';
+                  const nameValidation = validateDisplayName(editDisplayName, isTargetSuperAdmin);
                   if (!nameValidation.isValid) {
                     setEditUserError(nameValidation.error || 'Nombre visible inválido');
                     return;
                   }
 
-                  const usernameValidation = validateUsername(editUsername);
+                  const usernameValidation = validateUsername(editUsername, isTargetSuperAdmin);
                   if (!usernameValidation.isValid) {
                     setEditUserError(usernameValidation.error || 'Nombre de usuario inválido');
                     return;

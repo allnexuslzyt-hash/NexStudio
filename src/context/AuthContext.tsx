@@ -36,7 +36,7 @@ interface AuthContextType {
   clearAuthError: () => void;
   setUnauthorizedDomain: (domain: string | null) => void;
   updateBio: (bio: string) => Promise<void>;
-  updateProfileData: (data: { displayName?: string; username?: string; photoURL?: string }) => Promise<void>;
+  updateProfileData: (data: { displayName?: string; username?: string; photoURL?: string; onboardingCompleted?: boolean; bio?: string }) => Promise<void>;
   deleteAccount: () => Promise<void>;
 }
 
@@ -57,6 +57,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const syncUserProfile = async (firebaseUser: User) => {
     const isSuperAdmin = isSuperAdminEmail(firebaseUser.email);
     const userDocRef = doc(db, 'users', firebaseUser.uid);
+    const localOnboarding = localStorage.getItem(`nexstudio_onboarding_${firebaseUser.uid}`) === 'true';
+
     try {
       const docSnap = await getDoc(userDocRef);
       if (docSnap.exists()) {
@@ -64,6 +66,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         if (isSuperAdmin && data.role !== 'SuperAdmin') {
           data.role = 'SuperAdmin';
           await setDoc(userDocRef, { role: 'SuperAdmin' }, { merge: true });
+        }
+        if (localOnboarding && !data.onboardingCompleted) {
+          data.onboardingCompleted = true;
         }
         setProfile(data);
       } else {
@@ -76,6 +81,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           bio: isSuperAdmin ? 'Super Administrador del Sistema NexStudio.' : 'Diseñador y desarrollador en NexStudio.',
           createdAt: new Date().toISOString(),
           lastLogin: new Date().toISOString(),
+          onboardingCompleted: localOnboarding,
         };
         await setDoc(userDocRef, newProfile);
         setProfile(newProfile);
@@ -91,6 +97,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         role: isSuperAdmin ? 'SuperAdmin' : 'Creador Digital',
         bio: isSuperAdmin ? 'Super Administrador del Sistema NexStudio.' : 'Miembro verificado de NexStudio',
         createdAt: new Date().toISOString(),
+        onboardingCompleted: localOnboarding,
       });
       handleFirestoreError(err, OperationType.GET, `users/${firebaseUser.uid}`);
     }
@@ -221,16 +228,26 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  const updateProfileData = async (data: { displayName?: string; username?: string; photoURL?: string }) => {
+  const updateProfileData = async (data: { 
+    displayName?: string; 
+    username?: string; 
+    photoURL?: string;
+    onboardingCompleted?: boolean;
+    bio?: string;
+  }) => {
     if (!user) return;
     const userDocRef = doc(db, 'users', user.uid);
     try {
       // Update Firebase Auth current user if displayName or photoURL changed
       if (data.displayName || data.photoURL) {
-        await fbUpdateProfile(user, {
-          displayName: data.displayName ?? user.displayName,
-          photoURL: data.photoURL ?? user.photoURL,
-        });
+        try {
+          await fbUpdateProfile(user, {
+            displayName: data.displayName ?? user.displayName,
+            photoURL: data.photoURL ?? user.photoURL,
+          });
+        } catch (e) {
+          console.warn('No se pudo actualizar perfil de Firebase Auth directamente:', e);
+        }
       }
 
       // Update Firestore document
@@ -238,10 +255,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (data.displayName !== undefined) updatePayload.displayName = data.displayName;
       if (data.username !== undefined) updatePayload.username = data.username;
       if (data.photoURL !== undefined) updatePayload.photoURL = data.photoURL;
+      if (data.onboardingCompleted !== undefined) updatePayload.onboardingCompleted = data.onboardingCompleted;
+      if (data.bio !== undefined) updatePayload.bio = data.bio;
 
-      await setDoc(userDocRef, updatePayload, { merge: true });
+      if (data.onboardingCompleted) {
+        try {
+          localStorage.setItem(`nexstudio_onboarding_${user.uid}`, 'true');
+        } catch (e) {}
+      }
 
-      // Update local profile state
+      try {
+        await setDoc(userDocRef, updatePayload, { merge: true });
+      } catch (fsErr) {
+        console.warn('Firestore setDoc falló o regla pendiente, actualizando estado local:', fsErr);
+      }
+
+      // Update local profile state immediately
       setProfile((prev) => {
         if (!prev) return null;
         return {
@@ -251,6 +280,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       });
     } catch (err) {
       console.error('Error actualizando perfil:', err);
+      // Actualizar estado local para no bloquear la interfaz
+      setProfile((prev) => prev ? { ...prev, ...data } : null);
       handleFirestoreError(err, OperationType.UPDATE, `users/${user.uid}`);
       throw err;
     }

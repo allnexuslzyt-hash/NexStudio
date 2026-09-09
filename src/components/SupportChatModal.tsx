@@ -14,7 +14,9 @@ import {
   User, 
   Mail, 
   HelpCircle,
-  AlertCircle
+  AlertCircle,
+  Lock,
+  LogIn
 } from 'lucide-react';
 import { useSupport } from '../context/SupportContext';
 import { useAuth } from '../context/AuthContext';
@@ -33,7 +35,7 @@ export const SupportChatModal: React.FC = () => {
     isLoading 
   } = useSupport();
 
-  const { user } = useAuth();
+  const { user, signInWithGoogle } = useAuth();
 
   // Form states
   const [subject, setSubject] = useState('');
@@ -49,12 +51,18 @@ export const SupportChatModal: React.FC = () => {
     e.preventDefault();
     setFormError(null);
 
+    if (!user) {
+      setFormError('Debes estar registrado e iniciar sesión para abrir un ticket de soporte.');
+      return;
+    }
+
     if (!subject.trim()) {
       setFormError('Por favor introduce el motivo de tu consulta.');
       return;
     }
 
-    if (!contactEmail.trim() || !contactEmail.includes('@')) {
+    const emailToUse = user.email || contactEmail.trim();
+    if (!emailToUse || !emailToUse.includes('@')) {
       setFormError('Introduce un correo electrónico de contacto válido.');
       return;
     }
@@ -67,7 +75,7 @@ export const SupportChatModal: React.FC = () => {
     try {
       await createTicket({
         subject: subject.trim(),
-        contactEmail: contactEmail.trim(),
+        contactEmail: emailToUse,
         priority,
         initialMessage: initialMessage.trim()
       });
@@ -260,99 +268,125 @@ export const SupportChatModal: React.FC = () => {
           ) : (
             /* Ticket Form / List View */
             <div className="flex-1 flex flex-col md:flex-row overflow-hidden">
-              {/* Left Column: Form to open new ticket */}
+              {/* Left Column: Form to open new ticket or Login Prompt */}
               <div className="flex-1 overflow-y-auto p-5 sm:p-6 space-y-4 border-r border-slate-200">
-                <div className="flex items-center gap-2 text-slate-800 font-bold text-sm">
-                  <Plus className="w-4 h-4 text-indigo-600" />
-                  <span>Abrir Nuevo Ticket de Soporte</span>
-                </div>
-
-                {formError && (
-                  <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs flex items-start gap-2">
-                    <AlertCircle className="w-4 h-4 text-rose-500 shrink-0 mt-0.5" />
-                    <span>{formError}</span>
-                  </div>
-                )}
-
-                <form onSubmit={handleCreateTicketSubmit} className="space-y-4">
-                  {/* Motivo / Asunto */}
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-700 mb-1">
-                      Motivo o Asunto de la Consulta *
-                    </label>
-                    <input
-                      type="text"
-                      value={subject}
-                      onChange={(e) => setSubject(e.target.value)}
-                      placeholder="Ej. Error al exportar proyecto, duda sobre dominios..."
-                      className="w-full px-3.5 py-2 rounded-xl border border-slate-200 text-xs focus:outline-none focus:border-indigo-600"
-                    />
-                  </div>
-
-                  {/* Correo de Contacto */}
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-700 mb-1">
-                      Correo Electrónico de Contacto *
-                    </label>
-                    <input
-                      type="email"
-                      value={contactEmail}
-                      onChange={(e) => setContactEmail(e.target.value)}
-                      placeholder="tu@correo.com"
-                      className="w-full px-3.5 py-2 rounded-xl border border-slate-200 text-xs focus:outline-none focus:border-indigo-600"
-                    />
-                  </div>
-
-                  {/* Prioridad */}
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-700 mb-1.5">
-                      Seleccionar Prioridad *
-                    </label>
-                    <div className="grid grid-cols-4 gap-2">
-                      {(['baja', 'media', 'alta', 'urgente'] as TicketPriority[]).map((p) => {
-                        const isSelected = priority === p;
-                        return (
-                          <button
-                            key={p}
-                            type="button"
-                            onClick={() => setPriority(p)}
-                            className={`py-2 px-2 rounded-xl text-xs font-semibold uppercase tracking-wider border transition-all cursor-pointer ${
-                              isSelected
-                                ? 'bg-indigo-600 border-indigo-600 text-white shadow-xs'
-                                : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'
-                            }`}
-                          >
-                            {p}
-                          </button>
-                        );
-                      })}
+                {!user ? (
+                  <div className="h-full flex flex-col items-center justify-center text-center p-6 space-y-4">
+                    <div className="w-14 h-14 rounded-2xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600 shadow-xs">
+                      <Lock className="w-7 h-7" />
                     </div>
+                    <div className="space-y-1.5 max-w-sm">
+                      <h4 className="text-base font-bold text-slate-900">
+                        Acceso Exclusivo para Usuarios Registrados
+                      </h4>
+                      <p className="text-xs text-slate-500 leading-relaxed">
+                        Para abrir un ticket de soporte técnico, recibir seguimiento personalizado y chatear con nuestro equipo administrativo, debes iniciar sesión en NexStudio.
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      id="btn-support-login-gate"
+                      onClick={() => signInWithGoogle()}
+                      className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold shadow-md shadow-indigo-600/20 transition-all cursor-pointer"
+                    >
+                      <LogIn className="w-4 h-4" />
+                      <span>Iniciar Sesión para Abrir Ticket</span>
+                    </button>
                   </div>
+                ) : (
+                  <>
+                    <div className="flex items-center gap-2 text-slate-800 font-bold text-sm">
+                      <Plus className="w-4 h-4 text-indigo-600" />
+                      <span>Abrir Nuevo Ticket de Soporte</span>
+                    </div>
 
-                  {/* Mensaje Detallado */}
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-700 mb-1">
-                      Mensaje Detallado *
-                    </label>
-                    <textarea
-                      rows={4}
-                      value={initialMessage}
-                      onChange={(e) => setInitialMessage(e.target.value)}
-                      placeholder="Describe qué ocurre, los pasos para reproducirlo o tu pregunta..."
-                      className="w-full px-3.5 py-2 rounded-xl border border-slate-200 text-xs focus:outline-none focus:border-indigo-600 resize-none"
-                    />
-                  </div>
+                    {formError && (
+                      <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs flex items-start gap-2">
+                        <AlertCircle className="w-4 h-4 text-rose-500 shrink-0 mt-0.5" />
+                        <span>{formError}</span>
+                      </div>
+                    )}
 
-                  {/* Submit Button */}
-                  <button
-                    type="submit"
-                    disabled={isLoading}
-                    className="w-full py-2.5 px-4 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold transition-all shadow-xs flex items-center justify-center gap-2 cursor-pointer"
-                  >
-                    <MessageSquare className="w-4 h-4" />
-                    <span>Abrir Ticket y Comenzar Chat</span>
-                  </button>
-                </form>
+                    <form onSubmit={handleCreateTicketSubmit} className="space-y-4">
+                      {/* Motivo / Asunto */}
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-700 mb-1">
+                          Motivo o Asunto de la Consulta *
+                        </label>
+                        <input
+                          type="text"
+                          value={subject}
+                          onChange={(e) => setSubject(e.target.value)}
+                          placeholder="Ej. Error al exportar proyecto, duda sobre dominios..."
+                          className="w-full px-3.5 py-2 rounded-xl border border-slate-200 text-xs focus:outline-none focus:border-indigo-600"
+                        />
+                      </div>
+
+                      {/* Correo de Contacto */}
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-700 mb-1">
+                          Correo Electrónico de Contacto (Cuenta Registrada)
+                        </label>
+                        <input
+                          type="email"
+                          value={user.email || contactEmail}
+                          readOnly
+                          className="w-full px-3.5 py-2 rounded-xl border border-slate-200 bg-slate-50 text-slate-600 text-xs cursor-not-allowed"
+                        />
+                      </div>
+
+                      {/* Prioridad */}
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                          Seleccionar Prioridad *
+                        </label>
+                        <div className="grid grid-cols-4 gap-2">
+                          {(['baja', 'media', 'alta', 'urgente'] as TicketPriority[]).map((p) => {
+                            const isSelected = priority === p;
+                            return (
+                              <button
+                                key={p}
+                                type="button"
+                                onClick={() => setPriority(p)}
+                                className={`py-2 px-2 rounded-xl text-xs font-semibold uppercase tracking-wider border transition-all cursor-pointer ${
+                                  isSelected
+                                    ? 'bg-indigo-600 border-indigo-600 text-white shadow-xs'
+                                    : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'
+                                }`}
+                              >
+                                {p}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+
+                      {/* Mensaje Detallado */}
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-700 mb-1">
+                          Mensaje Detallado *
+                        </label>
+                        <textarea
+                          rows={4}
+                          value={initialMessage}
+                          onChange={(e) => setInitialMessage(e.target.value)}
+                          placeholder="Describe qué ocurre, los pasos para reproducirlo o tu pregunta..."
+                          className="w-full px-3.5 py-2 rounded-xl border border-slate-200 text-xs focus:outline-none focus:border-indigo-600 resize-none"
+                        />
+                      </div>
+
+                      {/* Submit Button */}
+                      <button
+                        type="submit"
+                        disabled={isLoading}
+                        className="w-full py-2.5 px-4 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold transition-all shadow-xs flex items-center justify-center gap-2 cursor-pointer"
+                      >
+                        <MessageSquare className="w-4 h-4" />
+                        <span>Abrir Ticket y Comenzar Chat</span>
+                      </button>
+                    </form>
+                  </>
+                )}
               </div>
 
               {/* Right Column: User's Existing Tickets */}

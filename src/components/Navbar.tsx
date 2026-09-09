@@ -18,11 +18,13 @@ import {
   MessageSquare,
   Settings,
   ShieldCheck,
-  Sliders
+  Sliders,
+  Headphones
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useSettings } from '../context/SettingsContext';
 import { useAdmin } from '../context/AdminContext';
+import { useSupport } from '../context/SupportContext';
 import { DropdownMenu } from './DropdownMenu';
 import { RedesDropdown } from './RedesDropdown';
 
@@ -49,6 +51,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   } = useAuth();
   const { siteSettings } = useAdmin();
   const { openSettings } = useSettings();
+  const { openSupportModal } = useSupport();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [mobileRedesExpanded, setMobileRedesExpanded] = useState(false);
@@ -234,6 +237,18 @@ export const Navbar: React.FC<NavbarProps> = ({
                         </button>
                         <button
                           type="button"
+                          id="user-item-support"
+                          onClick={() => {
+                            setUserMenuOpen(false);
+                            openSupportModal();
+                          }}
+                          className="w-full px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-100 rounded-lg flex items-center gap-2.5 transition-colors min-h-[44px] cursor-pointer"
+                        >
+                          <Headphones className="w-4 h-4 text-indigo-600" />
+                          <span>Chat de Soporte</span>
+                        </button>
+                        <button
+                          type="button"
                           id="user-item-signout"
                           onClick={() => {
                             setUserMenuOpen(false);
@@ -393,6 +408,18 @@ export const Navbar: React.FC<NavbarProps> = ({
                       Panel Admin
                     </span>
                   )}
+                </button>
+                <button
+                  type="button"
+                  id="mobile-support-btn"
+                  onClick={() => {
+                    openSupportModal();
+                    setMobileMenuOpen(false);
+                  }}
+                  className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-slate-700 hover:bg-slate-100 transition-colors min-h-[44px] cursor-pointer"
+                >
+                  <Headphones className="w-4 h-4 text-indigo-600" />
+                  <span>Chat de Soporte</span>
                 </button>
                 <button
                   type="button"
