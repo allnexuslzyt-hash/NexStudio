@@ -115,7 +115,9 @@ interface SettingsContextType {
   isPublicProfile: boolean;
   setIsPublicProfile: (val: boolean) => void;
   isSettingsOpen: boolean;
-  openSettings: () => void;
+  settingsTab: 'account' | 'appearance' | 'notifications' | 'privacy' | 'admin';
+  setSettingsTab: (tab: 'account' | 'appearance' | 'notifications' | 'privacy' | 'admin') => void;
+  openSettings: (tab?: 'account' | 'appearance' | 'notifications' | 'privacy' | 'admin') => void;
   closeSettings: () => void;
   currentAccentConfig: AccentColorConfig;
 }
@@ -123,6 +125,8 @@ interface SettingsContextType {
 const SettingsContext = createContext<SettingsContextType | undefined>(undefined);
 
 export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const [isSettingsOpen, setIsSettingsOpen] = useState<boolean>(false);
+  const [settingsTab, setSettingsTab] = useState<'account' | 'appearance' | 'notifications' | 'privacy' | 'admin'>('account');
   const [themeMode, setThemeModeState] = useState<ThemeMode>(() => {
     return (localStorage.getItem('nexstudio_theme_mode') as ThemeMode) || 'light';
   });
@@ -158,8 +162,6 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     const val = localStorage.getItem('nexstudio_privacy_public');
     return val !== null ? val === 'true' : true;
   });
-
-  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
 
   // Apply Theme Mode (Claro / Oscuro / Automático)
   useEffect(() => {
@@ -274,7 +276,12 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         isPublicProfile,
         setIsPublicProfile,
         isSettingsOpen,
-        openSettings: () => setIsSettingsOpen(true),
+        settingsTab,
+        setSettingsTab,
+        openSettings: (tab?: 'account' | 'appearance' | 'notifications' | 'privacy' | 'admin') => {
+          if (tab) setSettingsTab(tab);
+          setIsSettingsOpen(true);
+        },
         closeSettings: () => setIsSettingsOpen(false),
         currentAccentConfig,
       }}

@@ -71,6 +71,42 @@
         }
       },
       "required": ["id", "ownerId", "title"]
+    },
+    "SiteSettings": {
+      "title": "SiteSettings",
+      "description": "Global application configuration including maintenance mode and global announcements",
+      "type": "object",
+      "properties": {
+        "maintenanceMode": {
+          "type": "boolean",
+          "description": "Global kill switch to close website for non-admin visitors"
+        },
+        "maintenanceMessage": {
+          "type": "string",
+          "description": "Message displayed on maintenance screen"
+        },
+        "maintenanceEstimatedReturn": {
+          "type": "string",
+          "description": "Estimated return time"
+        },
+        "allowNewRegistrations": {
+          "type": "boolean",
+          "description": "Whether new registrations are permitted"
+        },
+        "lastUpdated": {
+          "type": "string",
+          "description": "ISO timestamp of last update"
+        },
+        "updatedBy": {
+          "type": "string",
+          "description": "Email of admin who updated the settings"
+        },
+        "banner": {
+          "type": "object",
+          "description": "Global top banner configuration"
+        }
+      },
+      "required": ["maintenanceMode"]
     }
   },
   "firestore": {
@@ -81,6 +117,10 @@
     "/projects/{projectId}": {
       "schema": "Project",
       "description": "Creative showcases and project files"
+    },
+    "/settings/{settingId}": {
+      "schema": "SiteSettings",
+      "description": "Global site settings including maintenance mode and global banners"
     }
   }
 }

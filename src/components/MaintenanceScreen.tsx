@@ -21,7 +21,7 @@ interface MaintenanceScreenProps {
 
 export const MaintenanceScreen: React.FC<MaintenanceScreenProps> = ({ onOpenAdminPanel }) => {
   const { siteSettings, toggleMaintenanceMode, isAdmin, isSuperAdmin } = useAdmin();
-  const { user, signInWithGoogle, signInWithDevAccount, loading } = useAuth();
+  const { user, signInWithGoogle, loading } = useAuth();
   const [showAdminLogin, setShowAdminLogin] = useState(false);
   const [isOpening, setIsOpening] = useState(false);
 
@@ -169,12 +169,12 @@ export const MaintenanceScreen: React.FC<MaintenanceScreenProps> = ({ onOpenAdmi
                   <p className="text-xs text-slate-400">
                     Solo administradores autorizados (<strong className="text-slate-200">allnexuslzyt@gmail.com</strong>) pueden omitir el bloqueo y reactivar el sitio.
                   </p>
-                  <div className="flex flex-col sm:flex-row items-center gap-2.5 w-full">
+                  <div className="w-full flex justify-center">
                     <button
                       type="button"
                       onClick={() => signInWithGoogle()}
                       disabled={loading}
-                      className="w-full sm:flex-1 inline-flex items-center justify-center gap-2.5 px-5 py-2.5 rounded-xl bg-white hover:bg-slate-100 text-slate-900 text-xs font-bold transition-all shadow-md cursor-pointer"
+                      className="w-full inline-flex items-center justify-center gap-2.5 px-6 py-3 rounded-xl bg-white hover:bg-slate-100 text-slate-900 text-xs font-bold transition-all shadow-md cursor-pointer"
                     >
                       <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24">
                         <path
@@ -195,15 +195,6 @@ export const MaintenanceScreen: React.FC<MaintenanceScreenProps> = ({ onOpenAdmi
                         />
                       </svg>
                       <span>Identificarse con Google</span>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => signInWithDevAccount('allnexuslzyt@gmail.com', 'SuperAdmin')}
-                      className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold transition-all shadow-md cursor-pointer"
-                    >
-                      <Lock className="w-3.5 h-3.5" />
-                      <span>Acceso Directo (SuperAdmin)</span>
                     </button>
                   </div>
                   <button

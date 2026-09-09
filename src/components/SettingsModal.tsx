@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   X, 
   User, 
@@ -23,12 +23,21 @@ import {
   Minimize2,
   Type,
   Eye,
-  EyeOff
+  EyeOff,
+  Sliders,
+  Power,
+  ShieldAlert,
+  AlertTriangle,
+  ArrowRight,
+  Activity,
+  Save,
+  Radio
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useSettings, ACCENT_COLORS, ThemeMode, AccentColor, Density, FontSize } from '../context/SettingsContext';
+import { useAdmin } from '../context/AdminContext';
 
-type TabId = 'account' | 'appearance' | 'notifications' | 'privacy';
+type TabId = 'account' | 'appearance' | 'notifications' | 'privacy' | 'admin';
 
 // Sample curated avatare seeds for instant selection
 const PRESET_AVATARS = [
@@ -40,11 +49,17 @@ const PRESET_AVATARS = [
   'https://api.dicebear.com/7.x/identicon/svg?seed=zenith_flow',
 ];
 
-export const SettingsModal: React.FC = () => {
-  const { user, profile, updateProfileData, deleteAccount, signOut } = useAuth();
+interface SettingsModalProps {
+  onOpenAdminCommandCenter?: () => void;
+}
+
+export const SettingsModal: React.FC<SettingsModalProps> = ({ onOpenAdminCommandCenter }) => {
+  const { user, profile, isAdmin, updateProfileData, deleteAccount, signOut } = useAuth();
+  const { siteSettings, toggleMaintenanceMode, updateSiteSettings, updateGlobalBanner, users, reports } = useAdmin();
   const {
     isSettingsOpen,
     closeSettings,
+    settingsTab,
     themeMode,
     setThemeMode,
     accentColor,
@@ -64,7 +79,32 @@ export const SettingsModal: React.FC = () => {
     currentAccentConfig,
   } = useSettings();
 
-  const [activeTab, setActiveTab] = useState<TabId>('account');
+  const [activeTab, setActiveTab] = useState<TabId>(settingsTab || 'account');
+
+  // Sync tab with external open requests
+  useEffect(() => {
+    if (settingsTab) {
+      setActiveTab(settingsTab);
+    }
+  }, [settingsTab]);
+
+  // Admin tab states
+  const [maintMsg, setMaintMsg] = useState(siteSettings.maintenanceMessage || 'Estamos realizando mejoras importantes en la plataforma. Volveremos pronto.');
+  const [estTime, setEstTime] = useState(siteSettings.estimatedTime || 'Pronto');
+  const [isUpdatingMaint, setIsUpdatingMaint] = useState(false);
+  const [bannerActive, setBannerActive] = useState(siteSettings.globalBanner?.active || false);
+  const [bannerMessage, setBannerMessage] = useState(siteSettings.globalBanner?.message || '');
+  const [bannerType, setBannerType] = useState(siteSettings.globalBanner?.type || 'info');
+
+  useEffect(() => {
+    if (siteSettings) {
+      setMaintMsg(siteSettings.maintenanceMessage || '');
+      setEstTime(siteSettings.estimatedTime || '');
+      setBannerActive(siteSettings.globalBanner?.active || false);
+      setBannerMessage(siteSettings.globalBanner?.message || '');
+      setBannerType(siteSettings.globalBanner?.type || 'info');
+    }
+  }, [siteSettings]);
 
   // Form states for Account Tab
   const [displayName, setDisplayName] = useState(profile?.displayName || user?.displayName || '');
@@ -298,6 +338,25 @@ export const SettingsModal: React.FC = () => {
               <Shield className="w-4 h-4 text-slate-500" />
               <span>Privacidad y Datos</span>
             </button>
+
+            {isAdmin && (
+              <button
+                type="button"
+                id="settings-tab-admin"
+                onClick={() => setActiveTab('admin')}
+                className={`flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs sm:text-sm font-semibold transition-all whitespace-nowrap min-h-[44px] cursor-pointer ${
+                  activeTab === 'admin'
+                    ? 'bg-indigo-600 text-white shadow-xs'
+                    : 'text-indigo-700 dark:text-indigo-400 bg-indigo-50/70 dark:bg-indigo-950/40 hover:bg-indigo-100 dark:hover:bg-indigo-900/50 border border-indigo-200 dark:border-indigo-800'
+                }`}
+              >
+                <div className="flex items-center gap-2.5">
+                  <Sliders className="w-4 h-4" />
+                  <span>Administración</span>
+                </div>
+                <span className={`w-2 h-2 rounded-full ${siteSettings?.maintenanceMode ? 'bg-rose-500 animate-pulse' : 'bg-emerald-500'}`} />
+              </button>
+            )}
           </nav>
 
           {/* User mini badge at bottom of sidebar */}
@@ -330,12 +389,14 @@ export const SettingsModal: React.FC = () => {
                 {activeTab === 'appearance' && 'Apariencia y Temas'}
                 {activeTab === 'notifications' && 'Notificaciones y Sonidos'}
                 {activeTab === 'privacy' && 'Privacidad y Datos'}
+                {activeTab === 'admin' && 'Panel de Administración'}
               </h3>
               <p className="text-xs text-slate-500 dark:text-slate-400">
                 {activeTab === 'account' && 'Gestiona tu avatar, nombre de usuario y seguridad de cuenta.'}
                 {activeTab === 'appearance' && 'Personaliza el tema claro/oscuro, color de acento y tipografía en tiempo real.'}
                 {activeTab === 'notifications' && 'Controla los correos, sonidos y alertas emergentes.'}
                 {activeTab === 'privacy' && 'Configura la visibilidad pública, descarga o elimina tus datos.'}
+                {activeTab === 'admin' && 'Control de estado global de la web, kill switch de mantenimiento y anuncios.'}
               </p>
             </div>
 
@@ -1083,6 +1144,279 @@ export const SettingsModal: React.FC = () => {
                         Confirmar y Borrar
                       </button>
                     </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* ========================================================= */}
+            {/* 5. PESTAÑA: PANEL DE ADMINISTRACIÓN (Solo SuperAdmin) */}
+            {/* ========================================================= */}
+            {activeTab === 'admin' && isAdmin && (
+              <div className="space-y-6 animate-in fade-in">
+                {/* Cabecera de Administración */}
+                <div className="p-4 rounded-2xl bg-indigo-50/70 dark:bg-indigo-950/30 border border-indigo-200 dark:border-indigo-800 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                  <div className="space-y-0.5">
+                    <div className="flex items-center gap-2">
+                      <Sliders className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
+                      <h4 className="text-sm font-bold text-slate-900 dark:text-white">
+                        Panel de Administración
+                      </h4>
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-600 text-white uppercase tracking-wider">
+                        SuperAdmin
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-600 dark:text-slate-400">
+                      Conectado como <span className="font-semibold text-indigo-700 dark:text-indigo-300">{user?.email}</span>
+                    </p>
+                  </div>
+
+                  {onOpenAdminCommandCenter && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        closeSettings();
+                        onOpenAdminCommandCenter();
+                      }}
+                      className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold shadow-xs transition-colors cursor-pointer shrink-0"
+                    >
+                      <span>Abrir Centro de Mando</span>
+                      <ArrowRight className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                </div>
+
+                {/* 1. INTERRUPTOR MAESTRO: CERRAR WEB PARA TODOS LOS USUARIOS (KILL SWITCH) */}
+                <div className={`p-5 rounded-2xl border-2 transition-all ${
+                  siteSettings?.maintenanceMode
+                    ? 'bg-rose-50/70 dark:bg-rose-950/30 border-rose-300 dark:border-rose-900/60 shadow-lg shadow-rose-600/5'
+                    : 'bg-emerald-50/60 dark:bg-emerald-950/20 border-emerald-300 dark:border-emerald-900/50'
+                }`}>
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                    <div className="space-y-1.5">
+                      <div className="flex items-center gap-2.5">
+                        <span className="relative flex h-3 w-3">
+                          <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${
+                            siteSettings?.maintenanceMode ? 'bg-rose-500' : 'bg-emerald-500'
+                          }`}></span>
+                          <span className={`relative inline-flex rounded-full h-3 w-3 ${
+                            siteSettings?.maintenanceMode ? 'bg-rose-600' : 'bg-emerald-600'
+                          }`}></span>
+                        </span>
+                        <h4 className={`text-base font-extrabold ${
+                          siteSettings?.maintenanceMode
+                            ? 'text-rose-900 dark:text-rose-200'
+                            : 'text-emerald-950 dark:text-emerald-200'
+                        }`}>
+                          {siteSettings?.maintenanceMode
+                            ? 'La Web está CERRADA para todos los usuarios'
+                            : 'La Web está ABIERTA y PÚBLICA'}
+                        </h4>
+                      </div>
+                      <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed max-w-xl">
+                        {siteSettings?.maintenanceMode
+                          ? 'Modo Mantenimiento ACTIVO globalmente en la nube. Todos los visitantes de la web son redirigidos de inmediato a la pantalla de bloqueo seguro. Nadie excepto el administrador puede acceder.'
+                          : 'Todos los visitantes del mundo pueden navegar, registrarse y utilizar NexStudio con normalidad.'}
+                      </p>
+                    </div>
+
+                    <button
+                      type="button"
+                      id="btn-toggle-maintenance-modal"
+                      disabled={isUpdatingMaint}
+                      onClick={async () => {
+                        setIsUpdatingMaint(true);
+                        try {
+                          await toggleMaintenanceMode(!siteSettings?.maintenanceMode);
+                          showFeedback(
+                            !siteSettings?.maintenanceMode
+                              ? '¡Web CERRADA para todos los usuarios! Se ha sincronizado en tiempo real.'
+                              : '¡Web ABIERTA y pública para todos los usuarios!'
+                          );
+                        } catch (e) {
+                          showFeedback('Error al actualizar estado en Firestore', true);
+                        } finally {
+                          setIsUpdatingMaint(false);
+                        }
+                      }}
+                      className={`inline-flex items-center justify-center gap-2.5 px-5 py-3 rounded-xl font-bold text-xs shadow-md transition-all cursor-pointer shrink-0 min-h-[44px] ${
+                        siteSettings?.maintenanceMode
+                          ? 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-emerald-600/20'
+                          : 'bg-rose-600 hover:bg-rose-500 text-white shadow-rose-600/20'
+                      }`}
+                    >
+                      <Power className="w-4 h-4" />
+                      <span>
+                        {siteSettings?.maintenanceMode
+                          ? 'Reabrir Web para Todos'
+                          : 'Cerrar Web para Todos'}
+                      </span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* 2. PERSONALIZACIÓN DEL AVISO DE CIERRE */}
+                <div className="p-5 rounded-2xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-800 space-y-4">
+                  <div className="flex items-center gap-2 text-slate-900 dark:text-white font-bold text-sm">
+                    <AlertTriangle className="w-4 h-4 text-amber-500" />
+                    <span>Mensaje para la pantalla de mantenimiento</span>
+                  </div>
+
+                  <div className="space-y-3">
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                        Mensaje que verán los usuarios cuando la web esté cerrada:
+                      </label>
+                      <textarea
+                        rows={2}
+                        value={maintMsg}
+                        onChange={(e) => setMaintMsg(e.target.value)}
+                        placeholder="Estamos realizando labores de mantenimiento y optimización en la plataforma..."
+                        className="w-full px-3.5 py-2.5 text-xs rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                        Tiempo estimado de regreso:
+                      </label>
+                      <input
+                        type="text"
+                        value={estTime}
+                        onChange={(e) => setEstTime(e.target.value)}
+                        placeholder="Ejemplo: 30 minutos, o Muy pronto"
+                        className="w-full sm:w-64 px-3.5 py-2 text-xs rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                      />
+                    </div>
+
+                    <button
+                      type="button"
+                      disabled={isUpdatingMaint}
+                      onClick={async () => {
+                        setIsUpdatingMaint(true);
+                        try {
+                          await updateSiteSettings({
+                            maintenanceMessage: maintMsg,
+                            estimatedTime: estTime
+                          });
+                          showFeedback('Ajustes del mensaje de cierre guardados.');
+                        } catch (e) {
+                          showFeedback('Error al guardar mensaje en Firestore', true);
+                        } finally {
+                          setIsUpdatingMaint(false);
+                        }
+                      }}
+                      className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 dark:bg-slate-700 dark:hover:bg-slate-600 text-white text-xs font-semibold shadow-xs transition-colors cursor-pointer"
+                    >
+                      <Save className="w-3.5 h-3.5" />
+                      <span>Guardar Mensaje de Mantenimiento</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* 3. AVISO GLOBAL (BANNER EN CABECERA) */}
+                <div className="p-5 rounded-2xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-800 space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2 text-slate-900 dark:text-white font-bold text-sm">
+                      <Radio className="w-4 h-4 text-indigo-600" />
+                      <span>Banner de Anuncio Global en Cabecera</span>
+                    </div>
+
+                    <button
+                      type="button"
+                      role="switch"
+                      aria-checked={bannerActive}
+                      onClick={() => setBannerActive(!bannerActive)}
+                      className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                        bannerActive ? 'bg-indigo-600' : 'bg-slate-300 dark:bg-slate-700'
+                      }`}
+                    >
+                      <span
+                        className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-lg ring-0 transition duration-200 ease-in-out ${
+                          bannerActive ? 'translate-x-5' : 'translate-x-0'
+                        }`}
+                      />
+                    </button>
+                  </div>
+
+                  {bannerActive && (
+                    <div className="space-y-3 pt-2">
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                          Texto del anuncio:
+                        </label>
+                        <input
+                          type="text"
+                          value={bannerMessage}
+                          onChange={(e) => setBannerMessage(e.target.value)}
+                          placeholder="Ejemplo: ¡Nueva actualización disponible en NexStudio!"
+                          className="w-full px-3.5 py-2 text-xs rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                        />
+                      </div>
+
+                      <div className="flex items-center gap-3">
+                        <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">
+                          Tipo de anuncio:
+                        </label>
+                        <select
+                          value={bannerType}
+                          onChange={(e) => setBannerType(e.target.value as any)}
+                          className="px-3 py-1.5 text-xs rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white"
+                        >
+                          <option value="info">Información</option>
+                          <option value="advertencia">Advertencia</option>
+                          <option value="exito">Éxito</option>
+                          <option value="urgente">Urgente</option>
+                        </select>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          try {
+                            await updateGlobalBanner({
+                              active: bannerActive,
+                              message: bannerMessage,
+                              type: bannerType as any,
+                            });
+                            showFeedback('Banner global actualizado.');
+                          } catch (e) {
+                            showFeedback('Error al actualizar banner', true);
+                          }
+                        }}
+                        className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold shadow-xs transition-colors cursor-pointer"
+                      >
+                        <Save className="w-3.5 h-3.5" />
+                        <span>Guardar Anuncio</span>
+                      </button>
+                    </div>
+                  )}
+                </div>
+
+                {/* 4. ACCESO AL CENTRO DE MANDO COMPLETO */}
+                {onOpenAdminCommandCenter && (
+                  <div className="p-4 sm:p-5 rounded-2xl bg-indigo-500/10 border border-indigo-200 dark:border-indigo-800 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                    <div className="space-y-1">
+                      <h4 className="text-sm font-bold text-indigo-950 dark:text-indigo-200">
+                        Centro de Mando Avanzado
+                      </h4>
+                      <p className="text-xs text-slate-600 dark:text-slate-400">
+                        Accede al panel completo con gestión de {users.length} usuarios, reportes de moderación, centro de ayuda y logs de auditoría.
+                      </p>
+                    </div>
+
+                    <button
+                      type="button"
+                      id="btn-open-full-command-center"
+                      onClick={() => {
+                        closeSettings();
+                        onOpenAdminCommandCenter();
+                      }}
+                      className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold shadow-md shadow-indigo-600/20 transition-all cursor-pointer shrink-0"
+                    >
+                      <span>Ir al Centro de Mando Completo</span>
+                      <ArrowRight className="w-4 h-4" />
+                    </button>
                   </div>
                 )}
               </div>

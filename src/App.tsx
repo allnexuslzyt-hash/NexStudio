@@ -125,7 +125,7 @@ const WorkspaceContent: React.FC = () => {
       <Footer onOpenTerms={() => setIsTermsOpen(true)} />
 
       {/* Modal de Configuración y Personalización */}
-      <SettingsModal />
+      <SettingsModal onOpenAdminCommandCenter={() => setActiveView('admin')} />
 
       {/* Modal de Términos y Condiciones bajo demanda */}
       <TermsModal

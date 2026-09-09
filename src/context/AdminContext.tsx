@@ -10,7 +10,7 @@ import {
 } from '../types';
 import { useAuth, isSuperAdminEmail } from './AuthContext';
 import { FAQ_ITEMS, GUIDE_ARTICLES, FAQItem, GuideArticle } from '../data/helpData';
-import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc, onSnapshot } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 
 interface AdminContextType {
@@ -314,22 +314,24 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     return INITIAL_AUDIT_LOGS;
   });
 
-  // Sync with Firestore site settings if exists
+  // Real-time synchronization with Firestore site settings (Kill switch & global announcements)
   useEffect(() => {
-    const fetchRemoteSettings = async () => {
-      try {
-        const settingsRef = doc(db, 'settings', 'global');
-        const docSnap = await getDoc(settingsRef);
+    const settingsRef = doc(db, 'settings', 'global');
+    // Listen in real time: as soon as the admin flips the switch, ALL devices and users see the change instantly
+    const unsubscribe = onSnapshot(
+      settingsRef,
+      (docSnap) => {
         if (docSnap.exists()) {
           const remoteData = docSnap.data() as Partial<SiteSettings>;
           setSiteSettingsState((prev) => ({ ...prev, ...remoteData }));
         }
-      } catch (err) {
-        // Fallback gracefully to local storage
-        console.log('Utilizando configuración local para NexStudio');
+      },
+      (err) => {
+        console.warn('Configuración global funcionando con sincronización local/resiliente:', err.message);
       }
-    };
-    fetchRemoteSettings();
+    );
+
+    return () => unsubscribe();
   }, []);
 
   // Save changes to localStorage

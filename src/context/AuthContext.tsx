@@ -97,28 +97,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   useEffect(() => {
-    // Check if there is an active simulated dev session in localStorage
-    const savedDevUser = localStorage.getItem('nexstudio_dev_user');
-    const savedDevProfile = localStorage.getItem('nexstudio_dev_profile');
+    // Clear any previous dev tokens for security so visitors cannot impersonate admin
+    try {
+      localStorage.removeItem('nexstudio_dev_user');
+      localStorage.removeItem('nexstudio_dev_profile');
+    } catch (e) {}
 
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
       if (currentUser) {
         setUser(currentUser);
         await syncUserProfile(currentUser);
-        setLoading(false);
-      } else if (savedDevUser && savedDevProfile) {
-        try {
-          const parsedUser = JSON.parse(savedDevUser);
-          const parsedProfile = JSON.parse(savedDevProfile);
-          // Attach dummy delete method to satisfy User interface
-          parsedUser.delete = async () => {};
-          setUser(parsedUser as User);
-          setProfile(parsedProfile);
-        } catch (e) {
-          console.warn('Error reading dev user from storage:', e);
-          setUser(null);
-          setProfile(null);
-        }
         setLoading(false);
       } else {
         setUser(null);
@@ -190,7 +178,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (err.code === 'auth/unauthorized-domain') {
         const currentHostname = typeof window !== 'undefined' ? window.location.hostname : '';
         setUnauthorizedDomain(currentHostname);
-        setAuthError(`Dominio no autorizado en Firebase ("${currentHostname}"). Abre la guía para autorizarlo o usa el Acceso de Desarrollo.`);
+        setAuthError(`Dominio no autorizado en Firebase ("${currentHostname}"). Abre la guía para autorizarlo en tu consola de Firebase.`);
         return;
       }
       let message = 'No se pudo completar el inicio de sesión con Google.';

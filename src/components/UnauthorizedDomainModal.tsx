@@ -5,12 +5,8 @@ import {
   Copy, 
   Check, 
   ExternalLink, 
-  UserCheck, 
   X, 
-  KeyRound, 
-  Sparkles,
-  Info,
-  ChevronRight
+  Info
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -25,7 +21,7 @@ export const UnauthorizedDomainModal: React.FC<UnauthorizedDomainModalProps> = (
   isOpen,
   onClose,
 }) => {
-  const { signInWithDevAccount, clearAuthError } = useAuth();
+  const { signInWithGoogle, clearAuthError } = useAuth();
   const [copied, setCopied] = useState(false);
 
   if (!isOpen) return null;
@@ -40,12 +36,6 @@ export const UnauthorizedDomainModal: React.FC<UnauthorizedDomainModalProps> = (
     } catch (e) {
       console.warn('Clipboard copy failed:', e);
     }
-  };
-
-  const handleDevLogin = (email: string, role: any) => {
-    signInWithDevAccount(email, role);
-    clearAuthError();
-    onClose();
   };
 
   return (
@@ -142,37 +132,21 @@ export const UnauthorizedDomainModal: React.FC<UnauthorizedDomainModalProps> = (
               </ol>
             </div>
 
-            {/* Fast Alternative: Instant Developer Login */}
-            <div className="p-5 rounded-2xl bg-indigo-50/70 border border-indigo-200 space-y-3">
-              <div className="flex items-center gap-2">
-                <Sparkles className="w-4 h-4 text-indigo-600" />
-                <h3 className="text-xs font-bold text-indigo-950 uppercase tracking-wide">
-                  Solución Inmediata &bull; Acceso Directo de Desarrollo
-                </h3>
-              </div>
-              <p className="text-xs text-slate-600 leading-relaxed">
-                Para que no te quedes bloqueado mientras autorizas el dominio, puedes iniciar sesión instantáneamente con tu cuenta de administrador:
+            {/* Action Buttons: Retry with Google or Close */}
+            <div className="p-4 rounded-2xl bg-indigo-50/70 border border-indigo-200 flex flex-col sm:flex-row items-center justify-between gap-3">
+              <p className="text-xs text-indigo-950 font-medium">
+                Una vez agregado el dominio en Firebase Console, reintenta iniciar sesión:
               </p>
-
-              <div className="flex flex-col sm:flex-row gap-2.5 pt-1">
-                <button
-                  type="button"
-                  onClick={() => handleDevLogin('allnexuslzyt@gmail.com', 'SuperAdmin')}
-                  className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold shadow-md shadow-indigo-600/20 transition-all cursor-pointer"
-                >
-                  <KeyRound className="w-4 h-4" />
-                  <span>Acceder como allnexuslzyt@gmail.com (SuperAdmin)</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => handleDevLogin('usuario.demo@nexstudio.app', 'Creador Digital')}
-                  className="inline-flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-white hover:bg-slate-100 text-slate-800 text-xs font-semibold border border-slate-300 transition-all cursor-pointer"
-                >
-                  <UserCheck className="w-4 h-4 text-slate-600" />
-                  <span>Usuario Demo</span>
-                </button>
-              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  onClose();
+                  useAuth().signInWithGoogle();
+                }}
+                className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold shadow-xs transition-colors cursor-pointer shrink-0"
+              >
+                <span>Reintentar con Google</span>
+              </button>
             </div>
           </div>
 
