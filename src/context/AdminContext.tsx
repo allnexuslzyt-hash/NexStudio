@@ -15,7 +15,7 @@ import { db, handleFirestoreError, OperationType } from '../lib/firebase';
 
 interface AdminContextType {
   siteSettings: SiteSettings;
-  toggleMaintenanceMode: (enabled?: boolean, message?: string) => Promise<void>;
+  toggleMaintenanceMode: (enabled?: boolean, message?: string, estimatedReturn?: string, reason?: string) => Promise<void>;
   updateGlobalBanner: (bannerConfig: Partial<GlobalBannerConfig>) => Promise<void>;
   updateSiteSettings: (settings: Partial<SiteSettings>) => Promise<void>;
   
@@ -63,6 +63,8 @@ const INITIAL_SITE_SETTINGS: SiteSettings = {
   maintenanceMode: false,
   maintenanceMessage: 'NexStudio se encuentra actualmente en labores de mantenimiento programado. Volveremos a estar disponibles muy pronto.',
   maintenanceEstimatedReturn: 'Aproximadamente 30 minutos',
+  estimatedTime: 'Aproximadamente 30 minutos',
+  maintenanceReason: 'Actualización crítica del sistema',
   allowNewRegistrations: true,
   lastUpdated: new Date().toISOString(),
   updatedBy: 'allnexuslzyt@gmail.com',
@@ -297,12 +299,20 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   };
 
   // Toggle Maintenance Mode / Kill Switch
-  const toggleMaintenanceMode = async (enabled?: boolean, message?: string) => {
+  const toggleMaintenanceMode = async (
+    enabled?: boolean, 
+    message?: string, 
+    estimatedReturn?: string,
+    reason?: string
+  ) => {
     const newState = enabled !== undefined ? enabled : !siteSettings.maintenanceMode;
     const updatedSettings: SiteSettings = {
       ...siteSettings,
       maintenanceMode: newState,
       maintenanceMessage: message || siteSettings.maintenanceMessage,
+      maintenanceEstimatedReturn: estimatedReturn || siteSettings.maintenanceEstimatedReturn || siteSettings.estimatedTime || 'Aproximadamente 30 minutos',
+      estimatedTime: estimatedReturn || siteSettings.estimatedTime || 'Aproximadamente 30 minutos',
+      maintenanceReason: reason || siteSettings.maintenanceReason || 'Actualización crítica del sistema',
       lastUpdated: new Date().toISOString(),
       updatedBy: user?.email || 'allnexuslzyt@gmail.com'
     };

@@ -250,8 +250,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
       }
 
-      // Update Firestore document
-      const updatePayload: Record<string, any> = {};
+      // Update Firestore document with all required fields
+      const updatePayload: Record<string, any> = {
+        userId: user.uid,
+        email: user.email || '',
+      };
       if (data.displayName !== undefined) updatePayload.displayName = data.displayName;
       if (data.username !== undefined) updatePayload.username = data.username;
       if (data.photoURL !== undefined) updatePayload.photoURL = data.photoURL;
@@ -270,13 +273,39 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         console.warn('Firestore setDoc falló o regla pendiente, actualizando estado local:', fsErr);
       }
 
-      // Update local profile state immediately
+      // Update local profile state immediately (even if previous state was null)
+      const isSuper = isSuperAdminEmail(user.email);
       setProfile((prev) => {
-        if (!prev) return null;
-        return {
-          ...prev,
+        const base: UserProfile = prev || {
+          userId: user.uid,
+          email: user.email || '',
+          displayName: data.displayName || user.displayName || 'Usuario NexStudio',
+          username: data.username || user.email?.split('@')[0] || 'usuario',
+          photoURL: data.photoURL || user.photoURL || `https://api.dicebear.com/7.x/identicon/svg?seed=${user.uid}`,
+          role: isSuper ? 'SuperAdmin' : 'Creador Digital',
+          bio: isSuper ? 'Super Administrador del Sistema NexStudio.' : 'Miembro de NexStudio',
+          createdAt: new Date().toISOString(),
+          lastLogin: new Date().toISOString(),
+          onboardingCompleted: true,
+        };
+        const updated = {
+          ...base,
           ...updatePayload,
         };
+        try {
+          localStorage.setItem(`nexstudio_profile_${user.uid}`, JSON.stringify(updated));
+        } catch (e) {}
+        return updated;
+      });
+
+      // Also update React user state in memory
+      setUser((prevUser) => {
+        if (!prevUser) return null;
+        return {
+          ...prevUser,
+          displayName: data.displayName !== undefined ? data.displayName : prevUser.displayName,
+          photoURL: data.photoURL !== undefined ? data.photoURL : prevUser.photoURL,
+        } as User;
       });
     } catch (err) {
       console.error('Error actualizando perfil:', err);

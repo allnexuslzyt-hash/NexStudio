@@ -39,14 +39,20 @@ import { useAdmin } from '../context/AdminContext';
 
 type TabId = 'account' | 'appearance' | 'notifications' | 'privacy' | 'admin';
 
-// Sample curated avatare seeds for instant selection
+// Curated preset avatars for instant 1-click selection without device upload
 const PRESET_AVATARS = [
+  'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
+  'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80',
+  'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150&auto=format&fit=crop&q=80',
+  'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150&auto=format&fit=crop&q=80',
+  'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=150&auto=format&fit=crop&q=80',
+  'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&auto=format&fit=crop&q=80',
+  'https://api.dicebear.com/7.x/bottts/svg?seed=nexus_bot',
   'https://api.dicebear.com/7.x/identicon/svg?seed=nexus1',
-  'https://api.dicebear.com/7.x/identicon/svg?seed=creator99',
+  'https://api.dicebear.com/7.x/lorelei/svg?seed=sofia_art',
+  'https://api.dicebear.com/7.x/avataaars/svg?seed=alex_dev',
+  'https://api.dicebear.com/7.x/bottts/svg?seed=cyber_cat',
   'https://api.dicebear.com/7.x/identicon/svg?seed=pixel_star',
-  'https://api.dicebear.com/7.x/identicon/svg?seed=artisan_blue',
-  'https://api.dicebear.com/7.x/identicon/svg?seed=cyber_cat',
-  'https://api.dicebear.com/7.x/identicon/svg?seed=zenith_flow',
 ];
 
 interface SettingsModalProps {
@@ -113,7 +119,30 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onOpenAdminCommand
     profile?.photoURL || user?.photoURL || `https://api.dicebear.com/7.x/identicon/svg?seed=${user?.uid || 'user'}`
   );
   const [customAvatarUrl, setCustomAvatarUrl] = useState('');
-  const [isChangingAvatar, setIsChangingAvatar] = useState(false);
+  const [isChangingAvatar, setIsChangingAvatar] = useState(true);
+
+  // Sync profile data when settings modal opens or profile changes
+  useEffect(() => {
+    if (isSettingsOpen) {
+      if (profile?.displayName) {
+        setDisplayName(profile.displayName);
+      } else if (user?.displayName) {
+        setDisplayName(user.displayName);
+      }
+
+      if (profile?.username) {
+        setUsername(profile.username);
+      } else if (user?.email) {
+        setUsername(user.email.split('@')[0]);
+      }
+
+      if (profile?.photoURL) {
+        setSelectedPhoto(profile.photoURL);
+      } else if (user?.photoURL) {
+        setSelectedPhoto(user.photoURL);
+      }
+    }
+  }, [isSettingsOpen, profile, user]);
 
   // Email change state
   const [newEmailInput, setNewEmailInput] = useState('');
@@ -461,14 +490,14 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onOpenAdminCommand
                         {displayName || 'Usuario NexStudio'}
                       </p>
                       <p className="text-xs text-slate-500 dark:text-slate-400">
-                        Selecciona uno de los avatares predeterminados o introduce una URL directa.
+                        Selecciona tu foto favorita con un clic de la galería directa sin necesidad de buscar archivos en tu dispositivo.
                       </p>
                       <button
                         type="button"
                         onClick={() => setIsChangingAvatar(!isChangingAvatar)}
                         className="text-xs font-semibold text-indigo-600 dark:text-indigo-400 hover:underline cursor-pointer"
                       >
-                        {isChangingAvatar ? 'Ocultar selector' : 'Cambiar avatar'}
+                        {isChangingAvatar ? 'Ocultar galería de avatares' : 'Elegir avatar prediseñado'}
                       </button>
                     </div>
                   </div>
@@ -476,22 +505,32 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onOpenAdminCommand
                   {/* Preset Avatar Selector */}
                   {isChangingAvatar && (
                     <div className="pt-3 border-t border-slate-200 dark:border-slate-700 space-y-3 animate-in fade-in">
-                      <p className="text-xs font-semibold text-slate-700 dark:text-slate-300">
-                        Avatares recomendados:
-                      </p>
-                      <div className="flex flex-wrap gap-3">
+                      <div className="flex items-center justify-between">
+                        <p className="text-xs font-semibold text-slate-700 dark:text-slate-300">
+                          Avatares prediseñados (clic directo):
+                        </p>
+                        <span className="text-[11px] text-emerald-600 dark:text-emerald-400 font-medium">
+                          ✓ No requiere subir desde el dispositivo
+                        </span>
+                      </div>
+                      <div className="grid grid-cols-4 sm:grid-cols-6 gap-2.5">
                         {PRESET_AVATARS.map((url, i) => (
                           <button
                             key={i}
                             type="button"
                             onClick={() => setSelectedPhoto(url)}
-                            className={`p-1 rounded-xl border-2 transition-all cursor-pointer ${
+                            className={`p-1 rounded-xl border-2 transition-all cursor-pointer flex items-center justify-center relative overflow-hidden ${
                               selectedPhoto === url 
-                                ? 'border-indigo-600 ring-2 ring-indigo-500/20 scale-105' 
-                                : 'border-slate-200 dark:border-slate-700 hover:border-slate-400'
+                                ? 'border-indigo-600 ring-2 ring-indigo-500/20 scale-105 shadow-sm bg-indigo-50/30 dark:bg-indigo-950/30' 
+                                : 'border-slate-200 dark:border-slate-700 hover:border-indigo-300'
                             }`}
                           >
-                            <img src={url} alt="Preset" className="w-10 h-10 rounded-lg bg-white" />
+                            <img src={url} alt={`Preset ${i + 1}`} className="w-11 h-11 rounded-lg object-cover bg-white" />
+                            {selectedPhoto === url && (
+                              <span className="absolute bottom-1 right-1 w-3.5 h-3.5 rounded-full bg-indigo-600 text-white flex items-center justify-center text-[9px] font-bold">
+                                ✓
+                              </span>
+                            )}
                           </button>
                         ))}
                       </div>

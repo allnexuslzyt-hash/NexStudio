@@ -10,7 +10,13 @@ const PRESET_AVATARS = [
   'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150&auto=format&fit=crop&q=80',
   'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150&auto=format&fit=crop&q=80',
   'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=150&auto=format&fit=crop&q=80',
-  'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&auto=format&fit=crop&q=80'
+  'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&auto=format&fit=crop&q=80',
+  'https://api.dicebear.com/7.x/bottts/svg?seed=nexus_bot',
+  'https://api.dicebear.com/7.x/identicon/svg?seed=nexus1',
+  'https://api.dicebear.com/7.x/lorelei/svg?seed=sofia_art',
+  'https://api.dicebear.com/7.x/avataaars/svg?seed=alex_dev',
+  'https://api.dicebear.com/7.x/bottts/svg?seed=cyber_cat',
+  'https://api.dicebear.com/7.x/identicon/svg?seed=pixel_star',
 ];
 
 export const OnboardingModal: React.FC = () => {
@@ -207,9 +213,14 @@ export const OnboardingModal: React.FC = () => {
 
           {/* Avatar Picker */}
           <div>
-            <label className="block text-xs font-semibold text-slate-700 mb-2 flex items-center gap-1.5">
-              <Image className="w-3.5 h-3.5 text-slate-400" />
-              <span>Elige tu Foto de Perfil</span>
+            <label className="block text-xs font-semibold text-slate-700 mb-2 flex items-center justify-between">
+              <span className="flex items-center gap-1.5">
+                <Image className="w-3.5 h-3.5 text-slate-400" />
+                <span>Elige tu Foto de Perfil</span>
+              </span>
+              <span className="text-[11px] text-emerald-600 font-medium">
+                1 Clic directo (sin subir archivos)
+              </span>
             </label>
             <div className="flex items-center gap-2.5 overflow-x-auto py-1">
               {PRESET_AVATARS.map((avatar, idx) => {

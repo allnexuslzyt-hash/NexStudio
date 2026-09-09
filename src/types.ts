@@ -98,6 +98,8 @@ export interface SiteSettings {
   maintenanceMode: boolean; // Kill Switch
   maintenanceMessage: string;
   maintenanceEstimatedReturn?: string;
+  estimatedTime?: string;
+  maintenanceReason?: string;
   banner: GlobalBannerConfig;
   allowNewRegistrations: boolean;
   lastUpdated: string;
