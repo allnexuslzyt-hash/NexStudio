@@ -11,6 +11,7 @@ import {
   getDoc, 
   setDoc, 
   deleteDoc,
+  onSnapshot,
   serverTimestamp 
 } from 'firebase/firestore';
 import { auth, db, googleProvider, handleFirestoreError, OperationType, testConnection } from '../lib/firebase';
@@ -38,6 +39,8 @@ interface AuthContextType {
   updateBio: (bio: string) => Promise<void>;
   updateProfileData: (data: { displayName?: string; username?: string; photoURL?: string; onboardingCompleted?: boolean; bio?: string }) => Promise<void>;
   deleteAccount: () => Promise<void>;
+  isBanned: boolean;
+  refreshProfile: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -110,10 +113,37 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       localStorage.removeItem('nexstudio_dev_profile');
     } catch (e) {}
 
+    let unsubUserDoc: (() => void) | null = null;
+
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
+      if (unsubUserDoc) {
+        unsubUserDoc();
+        unsubUserDoc = null;
+      }
+
       if (currentUser) {
         setUser(currentUser);
         await syncUserProfile(currentUser);
+
+        // Subscribirse en tiempo real a los cambios de estado (baneos, roles, perfil)
+        try {
+          unsubUserDoc = onSnapshot(doc(db, 'users', currentUser.uid), async (docSnap) => {
+            if (docSnap.exists()) {
+              const data = docSnap.data() as UserProfile;
+              // Si la suspensión temporal ya expiró, reactivar
+              if (data.status === 'suspendido' && data.banExpiresAt && new Date(data.banExpiresAt) <= new Date()) {
+                data.status = 'activo';
+                try {
+                  await setDoc(doc(db, 'users', currentUser.uid), {
+                    status: 'activo'
+                  }, { merge: true });
+                } catch (e) {}
+              }
+              setProfile(data);
+            }
+          });
+        } catch (e) {}
+
         setLoading(false);
       } else {
         setUser(null);
@@ -122,7 +152,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
     });
 
-    return () => unsubscribe();
+    return () => {
+      if (unsubUserDoc) unsubUserDoc();
+      unsubscribe();
+    };
   }, []);
 
   const signInWithDevAccount = (customEmail?: string, customRole?: string) => {
@@ -346,12 +379,26 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     profile?.role === 'Admin'
   );
 
+  const isBanned = Boolean(
+    !isAdmin &&
+    profile &&
+    (profile.status === 'baneado' || 
+     (profile.status === 'suspendido' && (!profile.banExpiresAt || new Date(profile.banExpiresAt) > new Date())))
+  );
+
+  const refreshProfile = async () => {
+    if (user) {
+      await syncUserProfile(user);
+    }
+  };
+
   return (
     <AuthContext.Provider
       value={{
         user,
         profile,
         isAdmin,
+        isBanned,
         loading,
         authError,
         unauthorizedDomain,
@@ -363,6 +410,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         updateBio,
         updateProfileData,
         deleteAccount,
+        refreshProfile,
       }}
     >
       {children}

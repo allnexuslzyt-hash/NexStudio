@@ -861,6 +861,14 @@ export const AdminCommandCenter: React.FC<AdminCommandCenterProps> = ({ onBack }
                           {t.subject}
                         </span>
 
+                        {/* Ban Appeal Badge */}
+                        {t.isBanAppeal && (
+                          <span className="px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider bg-rose-50 text-rose-700 border border-rose-200 flex items-center gap-1">
+                            <ShieldAlert className="w-3 h-3 text-rose-600" />
+                            <span>Reclamación de Baneo</span>
+                          </span>
+                        )}
+
                         {/* Priority Badge */}
                         <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider ${
                           t.priority === 'urgente'
@@ -2083,6 +2091,61 @@ export const AdminCommandCenter: React.FC<AdminCommandCenterProps> = ({ onBack }
                   )}
                 </span>
               </div>
+
+              {/* Ban Appeal Resolution Bar if isBanAppeal */}
+              {activeAdminChatTicket.isBanAppeal && (
+                <div className="px-4 py-3 bg-rose-50/90 border-b border-rose-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div className="flex items-center gap-2.5">
+                    <ShieldAlert className="w-5 h-5 text-rose-600 shrink-0" />
+                    <div>
+                      <span className="text-xs font-bold text-rose-900 block">
+                        Reclamación Oficial de Sanción / Baneo
+                      </span>
+                      <span className="text-[11px] text-rose-700">
+                        Motivo: <strong>{activeAdminChatTicket.banReason || 'No especificado'}</strong> &bull; Duración: <strong>{activeAdminChatTicket.banDuration || 'Permanente'}</strong>
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2 shrink-0">
+                    {activeAdminChatTicket.userId && (
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          if (confirm(`¿Levantar sanción y reactivar al usuario ${activeAdminChatTicket.userName}?`)) {
+                            await banOrSuspendUser(activeAdminChatTicket.userId!, 'activo', 'Sanción levantada tras revisión de apelación');
+                            await addMessageToTicket(
+                              activeAdminChatTicket.id,
+                              '✅ Tu reclamación ha sido aceptada por la administración. La sanción ha sido levantada y tu cuenta ha sido reactivada con normalidad.'
+                            );
+                            await closeTicket(activeAdminChatTicket.id);
+                            showToast('Sanción levantada y usuario reactivado');
+                          }
+                        }}
+                        className="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold shadow-xs cursor-pointer"
+                      >
+                        Levantar Baneo y Reactivar
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        if (confirm('¿Rechazar esta reclamación y mantener la sanción?')) {
+                          await addMessageToTicket(
+                            activeAdminChatTicket.id,
+                            '❌ Tu reclamación ha sido examinada minuciosamente y el equipo de administración ha determinado mantener la sanción.'
+                          );
+                          await closeTicket(activeAdminChatTicket.id);
+                          showToast('Reclamación rechazada y caso cerrado');
+                        }
+                      }}
+                      className="px-3 py-1.5 rounded-xl bg-white border border-rose-300 text-rose-700 hover:bg-rose-100 text-xs font-semibold cursor-pointer"
+                    >
+                      Mantener Sanción
+                    </button>
+                  </div>
+                </div>
+              )}
 
               {/* Chat messages */}
               <div className="flex-1 p-4 overflow-y-auto space-y-3 bg-slate-50/50">

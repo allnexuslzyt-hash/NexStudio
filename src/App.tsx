@@ -14,6 +14,7 @@ import { HelpPageView } from './components/HelpPageView';
 import { SettingsModal } from './components/SettingsModal';
 import { GlobalBanner } from './components/GlobalBanner';
 import { MaintenanceScreen } from './components/MaintenanceScreen';
+import { BannedScreen } from './components/BannedScreen';
 import { AdminCommandCenter } from './components/AdminCommandCenter';
 import { UnauthorizedDomainModal } from './components/UnauthorizedDomainModal';
 import { OnboardingModal } from './components/OnboardingModal';
@@ -22,13 +23,27 @@ import { motion } from 'motion/react';
 import { Boxes } from 'lucide-react';
 
 const WorkspaceContent: React.FC = () => {
-  const { user, unauthorizedDomain, setUnauthorizedDomain } = useAuth();
+  const { user, isBanned, unauthorizedDomain, setUnauthorizedDomain } = useAuth();
   const { siteSettings, isAdmin } = useAdmin();
   const [activeView, setActiveView] = useState<string>('workspace');
   const [isTermsOpen, setIsTermsOpen] = useState<boolean>(false);
 
   // Vistas de página blanca requeridas por el usuario hasta que defina contenido
   const isBlankView = ['proyectos', 'creaciones', 'herramientas'].includes(activeView);
+
+  // Si el usuario está baneado o suspendido activamente, bloquear totalmente el acceso a la web y mostrar BannedScreen
+  if (isBanned) {
+    return (
+      <>
+        <BannedScreen />
+        <UnauthorizedDomainModal
+          domain={unauthorizedDomain || ''}
+          isOpen={Boolean(unauthorizedDomain)}
+          onClose={() => setUnauthorizedDomain(null)}
+        />
+      </>
+    );
+  }
 
   // Si el interruptor de cierre global (Kill Switch) está activo y el usuario no es admin, bloquear inmediatamente
   if (siteSettings.maintenanceMode && !isAdmin) {

@@ -428,34 +428,86 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   const banOrSuspendUser = async (userId: string, status: UserStatus, reason: string, duration: string = 'Permanente') => {
     const targetUser = users.find(u => u.id === userId);
+
+    if (status === 'activo') {
+      try {
+        await setDoc(doc(db, 'users', userId), {
+          status: 'activo',
+          banReason: null,
+          banDuration: null,
+          bannedAt: null,
+          banExpiresAt: null
+        }, { merge: true });
+      } catch (e) {
+        console.warn('Error reactivando usuario en Firestore:', e);
+      }
+      setUsers(prev => prev.map(u => {
+        if (u.id === userId) {
+          return {
+            ...u,
+            status: 'activo',
+            banReason: undefined,
+            banDuration: undefined,
+            bannedAt: undefined,
+            banExpiresAt: undefined
+          };
+        }
+        return u;
+      }));
+      logAdminAction(
+        'Reactivó usuario (Sanción levantada)',
+        targetUser ? `${targetUser.displayName} (@${targetUser.username})` : userId,
+        'usuarios',
+        `El usuario ha sido reincorporado al servicio con estado activo.`
+      );
+      return;
+    }
+
+    const now = new Date();
+    let banExpiresAt: string | null = null;
+    if (duration === '24 horas') {
+      banExpiresAt = new Date(now.getTime() + 24 * 60 * 60 * 1000).toISOString();
+    } else if (duration === '7 días') {
+      banExpiresAt = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000).toISOString();
+    } else if (duration === '30 días') {
+      banExpiresAt = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000).toISOString();
+    }
+
+    const effectiveReason = reason?.trim() || (status === 'baneado' ? 'Incumplimiento de las normas de la comunidad' : 'Suspensión temporal por infracción');
+
     try {
       await setDoc(doc(db, 'users', userId), {
         status,
-        banReason: reason,
-        banDuration: duration
+        banReason: effectiveReason,
+        banDuration: duration,
+        bannedAt: now.toISOString(),
+        banExpiresAt
       }, { merge: true });
     } catch (e) {
       console.warn('Error guardando sanción en Firestore:', e);
     }
+
     setUsers(prev => prev.map(u => {
       if (u.id === userId) {
         return {
           ...u,
           status,
-          banReason: reason,
+          banReason: effectiveReason,
           banDuration: duration,
+          bannedAt: now.toISOString(),
+          banExpiresAt: banExpiresAt || undefined,
           sanctionsCount: (u.sanctionsCount || 0) + 1
         };
       }
       return u;
     }));
 
-    const actionTitle = status === 'baneado' ? 'Baneó usuario' : (status === 'suspendido' ? 'Suspendió usuario' : 'Reactivó usuario');
+    const actionTitle = status === 'baneado' ? 'Baneó usuario' : 'Suspendió usuario temporalmente';
     logAdminAction(
       actionTitle,
       targetUser ? `${targetUser.displayName} (@${targetUser.username})` : userId,
       'usuarios',
-      `Motivo: ${reason} | Duración: ${duration}`
+      `Motivo: ${effectiveReason} | Duración: ${duration}${banExpiresAt ? ` | Expira: ${new Date(banExpiresAt).toLocaleString()}` : ''}`
     );
   };
 

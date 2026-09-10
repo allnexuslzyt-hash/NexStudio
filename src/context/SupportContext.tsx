@@ -33,6 +33,9 @@ interface SupportContextType {
   closeTicket: (ticketId: string) => Promise<void>;
   reopenTicket: (ticketId: string) => Promise<void>;
   deleteTicket: (ticketId: string) => Promise<void>;
+  submitBanAppeal: (explanation: string) => Promise<SupportTicket>;
+  hasSubmittedBanAppeal: boolean;
+  userBanAppealTicket: SupportTicket | null;
 }
 
 const SupportContext = createContext<SupportContextType | undefined>(undefined);
@@ -269,6 +272,89 @@ export const SupportProvider: React.FC<{ children: React.ReactNode }> = ({ child
     }
   };
 
+  // Dedicated Ban Appeal Ticket logic (Right to a SINGLE appeal ticket)
+  const userBanAppealTicket = React.useMemo(() => {
+    if (!user) return null;
+    return (
+      tickets.find(
+        (t) =>
+          (t.userId === user.uid || (user.email && t.contactEmail?.toLowerCase() === user.email.toLowerCase())) &&
+          (Boolean(t.isBanAppeal) || t.id === profile?.appealTicketId)
+      ) || null
+    );
+  }, [tickets, user, profile?.appealTicketId]);
+
+  const hasSubmittedBanAppeal = Boolean(userBanAppealTicket || profile?.appealTicketId);
+
+  const submitBanAppeal = async (explanation: string): Promise<SupportTicket> => {
+    if (!user) {
+      throw new Error('Debes estar autenticado para remitir una reclamación de baneo.');
+    }
+    if (hasSubmittedBanAppeal) {
+      throw new Error('Ya has ejercido tu derecho a un único ticket de reclamación para este baneo.');
+    }
+    if (!explanation.trim() || explanation.trim().length < 15) {
+      throw new Error('Por favor, redacta una justificación detallada de al menos 15 caracteres.');
+    }
+
+    setIsLoading(true);
+    const appealId = `appeal-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
+    const nowIso = new Date().toISOString();
+
+    const senderName = profile?.displayName || user.displayName || user.email?.split('@')[0] || 'Usuario Sancionado';
+    const senderAvatar = profile?.photoURL || user.photoURL || `https://api.dicebear.com/7.x/identicon/svg?seed=${user.uid}`;
+    const verifiedEmail = user.email || profile?.email || '';
+
+    const initialMsg: TicketMessage = {
+      id: `msg-${Date.now()}`,
+      senderId: user.uid,
+      senderEmail: verifiedEmail,
+      senderName,
+      senderAvatar,
+      isAdmin: false,
+      text: explanation.trim(),
+      timestamp: nowIso
+    };
+
+    const newTicket: SupportTicket = {
+      id: appealId,
+      subject: `Reclamación de Baneo: @${profile?.username || senderName}`,
+      contactEmail: verifiedEmail,
+      priority: 'urgente',
+      status: 'abierto',
+      userId: user.uid,
+      userName: senderName,
+      userAvatar: senderAvatar,
+      createdAt: nowIso,
+      updatedAt: nowIso,
+      claimedBy: null,
+      claimedByName: null,
+      claimedByEmail: null,
+      messages: [initialMsg],
+      isBanAppeal: true,
+      banReason: profile?.banReason || 'Incumplimiento de directrices',
+      banDuration: profile?.banDuration || 'Permanente'
+    };
+
+    try {
+      const docRef = doc(db, 'support_tickets', appealId);
+      await setDoc(docRef, newTicket);
+
+      // Persist appealTicketId in the user's profile to permanently lock subsequent attempts
+      const userRef = doc(db, 'users', user.uid);
+      await setDoc(userRef, { appealTicketId: appealId }, { merge: true });
+
+      setActiveTicketId(appealId);
+      return newTicket;
+    } catch (err) {
+      console.error('Error enviando reclamación de baneo:', err);
+      handleFirestoreError(err, OperationType.CREATE, `support_tickets/${appealId}`);
+      throw err;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   return (
     <SupportContext.Provider
       value={{
@@ -286,7 +372,10 @@ export const SupportProvider: React.FC<{ children: React.ReactNode }> = ({ child
         claimTicket,
         closeTicket,
         reopenTicket,
-        deleteTicket
+        deleteTicket,
+        submitBanAppeal,
+        hasSubmittedBanAppeal,
+        userBanAppealTicket
       }}
     >
       {children}
