@@ -116,6 +116,13 @@ export const SupportProvider: React.FC<{ children: React.ReactNode }> = ({ child
       throw new Error('Debes iniciar sesión con tu cuenta registrada para abrir un ticket de soporte.');
     }
 
+    if (
+      profile?.status === 'baneado' ||
+      (profile?.status === 'suspendido' && (!profile.banExpiresAt || new Date(profile.banExpiresAt) > new Date()))
+    ) {
+      throw new Error('Tu cuenta se encuentra bajo sanción activa. Dispones de un único ticket de reclamación por baneo gestionable directamente desde tu pantalla de bloqueo.');
+    }
+
     setIsLoading(true);
     const ticketId = `tkt-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
     const nowIso = new Date().toISOString();
@@ -272,26 +279,38 @@ export const SupportProvider: React.FC<{ children: React.ReactNode }> = ({ child
     }
   };
 
-  // Dedicated Ban Appeal Ticket logic (Right to a SINGLE appeal ticket)
+  // Dedicated Ban Appeal Ticket logic (Right to a SINGLE appeal ticket PER BAN)
   const userBanAppealTicket = React.useMemo(() => {
     if (!user) return null;
     return (
       tickets.find(
         (t) =>
+          Boolean(t.isBanAppeal) &&
           (t.userId === user.uid || (user.email && t.contactEmail?.toLowerCase() === user.email.toLowerCase())) &&
-          (Boolean(t.isBanAppeal) || t.id === profile?.appealTicketId)
+          (
+            // Match current ban instance if available
+            (profile?.currentBanId && t.banId === profile.currentBanId) ||
+            (profile?.appealTicketId && t.id === profile.appealTicketId) ||
+            // Fallback: created around or after the user's ban timestamp
+            (profile?.bannedAt && new Date(t.createdAt).getTime() >= new Date(profile.bannedAt).getTime() - 15000) ||
+            // Or if no new ban was registered yet, match any appeal ticket
+            (!profile?.bannedAt && !profile?.currentBanId)
+          )
       ) || null
     );
-  }, [tickets, user, profile?.appealTicketId]);
+  }, [tickets, user, profile?.currentBanId, profile?.appealTicketId, profile?.bannedAt]);
 
-  const hasSubmittedBanAppeal = Boolean(userBanAppealTicket || profile?.appealTicketId);
+  const hasSubmittedBanAppeal = Boolean(
+    userBanAppealTicket ||
+    (profile?.appealTicketId && profile?.appealTicketId.trim() !== '')
+  );
 
   const submitBanAppeal = async (explanation: string): Promise<SupportTicket> => {
     if (!user) {
       throw new Error('Debes estar autenticado para remitir una reclamación de baneo.');
     }
     if (hasSubmittedBanAppeal) {
-      throw new Error('Ya has ejercido tu derecho a un único ticket de reclamación para este baneo.');
+      throw new Error('Ya has ejercido tu derecho a un único ticket de reclamación para esta sanción.');
     }
     if (!explanation.trim() || explanation.trim().length < 15) {
       throw new Error('Por favor, redacta una justificación detallada de al menos 15 caracteres.');
@@ -300,6 +319,7 @@ export const SupportProvider: React.FC<{ children: React.ReactNode }> = ({ child
     setIsLoading(true);
     const appealId = `appeal-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
     const nowIso = new Date().toISOString();
+    const effectiveBanId = profile?.currentBanId || `ban-${Date.now()}`;
 
     const senderName = profile?.displayName || user.displayName || user.email?.split('@')[0] || 'Usuario Sancionado';
     const senderAvatar = profile?.photoURL || user.photoURL || `https://api.dicebear.com/7.x/identicon/svg?seed=${user.uid}`;
@@ -332,6 +352,7 @@ export const SupportProvider: React.FC<{ children: React.ReactNode }> = ({ child
       claimedByEmail: null,
       messages: [initialMsg],
       isBanAppeal: true,
+      banId: effectiveBanId,
       banReason: profile?.banReason || 'Incumplimiento de directrices',
       banDuration: profile?.banDuration || 'Permanente'
     };
@@ -340,9 +361,12 @@ export const SupportProvider: React.FC<{ children: React.ReactNode }> = ({ child
       const docRef = doc(db, 'support_tickets', appealId);
       await setDoc(docRef, newTicket);
 
-      // Persist appealTicketId in the user's profile to permanently lock subsequent attempts
+      // Persist appealTicketId in the user's profile for this ban instance
       const userRef = doc(db, 'users', user.uid);
-      await setDoc(userRef, { appealTicketId: appealId }, { merge: true });
+      await setDoc(userRef, { 
+        appealTicketId: appealId,
+        currentBanId: effectiveBanId
+      }, { merge: true });
 
       setActiveTicketId(appealId);
       return newTicket;

@@ -255,11 +255,11 @@ export const BannedScreen: React.FC = () => {
                 <h2 className="text-base font-bold text-white flex items-center gap-2">
                   <span>Derecho a Reclamación de Sanción</span>
                   <span className="px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 text-[10px] font-bold uppercase">
-                    1 Ticket Único
+                    1 Ticket por Baneo
                   </span>
                 </h2>
                 <p className="text-xs text-slate-400">
-                  Todo usuario sancionado tiene derecho a abrir un único ticket oficial de reclamación ante la administración.
+                  Todo usuario sancionado tiene derecho a abrir un único ticket oficial de reclamación por cada baneo o sanción aplicada.
                 </p>
               </div>
             </div>
@@ -267,7 +267,7 @@ export const BannedScreen: React.FC = () => {
             {hasSubmittedBanAppeal && (
               <span className="px-3 py-1 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs font-semibold flex items-center gap-1.5 self-start sm:self-center">
                 <CheckCircle2 className="w-3.5 h-3.5" />
-                <span>Ticket en curso</span>
+                <span>Ticket de este baneo registrado</span>
               </span>
             )}
           </div>
@@ -278,8 +278,8 @@ export const BannedScreen: React.FC = () => {
               <div className="p-4 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-300 text-xs leading-relaxed flex items-start gap-3">
                 <Info className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
                 <div>
-                  <strong className="font-semibold block mb-0.5">Norma de Apelación Única:</strong>
-                  Solo puedes enviar <strong>un único ticket de reclamación</strong> para esta sanción. Asegúrate de incluir todos los argumentos, justificaciones y aclaraciones pertinentes de manera respetuosa y detallada.
+                  <strong className="font-semibold block mb-0.5">Norma de Apelación (1 Ticket por Baneo):</strong>
+                  Dispones de <strong>un único ticket de reclamación para este baneo en curso</strong>. Asegúrate de incluir todos los argumentos, justificaciones y aclaraciones pertinentes de manera respetuosa y detallada.
                 </div>
               </div>
 
@@ -321,7 +321,7 @@ export const BannedScreen: React.FC = () => {
                 ) : (
                   <>
                     <Send className="w-4 h-4" />
-                    <span>Enviar Reclamación Oficial (Único Intento)</span>
+                    <span>Enviar Reclamación Oficial (1 por Baneo)</span>
                   </>
                 )}
               </button>
@@ -350,7 +350,7 @@ export const BannedScreen: React.FC = () => {
                     </span>
                   </div>
                   <p className="text-[11px] text-slate-400">
-                    Has utilizado tu derecho a un único ticket de reclamación. No es posible crear tickets adicionales.
+                    Has ejercido el ticket de reclamación correspondiente a este baneo. La resolución de este expediente aplica para este periodo de sanción.
                   </p>
                 </div>
 

@@ -16,6 +16,7 @@ export interface UserProfile {
   banDuration?: string;
   bannedAt?: string;
   banExpiresAt?: string;
+  currentBanId?: string;
   appealTicketId?: string;
   onboardingCompleted?: boolean;
 }
@@ -50,6 +51,7 @@ export interface SupportTicket {
   claimedByEmail?: string | null;
   messages: TicketMessage[];
   isBanAppeal?: boolean;
+  banId?: string;
   banReason?: string;
   banDuration?: string;
 }
@@ -68,6 +70,7 @@ export interface ManagedUser {
   banDuration?: string;
   bannedAt?: string;
   banExpiresAt?: string;
+  currentBanId?: string;
   appealTicketId?: string;
   sanctionsCount?: number;
 }

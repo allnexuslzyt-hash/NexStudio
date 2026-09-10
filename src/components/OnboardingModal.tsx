@@ -1,23 +1,9 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { motion } from 'motion/react';
-import { User, AtSign, Check, AlertCircle, Sparkles, Image, ShieldCheck, Crown, X } from 'lucide-react';
+import { User, AtSign, Check, AlertCircle, Sparkles, Image, ShieldCheck, Crown, X, Upload, Camera, Loader2 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { validateUsername, validateDisplayName } from '../utils/usernameValidation';
-
-const PRESET_AVATARS = [
-  'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
-  'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80',
-  'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150&auto=format&fit=crop&q=80',
-  'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150&auto=format&fit=crop&q=80',
-  'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=150&auto=format&fit=crop&q=80',
-  'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&auto=format&fit=crop&q=80',
-  'https://api.dicebear.com/7.x/bottts/svg?seed=nexus_bot',
-  'https://api.dicebear.com/7.x/identicon/svg?seed=nexus1',
-  'https://api.dicebear.com/7.x/lorelei/svg?seed=sofia_art',
-  'https://api.dicebear.com/7.x/avataaars/svg?seed=alex_dev',
-  'https://api.dicebear.com/7.x/bottts/svg?seed=cyber_cat',
-  'https://api.dicebear.com/7.x/identicon/svg?seed=pixel_star',
-];
+import { processDeviceImage } from '../utils/imageUpload';
 
 export const OnboardingModal: React.FC = () => {
   const { user, profile, updateProfileData } = useAuth();
@@ -33,12 +19,32 @@ export const OnboardingModal: React.FC = () => {
     return profile?.username || (isSuperAdmin ? 'nexuslz' : '');
   });
 
+  const defaultInitialAvatar = profile?.photoURL || user?.photoURL || `https://api.dicebear.com/7.x/identicon/svg?seed=${user?.uid || 'user'}`;
+
   const [selectedAvatar, setSelectedAvatar] = useState<string>(() => {
-    return profile?.photoURL || user?.photoURL || PRESET_AVATARS[0];
+    return defaultInitialAvatar;
   });
+
+  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
+  const [avatarError, setAvatarError] = useState<string | null>(null);
+  const [isDraggingOver, setIsDraggingOver] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [isSaving, setIsSaving] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  const handleAvatarFileChange = async (file: File) => {
+    setAvatarError(null);
+    setIsUploadingAvatar(true);
+    try {
+      const dataUrl = await processDeviceImage(file);
+      setSelectedAvatar(dataUrl);
+    } catch (err: any) {
+      setAvatarError(err.message || 'Error al procesar la imagen seleccionada.');
+    } finally {
+      setIsUploadingAvatar(false);
+    }
+  };
 
   // Sync initial values when user or profile loads
   useEffect(() => {
@@ -50,10 +56,10 @@ export const OnboardingModal: React.FC = () => {
         setUsername(profile.username);
       }
       if (profile.photoURL || user?.photoURL) {
-        setSelectedAvatar(profile.photoURL || user?.photoURL || PRESET_AVATARS[0]);
+        setSelectedAvatar(profile.photoURL || user?.photoURL || defaultInitialAvatar);
       }
     }
-  }, [profile, user]);
+  }, [profile, user, defaultInitialAvatar]);
 
   // Validate in real time (SuperAdmin bypasses all restrictions)
   const usernameValidation = useMemo(() => {
@@ -211,44 +217,85 @@ export const OnboardingModal: React.FC = () => {
             </div>
           </div>
 
-          {/* Avatar Picker */}
+          {/* Foto de Perfil - Solo desde el dispositivo */}
           <div>
-            <label className="block text-xs font-semibold text-slate-700 mb-2 flex items-center justify-between">
+            <label className="block text-xs font-semibold text-slate-700 mb-1.5 flex items-center justify-between">
               <span className="flex items-center gap-1.5">
-                <Image className="w-3.5 h-3.5 text-slate-400" />
-                <span>Elige tu Foto de Perfil</span>
+                <Camera className="w-3.5 h-3.5 text-slate-400" />
+                <span>Foto de Perfil</span>
               </span>
-              <span className="text-[11px] text-emerald-600 font-medium">
-                1 Clic directo (sin subir archivos)
+              <span className="text-[11px] text-indigo-600 font-medium">
+                Solo desde tu dispositivo
               </span>
             </label>
-            <div className="flex items-center gap-2.5 overflow-x-auto py-1">
-              {PRESET_AVATARS.map((avatar, idx) => {
-                const isSelected = selectedAvatar === avatar;
-                return (
-                  <button
-                    key={idx}
-                    type="button"
-                    onClick={() => setSelectedAvatar(avatar)}
-                    className={`relative w-11 h-11 rounded-full overflow-hidden border-2 transition-all shrink-0 cursor-pointer ${
-                      isSelected ? 'border-indigo-600 ring-2 ring-indigo-600/30 scale-105' : 'border-slate-200 hover:border-slate-300'
-                    }`}
-                  >
-                    <img
-                      src={avatar}
-                      alt={`Avatar opción ${idx + 1}`}
-                      referrerPolicy="no-referrer"
-                      className="w-full h-full object-cover"
-                    />
-                    {isSelected && (
-                      <span className="absolute inset-0 bg-indigo-600/40 flex items-center justify-center text-white">
-                        <Check className="w-4 h-4 stroke-[3]" />
-                      </span>
-                    )}
-                  </button>
-                );
-              })}
+
+            <div
+              onDragOver={(e) => {
+                e.preventDefault();
+                setIsDraggingOver(true);
+              }}
+              onDragLeave={() => setIsDraggingOver(false)}
+              onDrop={(e) => {
+                e.preventDefault();
+                setIsDraggingOver(false);
+                const file = e.dataTransfer.files?.[0];
+                if (file) handleAvatarFileChange(file);
+              }}
+              className={`p-3 rounded-2xl border-2 border-dashed transition-all flex items-center justify-between gap-3 ${
+                isDraggingOver
+                  ? 'border-indigo-500 bg-indigo-50/50'
+                  : 'border-slate-200 hover:border-indigo-300 bg-slate-50/60'
+              }`}
+            >
+              <input
+                ref={fileInputRef}
+                type="file"
+                id="onboarding-avatar-input"
+                accept="image/png, image/jpeg, image/jpg, image/webp"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) handleAvatarFileChange(file);
+                  e.target.value = '';
+                }}
+                className="hidden"
+              />
+
+              <div className="flex items-center gap-3 overflow-hidden">
+                <div className="w-9 h-9 rounded-xl bg-white border border-slate-200 flex items-center justify-center text-indigo-600 shrink-0">
+                  {isUploadingAvatar ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <Upload className="w-4 h-4" />
+                  )}
+                </div>
+                <div className="overflow-hidden">
+                  <p className="text-xs font-bold text-slate-800 truncate">
+                    Elegir imagen de tu dispositivo
+                  </p>
+                  <p className="text-[11px] text-slate-500 truncate">
+                    Arrastra aquí o pulsa para buscar (JPG, PNG, WebP)
+                  </p>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                id="onboarding-upload-device-btn"
+                disabled={isUploadingAvatar}
+                onClick={() => fileInputRef.current?.click()}
+                className="px-3 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white text-xs font-bold cursor-pointer shrink-0 transition-colors flex items-center gap-1.5 min-h-[36px]"
+              >
+                <Upload className="w-3.5 h-3.5" />
+                <span>{isUploadingAvatar ? 'Cargando...' : 'Elegir archivo'}</span>
+              </button>
             </div>
+
+            {avatarError && (
+              <p className="text-xs text-rose-600 mt-1.5 flex items-center gap-1">
+                <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                <span>{avatarError}</span>
+              </p>
+            )}
           </div>
 
           {/* Nombre Visible */}

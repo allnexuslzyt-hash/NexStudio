@@ -436,7 +436,9 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           banReason: null,
           banDuration: null,
           bannedAt: null,
-          banExpiresAt: null
+          banExpiresAt: null,
+          currentBanId: null,
+          appealTicketId: null
         }, { merge: true });
       } catch (e) {
         console.warn('Error reactivando usuario en Firestore:', e);
@@ -449,7 +451,9 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
             banReason: undefined,
             banDuration: undefined,
             bannedAt: undefined,
-            banExpiresAt: undefined
+            banExpiresAt: undefined,
+            currentBanId: undefined,
+            appealTicketId: undefined
           };
         }
         return u;
@@ -464,6 +468,7 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
 
     const now = new Date();
+    const currentBanId = `ban-${now.getTime()}-${Math.random().toString(36).substring(2, 6)}`;
     let banExpiresAt: string | null = null;
     if (duration === '24 horas') {
       banExpiresAt = new Date(now.getTime() + 24 * 60 * 60 * 1000).toISOString();
@@ -481,7 +486,9 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         banReason: effectiveReason,
         banDuration: duration,
         bannedAt: now.toISOString(),
-        banExpiresAt
+        banExpiresAt,
+        currentBanId,
+        appealTicketId: null // Cada baneo nuevo otorga derecho a 1 ticket de reclamación para ese baneo específico
       }, { merge: true });
     } catch (e) {
       console.warn('Error guardando sanción en Firestore:', e);
@@ -496,6 +503,8 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           banDuration: duration,
           bannedAt: now.toISOString(),
           banExpiresAt: banExpiresAt || undefined,
+          currentBanId,
+          appealTicketId: undefined,
           sanctionsCount: (u.sanctionsCount || 0) + 1
         };
       }
