@@ -15,7 +15,8 @@ import {
   HelpCircle,
   Sparkles,
   Layers,
-  ArrowRight
+  ArrowRight,
+  Headphones
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
@@ -23,6 +24,7 @@ import {
   GuideArticle 
 } from '../data/helpData';
 import { useAdmin } from '../context/AdminContext';
+import { useSupport } from '../context/SupportContext';
 import { HelpArticleModal } from './HelpArticleModal';
 import { HelpSupportModal } from './HelpSupportModal';
 
@@ -32,6 +34,7 @@ interface HelpPageViewProps {
 
 export const HelpPageView: React.FC<HelpPageViewProps> = ({ onBack }) => {
   const { dynamicFaqs, dynamicGuides } = useAdmin();
+  const { openSupportModal } = useSupport();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [openFaqIds, setOpenFaqIds] = useState<Set<string>>(new Set(['faq-1']));
@@ -459,10 +462,21 @@ export const HelpPageView: React.FC<HelpPageViewProps> = ({ onBack }) => {
               type="button"
               id="help-btn-form"
               onClick={() => setIsSupportModalOpen(true)}
-              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs sm:text-sm font-semibold shadow-xs transition-all cursor-pointer min-h-[44px]"
+              className="inline-flex items-center gap-2 px-4 sm:px-5 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs sm:text-sm font-semibold shadow-xs transition-all cursor-pointer min-h-[44px]"
             >
               <FileText className="w-4 h-4" />
               <span>Formulario de soporte</span>
+            </button>
+
+            {/* Botón Soporte desde la web */}
+            <button
+              type="button"
+              id="help-btn-web-support"
+              onClick={() => openSupportModal()}
+              className="inline-flex items-center gap-2 px-4 sm:px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs sm:text-sm font-semibold shadow-xs hover:shadow-md transition-all cursor-pointer min-h-[44px]"
+            >
+              <Headphones className="w-4 h-4 text-indigo-100" />
+              <span>Soporte desde la web</span>
             </button>
           </div>
         </section>

@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useAdmin } from '../context/AdminContext';
 import { useAuth } from '../context/AuthContext';
 import { 
@@ -151,6 +151,27 @@ export const AdminCommandCenter: React.FC<AdminCommandCenterProps> = ({ onBack }
 
   // Kill Switch state
   const [maintenanceInputMessage, setMaintenanceInputMessage] = useState(siteSettings.maintenanceMessage);
+  const [maintenanceInputEstimatedTime, setMaintenanceInputEstimatedTime] = useState(
+    siteSettings.maintenanceEstimatedReturn || siteSettings.estimatedTime || 'Aproximadamente 30 minutos'
+  );
+  const [maintenanceInputReason, setMaintenanceInputReason] = useState(
+    siteSettings.maintenanceReason || 'Actualización crítica del sistema'
+  );
+
+  // Sync maintenance settings when siteSettings update
+  useEffect(() => {
+    if (siteSettings) {
+      if (siteSettings.maintenanceMessage) {
+        setMaintenanceInputMessage(siteSettings.maintenanceMessage);
+      }
+      if (siteSettings.maintenanceEstimatedReturn || siteSettings.estimatedTime) {
+        setMaintenanceInputEstimatedTime(siteSettings.maintenanceEstimatedReturn || siteSettings.estimatedTime || 'Aproximadamente 30 minutos');
+      }
+      if (siteSettings.maintenanceReason) {
+        setMaintenanceInputReason(siteSettings.maintenanceReason);
+      }
+    }
+  }, [siteSettings.maintenanceMessage, siteSettings.maintenanceEstimatedReturn, siteSettings.estimatedTime, siteSettings.maintenanceReason]);
 
   // Filtered Users
   const filteredUsers = useMemo(() => {
@@ -265,8 +286,14 @@ export const AdminCommandCenter: React.FC<AdminCommandCenterProps> = ({ onBack }
           <button
             type="button"
             onClick={() => {
-              toggleMaintenanceMode(!siteSettings.maintenanceMode);
-              showToast(siteSettings.maintenanceMode ? 'Sitio reabierto al público' : 'Sitio cerrado (Kill Switch activado)');
+              const newState = !siteSettings.maintenanceMode;
+              toggleMaintenanceMode(
+                newState,
+                maintenanceInputMessage,
+                maintenanceInputEstimatedTime,
+                maintenanceInputReason
+              );
+              showToast(siteSettings.maintenanceMode ? 'Sitio reabierto al público' : 'Sitio cerrado al público');
             }}
             className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all shadow-xs flex items-center gap-1.5 cursor-pointer ${
               siteSettings.maintenanceMode
@@ -1147,7 +1174,41 @@ export const AdminCommandCenter: React.FC<AdminCommandCenterProps> = ({ onBack }
               </span>
             </div>
 
-            <div className="space-y-3">
+            <div className="space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                    Tiempo estimado de reapertura:
+                  </label>
+                  <input
+                    type="text"
+                    value={maintenanceInputEstimatedTime}
+                    onChange={(e) => setMaintenanceInputEstimatedTime(e.target.value)}
+                    placeholder="ej. Aproximadamente 30 minutos, 1 hora, 15:00 UTC..."
+                    className="w-full px-3.5 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-900 focus:outline-none focus:border-indigo-500"
+                  />
+                  <p className="text-[11px] text-slate-400 mt-1">
+                    Se mostrará en el cuadro informativo de la pantalla de bloqueo.
+                  </p>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                    Motivo de cierre:
+                  </label>
+                  <input
+                    type="text"
+                    value={maintenanceInputReason}
+                    onChange={(e) => setMaintenanceInputReason(e.target.value)}
+                    placeholder="ej. Actualización crítica del sistema, Migración de servidores..."
+                    className="w-full px-3.5 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-900 focus:outline-none focus:border-indigo-500"
+                  />
+                  <p className="text-[11px] text-slate-400 mt-1">
+                    Indica el motivo técnico o administrativo de la desconexión temporal.
+                  </p>
+                </div>
+              </div>
+
               <div>
                 <label className="block text-xs font-semibold text-slate-700 mb-1">
                   Mensaje personalizado para la pantalla de cierre:
@@ -1156,20 +1217,48 @@ export const AdminCommandCenter: React.FC<AdminCommandCenterProps> = ({ onBack }
                   rows={2}
                   value={maintenanceInputMessage}
                   onChange={(e) => setMaintenanceInputMessage(e.target.value)}
+                  placeholder="Escribe el mensaje explicativo para los usuarios..."
                   className="w-full p-2.5 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-900 focus:outline-none focus:border-indigo-500"
                 />
               </div>
 
-              <div className="flex items-center gap-2 pt-1">
+              <div className="flex flex-wrap items-center justify-between gap-3 pt-1 border-t border-slate-100">
                 <button
                   type="button"
                   onClick={() => {
-                    updateSiteSettings({ maintenanceMessage: maintenanceInputMessage });
-                    showToast('Mensaje de mantenimiento actualizado');
+                    updateSiteSettings({ 
+                      maintenanceMessage: maintenanceInputMessage,
+                      maintenanceEstimatedReturn: maintenanceInputEstimatedTime,
+                      estimatedTime: maintenanceInputEstimatedTime,
+                      maintenanceReason: maintenanceInputReason
+                    });
+                    showToast('Ajustes de mantenimiento guardados y sincronizados');
                   }}
-                  className="px-4 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold cursor-pointer"
+                  className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold cursor-pointer shadow-xs transition-colors"
                 >
-                  Guardar Mensaje
+                  Guardar Ajustes de Mantenimiento
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    const newState = !siteSettings.maintenanceMode;
+                    toggleMaintenanceMode(
+                      newState, 
+                      maintenanceInputMessage, 
+                      maintenanceInputEstimatedTime, 
+                      maintenanceInputReason
+                    );
+                    showToast(newState ? 'Sitio cerrado al público (Modo Mantenimiento)' : 'Sitio reabierto al público');
+                  }}
+                  className={`px-4 py-2 rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer flex items-center gap-1.5 ${
+                    siteSettings.maintenanceMode
+                      ? 'bg-emerald-600 hover:bg-emerald-500 text-white'
+                      : 'bg-rose-600 hover:bg-rose-500 text-white'
+                  }`}
+                >
+                  <Power className="w-3.5 h-3.5" />
+                  <span>{siteSettings.maintenanceMode ? 'REABRIR SITIO AHORA' : 'ACTIVAR CIERRE DE SITIO'}</span>
                 </button>
               </div>
             </div>

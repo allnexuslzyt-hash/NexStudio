@@ -51,7 +51,7 @@ export const MaintenanceScreen: React.FC<MaintenanceScreenProps> = ({ onOpenAdmi
             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span>
             <span className="relative inline-flex rounded-full h-2 w-2 bg-rose-500"></span>
           </span>
-          <span>ESTADO: CERRADO AL PÚBLICO (KILL SWITCH ACTIVO)</span>
+          <span>ESTADO: CERRADO AL PÚBLICO</span>
         </motion.div>
 
         {/* Big Alert Icon */}
@@ -96,14 +96,14 @@ export const MaintenanceScreen: React.FC<MaintenanceScreenProps> = ({ onOpenAdmi
               <Clock className="w-4 h-4 text-amber-400 shrink-0" />
               <div>
                 <span className="text-slate-400 block font-medium">Tiempo estimado:</span>
-                <span className="text-slate-200 font-semibold">{siteSettings.maintenanceEstimatedReturn || 'Pocos minutos'}</span>
+                <span className="text-slate-200 font-semibold">{siteSettings.maintenanceEstimatedReturn || siteSettings.estimatedTime || 'Pocos minutos'}</span>
               </div>
             </div>
             <div className="flex items-center gap-3">
               <Radio className="w-4 h-4 text-rose-400 shrink-0" />
               <div>
                 <span className="text-slate-400 block font-medium">Motivo de cierre:</span>
-                <span className="text-slate-200 font-semibold">Actualización crítica del sistema</span>
+                <span className="text-slate-200 font-semibold">{siteSettings.maintenanceReason || 'Actualización del sistema'}</span>
               </div>
             </div>
           </div>
@@ -117,7 +117,7 @@ export const MaintenanceScreen: React.FC<MaintenanceScreenProps> = ({ onOpenAdmi
           className="w-full pt-4 border-t border-slate-800/80 flex flex-col items-center"
         >
           {isAdmin ? (
-            /* Logged in as Admin / allnexuslzyt@gmail.com */
+            /* Logged in as Admin */
             <div className="w-full p-4 rounded-2xl bg-slate-900/90 border border-indigo-500/30 flex flex-col sm:flex-row items-center justify-between gap-4">
               <div className="text-left">
                 <div className="flex items-center gap-2 text-xs font-semibold text-indigo-400 mb-0.5">
@@ -125,7 +125,7 @@ export const MaintenanceScreen: React.FC<MaintenanceScreenProps> = ({ onOpenAdmi
                   <span>Acceso de Administrador Activo</span>
                 </div>
                 <p className="text-xs text-slate-300">
-                  Conectado como <strong className="text-white">{user?.email || 'allnexuslzyt@gmail.com'}</strong>
+                  Conectado como <strong className="text-white">{user?.email || 'Administrador'}</strong>
                 </p>
               </div>
 
@@ -167,7 +167,7 @@ export const MaintenanceScreen: React.FC<MaintenanceScreenProps> = ({ onOpenAdmi
               ) : (
                 <div className="w-full p-4 rounded-2xl bg-slate-900 border border-slate-800 flex flex-col items-center gap-3">
                   <p className="text-xs text-slate-400">
-                    Solo administradores autorizados (<strong className="text-slate-200">allnexuslzyt@gmail.com</strong>) pueden omitir el bloqueo y reactivar el sitio.
+                    Solo administradores autorizados pueden omitir el bloqueo y reactivar el sitio.
                   </p>
                   <div className="w-full flex justify-center">
                     <button
