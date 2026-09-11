@@ -124,7 +124,23 @@ export interface AuditLogItem {
   adminName: string;
   action: string;
   target: string;
-  category: 'usuarios' | 'moderacion' | 'seguridad' | 'ajustes' | 'mantenimiento';
+  category: 'usuarios' | 'moderacion' | 'seguridad' | 'ajustes' | 'mantenimiento' | 'proyectos';
   timestamp: string;
   details?: string;
+}
+
+export interface AdminProject {
+  id: string;
+  title: string;
+  description: string;
+  category?: string;
+  tag?: string;
+  downloadUrl: string;
+  linkUrl?: string;
+  waitTimeSeconds: number;
+  isPublic: boolean; // Visibilidad (visible para visitantes o solo administradores)
+  requireAuth: boolean; // Restricción (requiere registro previo para descargar)
+  status: 'active' | 'draft' | 'archived';
+  createdAt?: string;
+  updatedAt?: string;
 }

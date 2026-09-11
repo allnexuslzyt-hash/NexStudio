@@ -28,8 +28,8 @@ const WorkspaceContent: React.FC = () => {
   const [activeView, setActiveView] = useState<string>('workspace');
   const [isTermsOpen, setIsTermsOpen] = useState<boolean>(false);
 
-  // Vistas de página blanca requeridas por el usuario hasta que defina contenido
-  const isBlankView = ['proyectos', 'creaciones', 'herramientas'].includes(activeView);
+  // Vistas de página blanca requeridas por el usuario hasta que defina contenido (creaciones y herramientas pendientes)
+  const isBlankView = ['creaciones', 'herramientas'].includes(activeView);
 
   // Si el usuario está baneado o suspendido activamente, bloquear totalmente el acceso a la web y mostrar BannedScreen
   if (isBanned) {
@@ -81,8 +81,14 @@ const WorkspaceContent: React.FC = () => {
         ) : activeView === 'ayuda' ? (
           /* Centro de Ayuda completo con buscador en tiempo real, categorías, FAQs, guías y contacto */
           <HelpPageView onBack={() => setActiveView('workspace')} />
+        ) : activeView === 'proyectos' ? (
+          /* Catálogo oficial de Proyectos con Proyecto 1: Asistente Web En HTML */
+          <CatalogView 
+            view="proyectos" 
+            onBack={() => setActiveView('workspace')} 
+          />
         ) : isBlankView ? (
-          /* Página completamente blanca para Proyectos, Creaciones y Herramientas */
+          /* Página completamente blanca para Creaciones y Herramientas */
           <BlankPageView 
             view={activeView} 
             onBack={() => setActiveView('workspace')} 

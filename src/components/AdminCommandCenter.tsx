@@ -40,19 +40,21 @@ import {
   Info,
   MessageSquare,
   Headphones,
-  Send
+  Send,
+  FolderGit2
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { ManagedUser, UserRole, UserStatus, ContentReport, GlobalBannerConfig, BannerType, SupportTicket } from '../types';
 import { FAQItem, GuideArticle } from '../data/helpData';
 import { useSupport } from '../context/SupportContext';
 import { validateUsername, validateDisplayName } from '../utils/usernameValidation';
+import { AdminProjectsManager } from './AdminProjectsManager';
 
 interface AdminCommandCenterProps {
   onBack: () => void;
 }
 
-type AdminTab = 'dashboard' | 'users' | 'tickets' | 'moderation' | 'settings';
+type AdminTab = 'dashboard' | 'users' | 'tickets' | 'projects' | 'moderation' | 'settings';
 
 export const AdminCommandCenter: React.FC<AdminCommandCenterProps> = ({ onBack }) => {
   const { 
@@ -79,6 +81,7 @@ export const AdminCommandCenter: React.FC<AdminCommandCenterProps> = ({ onBack }
     addGuide, 
     updateGuide, 
     deleteGuide,
+    projects,
     auditLogs, 
     serverStatus,
     isAdmin 
@@ -354,6 +357,23 @@ export const AdminCommandCenter: React.FC<AdminCommandCenterProps> = ({ onBack }
               {tickets.filter(t => t.status === 'abierto').length}
             </span>
           )}
+        </button>
+
+        <button
+          type="button"
+          id="btn-admin-tab-projects"
+          onClick={() => setActiveTab('projects')}
+          className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-semibold transition-all cursor-pointer whitespace-nowrap ${
+            activeTab === 'projects' 
+              ? 'bg-white text-slate-900 shadow-xs' 
+              : 'text-slate-600 hover:text-slate-900'
+          }`}
+        >
+          <FolderGit2 className="w-4 h-4" />
+          <span>Gestión de Proyectos</span>
+          <span className="ml-1 px-1.5 py-0.2 rounded-full text-[10px] bg-slate-200 text-slate-700 font-semibold">
+            {projects.length}
+          </span>
         </button>
 
         <button
@@ -1439,6 +1459,11 @@ export const AdminCommandCenter: React.FC<AdminCommandCenterProps> = ({ onBack }
             </div>
           </div>
         </div>
+      )}
+
+      {/* TAB PROYECTOS: GESTIÓN DE PROYECTOS, ENLACES, VISIBILIDAD Y RESTRICCIONES */}
+      {activeTab === 'projects' && (
+        <AdminProjectsManager onShowToast={showToast} />
       )}
 
       {/* MODAL 1: Cambiar Rol */}

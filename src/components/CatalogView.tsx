@@ -1,7 +1,8 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { motion } from 'motion/react';
 import { 
   ArrowLeft, 
+  ArrowRight,
   FolderKanban, 
   Palette, 
   Wrench, 
@@ -20,8 +21,14 @@ import {
   Youtube, 
   MessageSquare,
   Twitch,
-  Video
+  Video,
+  Download,
+  Clock,
+  ShieldCheck
 } from 'lucide-react';
+import { DownloadModal } from './DownloadModal';
+import { ProjectDetailView } from './ProjectDetailView';
+import { useAdmin } from '../context/AdminContext';
 
 interface CatalogViewProps {
   view: 'proyectos' | 'creaciones' | 'herramientas' | 'redes';
@@ -38,9 +45,13 @@ interface CardItem {
   accentColor: string;
   linkText?: string;
   linkUrl?: string;
+  downloadUrl?: string;
+  downloadSeconds?: number;
 }
 
 export const CatalogView: React.FC<CatalogViewProps> = ({ view, onBack }) => {
+  const { projects, isAdmin } = useAdmin();
+
   const getHeaderInfo = () => {
     switch (view) {
       case 'proyectos':
@@ -76,49 +87,21 @@ export const CatalogView: React.FC<CatalogViewProps> = ({ view, onBack }) => {
 
   const getCards = (): CardItem[] => {
     switch (view) {
-      case 'proyectos':
-        return [
-          {
-            id: 'proj-1',
-            title: 'NexStudio Core Engine',
-            category: 'Arquitectura Web',
-            description: 'Plataforma central reactiva con soporte en tiempo real y arquitectura de componentes desacoplados.',
-            tag: 'En Desarrollo',
-            icon: <Layers className="w-5 h-5 text-indigo-600" />,
-            accentColor: 'from-indigo-500/10 to-blue-500/10 border-indigo-200',
-            linkText: 'Explorar Detalles',
-          },
-          {
-            id: 'proj-2',
-            title: 'CloudSync Hub',
-            category: 'Integración Cloud',
-            description: 'Sistema de sincronización y persistencia distribuida con almacenamiento en Firestore de alta disponibilidad.',
-            tag: 'Activo',
-            icon: <Cpu className="w-5 h-5 text-blue-600" />,
-            accentColor: 'from-blue-500/10 to-cyan-500/10 border-blue-200',
-            linkText: 'Ver Especificaciones',
-          },
-          {
-            id: 'proj-3',
-            title: 'Secure Identity Gateway',
-            category: 'Seguridad y Auth',
-            description: 'Módulo de autenticación federada con Google Identity Services y protocolos de protección de cookies.',
-            tag: 'Verificado',
-            icon: <Terminal className="w-5 h-5 text-emerald-600" />,
-            accentColor: 'from-emerald-500/10 to-teal-500/10 border-emerald-200',
-            linkText: 'Ver Documentación',
-          },
-          {
-            id: 'proj-4',
-            title: 'Dynamic Asset Pipeline',
-            category: 'Optimización',
-            description: 'Compilador modular optimizado con Vite y entrega de activos estáticos sobre CDN global ultrarrápida.',
-            tag: 'Producción',
-            icon: <Code2 className="w-5 h-5 text-violet-600" />,
-            accentColor: 'from-violet-500/10 to-purple-500/10 border-violet-200',
-            linkText: 'Ver Pipeline',
-          },
-        ];
+      case 'proyectos': {
+        const visibleProjects = isAdmin ? projects : projects.filter(p => p.isPublic);
+        return visibleProjects.map((p, idx) => ({
+          id: p.id,
+          title: p.title,
+          category: p.category || `Proyecto ${idx + 1}`,
+          description: '',
+          tag: p.tag || `Proyecto ${idx + 1}`,
+          icon: <Code2 className="w-5 h-5 text-indigo-600" />,
+          accentColor: 'from-indigo-500/10 to-blue-500/10 border-indigo-200',
+          linkText: 'Ver',
+          downloadUrl: p.downloadUrl,
+          downloadSeconds: p.waitTimeSeconds ?? 3
+        }));
+      }
 
       case 'creaciones':
         return [
@@ -271,6 +254,25 @@ export const CatalogView: React.FC<CatalogViewProps> = ({ view, onBack }) => {
 
   const header = getHeaderInfo();
   const cards = getCards();
+  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
+
+  const [downloadTarget, setDownloadTarget] = useState<{
+    isOpen: boolean;
+    title: string;
+    url: string;
+    waitTime: number;
+  }>({
+    isOpen: false,
+    title: '',
+    url: '',
+    waitTime: 3,
+  });
+
+  // Si se selecciona un proyecto en la vista de proyectos, renderizar la página dedicada con animaciones
+  if (view === 'proyectos' && selectedProjectId) {
+    const activeProject = projects.find(p => p.id === selectedProjectId) || projects[0];
+    return <ProjectDetailView project={activeProject} onBack={() => setSelectedProjectId(null)} />;
+  }
 
   return (
     <div className="w-full max-w-6xl mx-auto px-4 sm:px-6 py-10 sm:py-14 animate-in fade-in duration-300">
@@ -306,55 +308,143 @@ export const CatalogView: React.FC<CatalogViewProps> = ({ view, onBack }) => {
         </p>
       </div>
 
-      {/* Cards Grid with Smooth Zoom Hover Effect */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-5 sm:gap-6">
-        {cards.map((card, idx) => (
-          <motion.div
-            key={card.id}
-            id={`card-${card.id}`}
-            initial={{ opacity: 0, y: 16 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.35, delay: idx * 0.08, ease: [0.16, 1, 0.3, 1] }}
-            onClick={() => {
-              if (card.linkUrl) {
-                window.open(card.linkUrl, '_blank', 'noopener,noreferrer');
-              }
-            }}
-            className="group relative flex flex-col justify-between p-6 rounded-2xl bg-white border border-slate-200 hover:border-indigo-300/80 shadow-xs hover:shadow-xl hover:shadow-indigo-500/10 transform transition-all duration-300 ease-out hover:scale-[1.03] cursor-pointer overflow-hidden"
-          >
-            {/* Background subtle hover glow */}
-            <div className={`absolute inset-0 bg-gradient-to-br ${card.accentColor} opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none`} />
-
-            <div className="relative z-10">
-              <div className="flex items-center justify-between gap-2 mb-4">
-                <div className="p-2.5 rounded-xl bg-slate-50 group-hover:bg-white border border-slate-200 group-hover:border-indigo-200 shadow-xs transform transition-transform duration-500 ease-out group-hover:scale-110">
+      {/* Renderizado de Proyectos (Solo muestra el nombre y botón Ver) o Catálogo Regular */}
+      {view === 'proyectos' ? (
+        <div className="w-full max-w-2xl mx-auto space-y-4">
+          {cards.map((card, idx) => (
+            <motion.div
+              key={card.id}
+              id={`project-card-${card.id}`}
+              initial={{ opacity: 0, y: 16 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.35, delay: idx * 0.08, ease: [0.16, 1, 0.3, 1] }}
+              onClick={() => setSelectedProjectId(card.id)}
+              className="group p-6 sm:p-7 rounded-2xl bg-white border border-slate-200 hover:border-indigo-300 shadow-xs hover:shadow-xl hover:shadow-indigo-500/10 transform transition-all duration-300 ease-out hover:scale-[1.01] cursor-pointer flex flex-col sm:flex-row items-start sm:items-center justify-between gap-5 text-left"
+            >
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 rounded-2xl bg-indigo-50 border border-indigo-200/80 flex items-center justify-center text-indigo-600 shadow-xs group-hover:scale-105 transition-transform shrink-0">
                   {card.icon}
                 </div>
-                {card.tag && (
-                  <span className="text-[11px] font-semibold px-2.5 py-1 rounded-full bg-slate-100 group-hover:bg-indigo-50 text-slate-700 group-hover:text-indigo-700 border border-slate-200 group-hover:border-indigo-200 transition-colors">
-                    {card.tag}
-                  </span>
-                )}
+                <div>
+                  <h3 className="text-xl font-bold text-slate-900 group-hover:text-indigo-950 transition-colors">
+                    {card.title}
+                  </h3>
+                </div>
               </div>
 
-              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-600 block mb-1">
-                {card.category}
-              </span>
-              <h3 className="text-lg font-bold text-slate-900 group-hover:text-indigo-950 transition-colors mb-2">
-                {card.title}
-              </h3>
-              <p className="text-xs sm:text-sm text-slate-600 leading-relaxed">
-                {card.description}
-              </p>
-            </div>
+              <button
+                type="button"
+                id={`btn-ver-proyecto-${card.id}`}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setSelectedProjectId(card.id);
+                }}
+                className="w-full sm:w-auto px-6 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700 text-white text-xs sm:text-sm font-bold shadow-md shadow-indigo-600/20 hover:shadow-lg hover:shadow-indigo-600/30 transition-all flex items-center justify-center gap-2 cursor-pointer min-h-[44px]"
+              >
+                <span>Ver</span>
+                <ArrowRight className="w-4 h-4 transform group-hover:translate-x-1 transition-transform" />
+              </button>
+            </motion.div>
+          ))}
+        </div>
+      ) : (
+        /* Cards Grid with Smooth Zoom Hover Effect for Redes and others */
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-5 sm:gap-6">
+          {cards.map((card, idx) => (
+            <motion.div
+              key={card.id}
+              id={`card-${card.id}`}
+              initial={{ opacity: 0, y: 16 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.35, delay: idx * 0.08, ease: [0.16, 1, 0.3, 1] }}
+              onClick={() => {
+                if (card.downloadUrl) {
+                  setDownloadTarget({
+                    isOpen: true,
+                    title: card.title,
+                    url: card.downloadUrl,
+                    waitTime: card.downloadSeconds || 3,
+                  });
+                } else if (card.linkUrl) {
+                  window.open(card.linkUrl, '_blank', 'noopener,noreferrer');
+                }
+              }}
+              className="group relative flex flex-col justify-between p-6 rounded-2xl bg-white border border-slate-200 hover:border-indigo-300/80 shadow-xs hover:shadow-xl hover:shadow-indigo-500/10 transform transition-all duration-300 ease-out hover:scale-[1.03] cursor-pointer overflow-hidden"
+            >
+              {/* Background subtle hover glow */}
+              <div className={`absolute inset-0 bg-gradient-to-br ${card.accentColor} opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none`} />
 
-            <div className="relative z-10 mt-6 pt-4 border-t border-slate-100 group-hover:border-slate-200/80 flex items-center justify-between text-xs font-semibold text-indigo-600 group-hover:text-indigo-700 transition-colors">
-              <span>{card.linkText || 'Ver más'}</span>
-              <ExternalLink className="w-3.5 h-3.5 transform transition-transform duration-300 group-hover:translate-x-1" />
-            </div>
-          </motion.div>
-        ))}
-      </div>
+              <div className="relative z-10">
+                <div className="flex items-center justify-between gap-2 mb-4">
+                  <div className="p-2.5 rounded-xl bg-slate-50 group-hover:bg-white border border-slate-200 group-hover:border-indigo-200 shadow-xs transform transition-transform duration-500 ease-out group-hover:scale-110">
+                    {card.icon}
+                  </div>
+                  {card.tag && (
+                    <span className={`text-[11px] font-semibold px-2.5 py-1 rounded-full border transition-colors ${
+                      card.downloadUrl
+                        ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                        : 'bg-slate-100 group-hover:bg-indigo-50 text-slate-700 group-hover:text-indigo-700 border-slate-200 group-hover:border-indigo-200'
+                    }`}>
+                      {card.tag}
+                    </span>
+                  )}
+                </div>
+
+                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-600 block mb-1">
+                  {card.category}
+                </span>
+                <h3 className="text-lg font-bold text-slate-900 group-hover:text-indigo-950 transition-colors mb-2">
+                  {card.title}
+                </h3>
+                <p className="text-xs sm:text-sm text-slate-600 leading-relaxed">
+                  {card.description}
+                </p>
+              </div>
+
+              {/* Bottom Action Footer */}
+              {card.downloadUrl ? (
+                <div className="relative z-10 mt-6 pt-4 border-t border-slate-100 group-hover:border-slate-200/80 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+                  <div className="flex items-center gap-1.5 text-[11px] font-semibold text-emerald-700">
+                    <Clock className="w-3.5 h-3.5 text-emerald-600" />
+                    <span>Espera de {card.downloadSeconds || 3} seg para descargar</span>
+                  </div>
+                  <button
+                    type="button"
+                    id={`btn-download-${card.id}`}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setDownloadTarget({
+                        isOpen: true,
+                        title: card.title,
+                        url: card.downloadUrl!,
+                        waitTime: card.downloadSeconds || 3,
+                      });
+                    }}
+                    className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white text-xs font-bold shadow-md shadow-emerald-600/20 hover:shadow-lg hover:shadow-emerald-600/30 transition-all flex items-center justify-center gap-1.5 cursor-pointer min-h-[38px]"
+                  >
+                    <Download className="w-4 h-4" />
+                    <span>Descargar</span>
+                  </button>
+                </div>
+              ) : (
+                <div className="relative z-10 mt-6 pt-4 border-t border-slate-100 group-hover:border-slate-200/80 flex items-center justify-between text-xs font-semibold text-indigo-600 group-hover:text-indigo-700 transition-colors">
+                  <span>{card.linkText || 'Ver más'}</span>
+                  <ExternalLink className="w-3.5 h-3.5 transform transition-transform duration-300 group-hover:translate-x-1" />
+                </div>
+              )}
+            </motion.div>
+          ))}
+        </div>
+      )}
+
+      {/* Download Countdown Modal */}
+      <DownloadModal
+        isOpen={downloadTarget.isOpen}
+        onClose={() => setDownloadTarget((prev) => ({ ...prev, isOpen: false }))}
+        projectTitle={downloadTarget.title}
+        downloadUrl={downloadTarget.url}
+        waitTimeSeconds={downloadTarget.waitTime}
+      />
     </div>
   );
 };

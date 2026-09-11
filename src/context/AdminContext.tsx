@@ -6,7 +6,8 @@ import {
   AuditLogItem, 
   UserRole, 
   UserStatus,
-  GlobalBannerConfig
+  GlobalBannerConfig,
+  AdminProject
 } from '../types';
 import { useAuth, isSuperAdminEmail } from './AuthContext';
 import { FAQ_ITEMS, GUIDE_ARTICLES, FAQItem, GuideArticle } from '../data/helpData';
@@ -43,6 +44,14 @@ interface AdminContextType {
   addGuide: (guide: Omit<GuideArticle, 'id'>) => Promise<void>;
   updateGuide: (guide: GuideArticle) => Promise<void>;
   deleteGuide: (guideId: string) => Promise<void>;
+  
+  // Projects Manager
+  projects: AdminProject[];
+  updateProject: (project: AdminProject) => Promise<void>;
+  addProject: (project: Omit<AdminProject, 'id' | 'createdAt' | 'updatedAt'>) => Promise<void>;
+  deleteProject: (projectId: string) => Promise<void>;
+  toggleProjectVisibility: (projectId: string) => Promise<void>;
+  toggleProjectRestriction: (projectId: string) => Promise<void>;
   
   // Audit Logs
   auditLogs: AuditLogItem[];
@@ -112,6 +121,24 @@ const INITIAL_AUDIT_LOGS: AuditLogItem[] = [
     category: 'usuarios',
     timestamp: 'Ayer a las 17:40',
     details: 'Suspensión temporal por 7 días tras detección de spam reiterado.'
+  }
+];
+
+export const INITIAL_PROJECTS: AdminProject[] = [
+  {
+    id: 'proj-1',
+    title: 'Asistente Web En HTML',
+    description: 'Estructura completa de asistente inteligente construida en código nativo. Lista para descargar, integrar y personalizar sin dependencias externas.',
+    category: 'Proyecto 1',
+    tag: 'Proyecto 1',
+    downloadUrl: 'https://drive.google.com/file/d/1l67EWOKt-Sc4ldmOLYhMI4lz1Ra0KPoa/view?usp=sharing',
+    linkUrl: '',
+    waitTimeSeconds: 3,
+    isPublic: true,
+    requireAuth: true,
+    status: 'active',
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString()
   }
 ];
 
@@ -208,6 +235,17 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     return GUIDE_ARTICLES;
   });
 
+  // Projects management state
+  const [projects, setProjects] = useState<AdminProject[]>(() => {
+    try {
+      const saved = localStorage.getItem('nexstudio_admin_projects');
+      if (saved) return JSON.parse(saved);
+    } catch (e) {
+      console.error('Error cargando proyectos locales:', e);
+    }
+    return INITIAL_PROJECTS;
+  });
+
   // Audit logs state
   const [auditLogs, setAuditLogs] = useState<AuditLogItem[]>(() => {
     try {
@@ -239,12 +277,39 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     return () => unsubscribe();
   }, []);
 
+  // Real-time synchronization with Firestore projects config
+  useEffect(() => {
+    const projectsRef = doc(db, 'settings', 'projects_config');
+    const unsubscribe = onSnapshot(
+      projectsRef,
+      (docSnap) => {
+        if (docSnap.exists()) {
+          const data = docSnap.data();
+          if (data && Array.isArray(data.items) && data.items.length > 0) {
+            setProjects(data.items as AdminProject[]);
+          }
+        }
+      },
+      (err) => {
+        console.warn('Proyectos sincronizados con almacenamiento local/resiliente:', err.message);
+      }
+    );
+
+    return () => unsubscribe();
+  }, []);
+
   // Save changes to localStorage
   useEffect(() => {
     try {
       localStorage.setItem('nexstudio_site_settings', JSON.stringify(siteSettings));
     } catch (e) {}
   }, [siteSettings]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('nexstudio_admin_projects', JSON.stringify(projects));
+    } catch (e) {}
+  }, [projects]);
 
   useEffect(() => {
     try {
@@ -669,6 +734,72 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     logAdminAction('Eliminó Artículo de Ayuda', target?.title || guideId, 'ajustes');
   };
 
+  // Projects Management Functions
+  const saveProjectsToFirestore = async (newProjects: AdminProject[]) => {
+    try {
+      const projectsRef = doc(db, 'settings', 'projects_config');
+      await setDoc(projectsRef, {
+        items: newProjects,
+        lastUpdated: new Date().toISOString(),
+        updatedBy: user?.email || 'admin'
+      }, { merge: true });
+    } catch (err) {
+      console.warn('No se pudo sincronizar en Firestore inmediatamente, guardado localmente:', err);
+    }
+  };
+
+  const updateProject = async (updatedProject: AdminProject) => {
+    const updated = {
+      ...updatedProject,
+      updatedAt: new Date().toISOString()
+    };
+    const newProjects = projects.map(p => p.id === updated.id ? updated : p);
+    setProjects(newProjects);
+    await saveProjectsToFirestore(newProjects);
+    logAdminAction(
+      'Edición de proyecto',
+      updated.title,
+      'proyectos',
+      `Actualizado: Visibilidad (${updated.isPublic ? 'Público' : 'Oculto'}), Restricción (${updated.requireAuth ? 'Registro Requerido' : 'Descarga Libre'}), Enlace: ${updated.downloadUrl}`
+    );
+  };
+
+  const addProject = async (projectData: Omit<AdminProject, 'id' | 'createdAt' | 'updatedAt'>) => {
+    const newId = `proj-${Date.now()}`;
+    const newProject: AdminProject = {
+      ...projectData,
+      id: newId,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    };
+    const newProjects = [...projects, newProject];
+    setProjects(newProjects);
+    await saveProjectsToFirestore(newProjects);
+    logAdminAction('Creación de proyecto', newProject.title, 'proyectos', `Creado nuevo proyecto con ID ${newId}`);
+  };
+
+  const deleteProject = async (projectId: string) => {
+    const projToDelete = projects.find(p => p.id === projectId);
+    const newProjects = projects.filter(p => p.id !== projectId);
+    setProjects(newProjects);
+    await saveProjectsToFirestore(newProjects);
+    logAdminAction('Eliminación de proyecto', projToDelete?.title || projectId, 'proyectos', `Eliminado proyecto con ID ${projectId}`);
+  };
+
+  const toggleProjectVisibility = async (projectId: string) => {
+    const target = projects.find(p => p.id === projectId);
+    if (!target) return;
+    const updated = { ...target, isPublic: !target.isPublic };
+    await updateProject(updated);
+  };
+
+  const toggleProjectRestriction = async (projectId: string) => {
+    const target = projects.find(p => p.id === projectId);
+    if (!target) return;
+    const updated = { ...target, requireAuth: !target.requireAuth };
+    await updateProject(updated);
+  };
+
   const serverStatus = {
     status: (siteSettings.maintenanceMode ? 'maintenance' : 'online') as 'online' | 'degraded' | 'maintenance',
     latencyMs: 24,
@@ -702,6 +833,12 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         addGuide,
         updateGuide,
         deleteGuide,
+        projects,
+        updateProject,
+        addProject,
+        deleteProject,
+        toggleProjectVisibility,
+        toggleProjectRestriction,
         auditLogs,
         logAdminAction,
         isAdmin,
