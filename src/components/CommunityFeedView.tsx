@@ -21,7 +21,7 @@ import {
   Users
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
-import { db, handleFirestoreError, OperationType } from '../lib/firebase';
+import { db, handleFirestoreError, OperationType, removeUndefinedFields } from '../lib/firebase';
 import { 
   collection, 
   doc, 
@@ -165,7 +165,7 @@ export const CommunityFeedView: React.FC<CommunityFeedViewProps> = ({ onBack }) 
       t.substring(1).toLowerCase()
     );
 
-    const newPost: CommunityPost = {
+    const postPayload: Record<string, any> = {
       id: newPostId,
       authorId: user.uid,
       authorName: profile?.displayName || user.displayName || 'Creador NexStudio',
@@ -173,18 +173,31 @@ export const CommunityFeedView: React.FC<CommunityFeedViewProps> = ({ onBack }) 
       authorPhotoURL: profile?.photoURL || user.photoURL || `https://api.dicebear.com/7.x/identicon/svg?seed=${user.uid}`,
       authorRole: isAdmin ? 'SuperAdmin' : (profile?.role || 'Creador Digital'),
       content: params.content,
-      attachmentUrl: params.attachment?.dataUrl || undefined,
-      attachmentName: params.attachment?.name || undefined,
-      attachmentType: params.attachment?.type || undefined,
-      attachmentSize: params.attachment?.size || undefined,
       visibility: params.visibility || 'public',
       likes: [],
       likesCount: 0,
       commentsCount: 0,
       sharesCount: 0,
       createdAt: new Date().toISOString(),
-      tags: detectedTags.length > 0 ? detectedTags : undefined,
     };
+
+    if (params.attachment?.dataUrl) {
+      postPayload.attachmentUrl = params.attachment.dataUrl;
+    }
+    if (params.attachment?.name) {
+      postPayload.attachmentName = params.attachment.name;
+    }
+    if (params.attachment?.type) {
+      postPayload.attachmentType = params.attachment.type;
+    }
+    if (typeof params.attachment?.size === 'number') {
+      postPayload.attachmentSize = params.attachment.size;
+    }
+    if (detectedTags.length > 0) {
+      postPayload.tags = detectedTags;
+    }
+
+    const newPost = removeUndefinedFields(postPayload) as CommunityPost;
 
     try {
       await setDoc(postDocRef, newPost);
@@ -312,7 +325,7 @@ export const CommunityFeedView: React.FC<CommunityFeedViewProps> = ({ onBack }) 
     const commentId = `comment_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
     const commentRef = doc(db, 'post_comments', commentId);
 
-    const newComment: PostComment = {
+    const commentPayload: Record<string, any> = {
       id: commentId,
       postId,
       authorId: user.uid,
@@ -322,6 +335,8 @@ export const CommunityFeedView: React.FC<CommunityFeedViewProps> = ({ onBack }) 
       content: text,
       createdAt: new Date().toISOString(),
     };
+
+    const newComment = removeUndefinedFields(commentPayload) as PostComment;
 
     try {
       await setDoc(commentRef, newComment);

@@ -81,8 +81,7 @@ service cloud.firestore {
              data.authorName.size() > 0 &&
              data.authorName.size() <= 120 &&
              data.content is string &&
-             data.content.size() > 0 &&
-             data.content.size() <= 1000 &&
+             data.content.size() <= 4000 &&
              (!('attachmentUrl' in data) || data.attachmentUrl is string) &&
              (!('attachmentName' in data) || data.attachmentName is string) &&
              (!('attachmentType' in data) || data.attachmentType is string) &&
@@ -146,10 +145,18 @@ service cloud.firestore {
       // Comments subcollection
       match /comments/{commentId} {
         allow read: if true;
-        allow create: if isSignedIn() && isValidId(commentId) && incoming().authorId == request.auth.uid && incoming().content is string && incoming().content.size() > 0 && incoming().content.size() <= 500;
-        allow update: if isSignedIn() && resource.data.authorId == request.auth.uid && incoming().authorId == resource.data.authorId && incoming().content is string && incoming().content.size() > 0 && incoming().content.size() <= 500;
+        allow create: if isSignedIn() && isValidId(commentId) && incoming().authorId == request.auth.uid && incoming().content is string && incoming().content.size() > 0 && incoming().content.size() <= 1000;
+        allow update: if isSignedIn() && resource.data.authorId == request.auth.uid && incoming().authorId == resource.data.authorId && incoming().content is string && incoming().content.size() > 0 && incoming().content.size() <= 1000;
         allow delete: if isAdmin() || (isSignedIn() && resource.data.authorId == request.auth.uid);
       }
+    }
+
+    // Top-level Post Comments Collection
+    match /post_comments/{commentId} {
+      allow read: if true;
+      allow create: if isSignedIn() && isValidId(commentId) && incoming().authorId == request.auth.uid && incoming().content is string && incoming().content.size() > 0 && incoming().content.size() <= 1000;
+      allow update: if isSignedIn() && resource.data.authorId == request.auth.uid && incoming().authorId == resource.data.authorId && incoming().content is string && incoming().content.size() > 0 && incoming().content.size() <= 1000;
+      allow delete: if isAdmin() || (isSignedIn() && resource.data.authorId == request.auth.uid);
     }
   }
 }

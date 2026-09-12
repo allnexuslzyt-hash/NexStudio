@@ -81,6 +81,21 @@ export function handleFirestoreError(error: unknown, operationType: OperationTyp
   throw new Error(JSON.stringify(errInfo));
 }
 
+// Helper to sanitize Firestore payloads and eliminate any 'undefined' field values
+export function removeUndefinedFields<T extends Record<string, any>>(obj: T): T {
+  const clean: Record<string, any> = {};
+  for (const [key, value] of Object.entries(obj)) {
+    if (value !== undefined) {
+      if (value !== null && typeof value === 'object' && !Array.isArray(value) && !(value instanceof Date)) {
+        clean[key] = removeUndefinedFields(value);
+      } else {
+        clean[key] = value;
+      }
+    }
+  }
+  return clean as T;
+}
+
 // Test connection on boot per Firebase guidelines
 export async function testConnection() {
   try {
