@@ -19,6 +19,7 @@ import { AdminCommandCenter } from './components/AdminCommandCenter';
 import { UnauthorizedDomainModal } from './components/UnauthorizedDomainModal';
 import { OnboardingModal } from './components/OnboardingModal';
 import { SupportChatModal } from './components/SupportChatModal';
+import { CommunityFeedView } from './components/CommunityFeedView';
 import { motion } from 'motion/react';
 import { Boxes } from 'lucide-react';
 
@@ -28,8 +29,8 @@ const WorkspaceContent: React.FC = () => {
   const [activeView, setActiveView] = useState<string>('workspace');
   const [isTermsOpen, setIsTermsOpen] = useState<boolean>(false);
 
-  // Vistas de página blanca requeridas por el usuario hasta que defina contenido (creaciones, herramientas y comunidad pendientes)
-  const isBlankView = ['creaciones', 'herramientas', 'comunidad'].includes(activeView);
+  // Vistas de página blanca requeridas por el usuario hasta que defina contenido (creaciones y herramientas pendientes)
+  const isBlankView = ['creaciones', 'herramientas'].includes(activeView);
 
   // Si el usuario está baneado o suspendido activamente, bloquear totalmente el acceso a la web y mostrar BannedScreen
   if (isBanned) {
@@ -87,6 +88,9 @@ const WorkspaceContent: React.FC = () => {
             view="proyectos" 
             onBack={() => setActiveView('workspace')} 
           />
+        ) : activeView === 'comunidad' ? (
+          /* Red Social de la Comunidad: feed interactivo estilo X para compartir proyectos, dar likes y comentar */
+          <CommunityFeedView onBack={() => setActiveView('workspace')} />
         ) : isBlankView ? (
           /* Página completamente blanca para Creaciones y Herramientas */
           <BlankPageView 

@@ -144,3 +144,36 @@ export interface AdminProject {
   createdAt?: string;
   updatedAt?: string;
 }
+
+export interface PostComment {
+  id: string;
+  postId: string;
+  authorId: string;
+  authorName: string;
+  authorUsername?: string;
+  authorPhotoURL?: string;
+  content: string;
+  createdAt: string;
+}
+
+export interface CommunityPost {
+  id: string;
+  authorId: string;
+  authorName: string;
+  authorUsername?: string;
+  authorPhotoURL?: string;
+  authorRole?: string;
+  content: string;
+  projectId?: string;
+  projectTitle?: string;
+  projectCategory?: string;
+  projectTag?: string;
+  projectLink?: string;
+  likes: string[]; // List of user IDs who liked
+  likesCount: number;
+  commentsCount: number;
+  sharesCount: number;
+  createdAt: string;
+  tags?: string[];
+}
+

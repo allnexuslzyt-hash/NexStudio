@@ -167,6 +167,122 @@
         }
       },
       "required": ["maintenanceMode"]
+    },
+    "CommunityPost": {
+      "title": "CommunityPost",
+      "description": "Public social post shared by authenticated users in the community feed",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique post ID"
+        },
+        "authorId": {
+          "type": "string",
+          "description": "Firebase Auth UID of the post creator"
+        },
+        "authorName": {
+          "type": "string",
+          "description": "Display name of author"
+        },
+        "authorUsername": {
+          "type": "string",
+          "description": "Unique username of author"
+        },
+        "authorPhotoURL": {
+          "type": "string",
+          "description": "Avatar URL of author"
+        },
+        "authorRole": {
+          "type": "string",
+          "description": "Author role in the platform"
+        },
+        "content": {
+          "type": "string",
+          "description": "Post text content, reflections or project summary"
+        },
+        "projectId": {
+          "type": "string",
+          "description": "Attached project ID if sharing a project"
+        },
+        "projectTitle": {
+          "type": "string",
+          "description": "Title of attached project"
+        },
+        "projectCategory": {
+          "type": "string",
+          "description": "Category of attached project"
+        },
+        "projectTag": {
+          "type": "string",
+          "description": "Tag or badge of attached project"
+        },
+        "projectLink": {
+          "type": "string",
+          "description": "Download or external link for attached project"
+        },
+        "likes": {
+          "type": "array",
+          "description": "Array of user IDs who liked this post"
+        },
+        "likesCount": {
+          "type": "number",
+          "description": "Cached total likes count"
+        },
+        "commentsCount": {
+          "type": "number",
+          "description": "Cached total comments count"
+        },
+        "sharesCount": {
+          "type": "number",
+          "description": "Cached total shares count"
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Timestamp string of post creation"
+        }
+      },
+      "required": ["id", "authorId", "authorName", "content"]
+    },
+    "PostComment": {
+      "title": "PostComment",
+      "description": "Comment reply on a community social post",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique comment ID"
+        },
+        "postId": {
+          "type": "string",
+          "description": "ID of parent post"
+        },
+        "authorId": {
+          "type": "string",
+          "description": "UID of comment author"
+        },
+        "authorName": {
+          "type": "string",
+          "description": "Display name of comment author"
+        },
+        "authorUsername": {
+          "type": "string",
+          "description": "Username of comment author"
+        },
+        "authorPhotoURL": {
+          "type": "string",
+          "description": "Avatar of comment author"
+        },
+        "content": {
+          "type": "string",
+          "description": "Comment text content"
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Timestamp string of creation"
+        }
+      },
+      "required": ["id", "postId", "authorId", "authorName", "content"]
     }
   },
   "firestore": {
@@ -185,6 +301,14 @@
     "/support_tickets/{ticketId}": {
       "schema": "SupportTicket",
       "description": "Support tickets and real-time conversation between users and support staff"
+    },
+    "/community_posts/{postId}": {
+      "schema": "CommunityPost",
+      "description": "Public social network feed posts where users share thoughts and projects"
+    },
+    "/community_posts/{postId}/comments/{commentId}": {
+      "schema": "PostComment",
+      "description": "Public comments and discussions under a community post"
     }
   }
 }
