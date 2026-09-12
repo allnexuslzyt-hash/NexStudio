@@ -268,6 +268,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     bannerUrl?: string;
     onboardingCompleted?: boolean;
     bio?: string;
+    description?: string;
     customStatus?: string;
     website?: string;
     visibility?: 'public' | 'community_only' | 'private';
@@ -297,7 +298,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (data.photoURL !== undefined) updatePayload.photoURL = data.photoURL;
       if (data.bannerUrl !== undefined) updatePayload.bannerUrl = data.bannerUrl;
       if (data.onboardingCompleted !== undefined) updatePayload.onboardingCompleted = data.onboardingCompleted;
-      if (data.bio !== undefined) updatePayload.bio = data.bio;
+      if (data.bio !== undefined) {
+        updatePayload.bio = data.bio;
+        updatePayload.description = data.bio;
+      }
+      if (data.description !== undefined) {
+        updatePayload.description = data.description;
+        if (data.bio === undefined) updatePayload.bio = data.description;
+      }
       if (data.customStatus !== undefined) updatePayload.customStatus = data.customStatus;
       if (data.website !== undefined) updatePayload.website = data.website;
       if (data.visibility !== undefined) updatePayload.visibility = data.visibility;

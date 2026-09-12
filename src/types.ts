@@ -10,6 +10,7 @@ export interface UserProfile {
   bannerUrl?: string;
   role?: string;
   bio?: string;
+  description?: string;
   customStatus?: string;
   website?: string;
   visibility?: 'public' | 'community_only' | 'private';

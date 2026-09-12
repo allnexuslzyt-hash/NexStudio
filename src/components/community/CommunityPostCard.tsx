@@ -33,6 +33,7 @@ interface CommunityPostCardProps {
   comments: PostComment[];
   onOpenLightbox: (imageUrl: string, title?: string, authorName?: string) => void;
   onFilterTag?: (tag: string) => void;
+  onOpenProfile?: (authorId: string, authorName?: string, authorUsername?: string, authorPhotoURL?: string) => void;
 }
 
 export const CommunityPostCard: React.FC<CommunityPostCardProps> = ({
@@ -45,6 +46,7 @@ export const CommunityPostCard: React.FC<CommunityPostCardProps> = ({
   comments,
   onOpenLightbox,
   onFilterTag,
+  onOpenProfile,
 }) => {
   const { user, profile, isAdmin, signInWithGoogle } = useAuth();
   const [isCommentsOpen, setIsCommentsOpen] = useState(false);
@@ -118,17 +120,29 @@ export const CommunityPostCard: React.FC<CommunityPostCardProps> = ({
       {/* Cabecera del Autor */}
       <div className="flex items-start justify-between gap-4 mb-3">
         <div className="flex items-center gap-3 min-w-0">
-          <img
-            src={post.authorPhotoURL || `https://api.dicebear.com/7.x/identicon/svg?seed=${post.authorId}`}
-            alt={post.authorName}
-            className="w-11 h-11 rounded-xl object-cover border border-slate-200 bg-slate-100 shrink-0"
-            referrerPolicy="no-referrer"
-          />
+          <button
+            type="button"
+            onClick={() => onOpenProfile && onOpenProfile(post.authorId, post.authorName, post.authorUsername, post.authorPhotoURL)}
+            className="shrink-0 group/avatar cursor-pointer text-left focus:outline-none"
+            title={`Ver perfil de ${post.authorName}`}
+          >
+            <img
+              src={post.authorPhotoURL || `https://api.dicebear.com/7.x/identicon/svg?seed=${post.authorId}`}
+              alt={post.authorName}
+              className="w-11 h-11 rounded-xl object-cover border border-slate-200 bg-slate-100 group-hover/avatar:ring-2 group-hover/avatar:ring-indigo-500/40 transition-all"
+              referrerPolicy="no-referrer"
+            />
+          </button>
           <div className="min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
-              <span className="text-sm sm:text-base font-bold text-slate-900 truncate">
-                {post.authorName}
-              </span>
+              <button
+                type="button"
+                onClick={() => onOpenProfile && onOpenProfile(post.authorId, post.authorName, post.authorUsername, post.authorPhotoURL)}
+                className="text-sm sm:text-base font-bold text-slate-900 truncate hover:text-indigo-600 transition-colors cursor-pointer text-left focus:outline-none inline-flex items-center gap-1"
+                title={`Ver perfil de ${post.authorName}`}
+              >
+                <span>{post.authorName}</span>
+              </button>
               {post.authorRole === 'SuperAdmin' && (
                 <span className="text-[10px] uppercase tracking-wider font-extrabold px-1.5 py-0.5 rounded bg-indigo-100 text-indigo-700 border border-indigo-200 flex items-center gap-1 shrink-0">
                   <ShieldCheck className="w-3 h-3 text-indigo-600" />
@@ -149,7 +163,13 @@ export const CommunityPostCard: React.FC<CommunityPostCardProps> = ({
               )}
             </div>
             <div className="flex items-center gap-1.5 text-xs text-slate-500">
-              <span>@{post.authorUsername || 'creador'}</span>
+              <button
+                type="button"
+                onClick={() => onOpenProfile && onOpenProfile(post.authorId, post.authorName, post.authorUsername, post.authorPhotoURL)}
+                className="hover:text-indigo-600 transition-colors cursor-pointer focus:outline-none"
+              >
+                @{post.authorUsername || 'creador'}
+              </button>
               <span>·</span>
               <span>{formatTimeAgo(post.createdAt)}</span>
             </div>

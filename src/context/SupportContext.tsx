@@ -8,7 +8,7 @@ import {
   query, 
   where 
 } from 'firebase/firestore';
-import { db, handleFirestoreError, OperationType } from '../lib/firebase';
+import { db, handleFirestoreError, OperationType, removeUndefinedFields } from '../lib/firebase';
 import { useAuth } from './AuthContext';
 import { SupportTicket, TicketMessage, TicketPriority } from '../types';
 
@@ -161,7 +161,8 @@ export const SupportProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
     try {
       const docRef = doc(db, 'support_tickets', ticketId);
-      await setDoc(docRef, newTicket);
+      const cleanTicket = removeUndefinedFields(newTicket);
+      await setDoc(docRef, cleanTicket);
       setActiveTicketId(ticketId);
       return newTicket;
     } catch (err) {

@@ -42,6 +42,7 @@ interface CommunityProfileTabProps {
   onDeleteComment: (postId: string, commentId: string) => void;
   postComments: Record<string, PostComment[]>;
   onOpenLightbox: (imageUrl: string, title?: string, authorName?: string) => void;
+  onOpenProfile?: (authorId: string, authorName?: string, authorUsername?: string, authorPhotoURL?: string) => void;
 }
 
 const PRESET_BANNERS = [
@@ -61,6 +62,7 @@ export const CommunityProfileTab: React.FC<CommunityProfileTabProps> = ({
   onDeleteComment,
   postComments,
   onOpenLightbox,
+  onOpenProfile,
 }) => {
   const { user, profile, updateProfileData, isAdmin } = useAuth();
 
@@ -152,6 +154,7 @@ export const CommunityProfileTab: React.FC<CommunityProfileTabProps> = ({
         displayName: displayName.trim(),
         username: username.trim().toLowerCase().replace(/[^a-z0-9_]/g, ''),
         bio: bio.trim(),
+        description: bio.trim(),
         website: website.trim(),
         customStatus: customStatus.trim(),
         visibility,
@@ -309,6 +312,11 @@ export const CommunityProfileTab: React.FC<CommunityProfileTabProps> = ({
                     💬 {customStatus}
                   </p>
                 )}
+                {bio && (
+                  <p className="text-xs sm:text-sm text-slate-700 mt-2 p-2.5 rounded-xl bg-slate-50 border border-slate-200/80 leading-relaxed whitespace-pre-line max-w-xl">
+                    {bio}
+                  </p>
+                )}
               </div>
             </div>
 
@@ -373,16 +381,21 @@ export const CommunityProfileTab: React.FC<CommunityProfileTabProps> = ({
               </div>
 
               <div className="md:col-span-2">
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Biografía / Presentación en la Comunidad
-                </label>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-xs font-semibold text-slate-700">
+                    Descripción del Perfil / Biografía (Visible en tu perfil público)
+                  </label>
+                  <span className="text-[11px] text-slate-400">
+                    {bio.length}/500
+                  </span>
+                </div>
                 <textarea
                   value={bio}
                   onChange={(e) => setBio(e.target.value)}
-                  rows={2}
-                  maxLength={240}
-                  placeholder="Cuéntale a la comunidad sobre tus intereses, proyectos o habilidades..."
-                  className="w-full px-3.5 py-2 text-xs sm:text-sm text-slate-800 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 resize-none"
+                  rows={3}
+                  maxLength={500}
+                  placeholder="Cuéntale a la comunidad sobre ti: tus intereses, proyectos, habilidades o herramientas que utilizas..."
+                  className="w-full px-3.5 py-2.5 text-xs sm:text-sm text-slate-800 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 resize-none"
                 />
               </div>
 
@@ -690,6 +703,7 @@ export const CommunityProfileTab: React.FC<CommunityProfileTabProps> = ({
                 onDeleteComment={onDeleteComment}
                 comments={postComments[post.id] || []}
                 onOpenLightbox={onOpenLightbox}
+                onOpenProfile={onOpenProfile}
               />
             ))}
           </div>

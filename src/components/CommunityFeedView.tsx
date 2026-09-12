@@ -38,6 +38,8 @@ import { CommunityPost, PostComment } from '../types';
 import { CommunityPostCard } from './community/CommunityPostCard';
 import { CommunityProfileTab } from './community/CommunityProfileTab';
 import { CommunityMediaModal } from './community/CommunityMediaModal';
+import { UserProfileModal } from './community/UserProfileModal';
+import { ReportUserModal } from './community/ReportUserModal';
 import { processDeviceFile, formatFileSize, ProcessedFile } from '../lib/fileUploadHelper';
 
 interface CommunityFeedViewProps {
@@ -73,6 +75,52 @@ export const CommunityFeedView: React.FC<CommunityFeedViewProps> = ({ onBack }) 
     title?: string;
     authorName?: string;
   }>({ isOpen: false });
+
+  // Modal para ver perfil completo de un usuario
+  const [selectedUserForProfile, setSelectedUserForProfile] = useState<{
+    id: string;
+    name?: string;
+    username?: string;
+    photoURL?: string;
+  } | null>(null);
+
+  // Modal para reportar usuario y crear ticket
+  const [userToReport, setUserToReport] = useState<{
+    id: string;
+    name: string;
+    username?: string;
+    photoURL?: string;
+    role?: string;
+  } | null>(null);
+
+  const handleOpenUserProfile = (
+    authorId: string,
+    authorName?: string,
+    authorUsername?: string,
+    authorPhotoURL?: string
+  ) => {
+    if (user && authorId === user.uid) {
+      setActiveTab('profile');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    } else {
+      setSelectedUserForProfile({
+        id: authorId,
+        name: authorName,
+        username: authorUsername,
+        photoURL: authorPhotoURL,
+      });
+    }
+  };
+
+  const handleReportUser = (reported: {
+    id: string;
+    name: string;
+    username?: string;
+    photoURL?: string;
+    role?: string;
+  }) => {
+    setUserToReport(reported);
+  };
 
   // Mensaje flotante de notificación
   const [toastMessage, setToastMessage] = useState<string | null>(null);
@@ -527,6 +575,7 @@ export const CommunityFeedView: React.FC<CommunityFeedViewProps> = ({ onBack }) 
               onOpenLightbox={(url, title, author) =>
                 setLightboxData({ isOpen: true, imageUrl: url, title, authorName: author })
               }
+              onOpenProfile={handleOpenUserProfile}
             />
           </div>
         ) : (
@@ -788,12 +837,52 @@ export const CommunityFeedView: React.FC<CommunityFeedViewProps> = ({ onBack }) 
                     setLightboxData({ isOpen: true, imageUrl: url, title, authorName: author })
                   }
                   onFilterTag={(tag) => setSelectedTag(tag)}
+                  onOpenProfile={handleOpenUserProfile}
                 />
               ))
             )}
           </div>
         </div>
       )}
+
+      {/* Modal para ver Perfil Público de un Creador */}
+      <UserProfileModal
+        isOpen={!!selectedUserForProfile}
+        onClose={() => setSelectedUserForProfile(null)}
+        userId={selectedUserForProfile?.id || null}
+        initialName={selectedUserForProfile?.name}
+        initialUsername={selectedUserForProfile?.username}
+        initialPhotoURL={selectedUserForProfile?.photoURL}
+        allPosts={posts}
+        postComments={postComments}
+        onLikePost={handleToggleLike}
+        onSharePost={handleShare}
+        onDeletePost={handleDeletePost}
+        onAddComment={handleAddComment}
+        onDeleteComment={handleDeleteComment}
+        onOpenLightbox={(url, title, author) =>
+          setLightboxData({ isOpen: true, imageUrl: url, title, authorName: author })
+        }
+        onFilterTag={(tag) => {
+          setSelectedTag(tag);
+          setSelectedUserForProfile(null);
+        }}
+        onReportUser={(user) => {
+          setSelectedUserForProfile(null);
+          handleReportUser(user);
+        }}
+        onGoToOwnProfile={() => {
+          setSelectedUserForProfile(null);
+          setActiveTab('profile');
+        }}
+      />
+
+      {/* Modal para Reportar Usuario y Crear Ticket Oficial */}
+      <ReportUserModal
+        isOpen={!!userToReport}
+        onClose={() => setUserToReport(null)}
+        reportedUser={userToReport}
+      />
     </div>
   );
 };
