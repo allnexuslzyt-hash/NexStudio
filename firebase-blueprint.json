@@ -319,6 +319,126 @@
         }
       },
       "required": ["id", "postId", "authorId", "authorName", "content"]
+    },
+    "UserRepository": {
+      "title": "UserRepository",
+      "description": "User created repository to organize, group and showcase their creative projects and files",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique repository ID"
+        },
+        "ownerId": {
+          "type": "string",
+          "description": "UID of repository owner"
+        },
+        "ownerName": {
+          "type": "string",
+          "description": "Display name of repository owner"
+        },
+        "ownerUsername": {
+          "type": "string",
+          "description": "Username of repository owner"
+        },
+        "name": {
+          "type": "string",
+          "description": "Repository title or name"
+        },
+        "description": {
+          "type": "string",
+          "description": "Repository description and objectives"
+        },
+        "category": {
+          "type": "string",
+          "description": "Category or topic"
+        },
+        "visibility": {
+          "type": "string",
+          "description": "public, community_only, or private"
+        },
+        "projectsCount": {
+          "type": "number",
+          "description": "Number of projects uploaded into this repo"
+        },
+        "isFeatured": {
+          "type": "boolean",
+          "description": "Admin featured flag"
+        },
+        "status": {
+          "type": "string",
+          "description": "active, hidden, or flagged"
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Creation timestamp"
+        }
+      },
+      "required": ["id", "ownerId", "ownerName", "name", "visibility"]
+    },
+    "UserRepoProject": {
+      "title": "UserRepoProject",
+      "description": "Individual project uploaded by a user into their repository",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique project ID"
+        },
+        "repoId": {
+          "type": "string",
+          "description": "Parent repository ID"
+        },
+        "repoName": {
+          "type": "string",
+          "description": "Parent repository name"
+        },
+        "ownerId": {
+          "type": "string",
+          "description": "UID of project owner"
+        },
+        "ownerName": {
+          "type": "string",
+          "description": "Name of project owner"
+        },
+        "title": {
+          "type": "string",
+          "description": "Project title"
+        },
+        "description": {
+          "type": "string",
+          "description": "Project description"
+        },
+        "attachmentUrl": {
+          "type": "string",
+          "description": "Data URL or file download URL"
+        },
+        "attachmentName": {
+          "type": "string",
+          "description": "Original file name uploaded from device"
+        },
+        "attachmentType": {
+          "type": "string",
+          "description": "File MIME type or category"
+        },
+        "attachmentSize": {
+          "type": "number",
+          "description": "File size in bytes"
+        },
+        "demoUrl": {
+          "type": "string",
+          "description": "Demo link or external URL"
+        },
+        "version": {
+          "type": "string",
+          "description": "Version string"
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Upload timestamp"
+        }
+      },
+      "required": ["id", "repoId", "ownerId", "title"]
     }
   },
   "firestore": {
@@ -329,6 +449,14 @@
     "/projects/{projectId}": {
       "schema": "Project",
       "description": "Creative showcases and project files"
+    },
+    "/user_repositories/{repoId}": {
+      "schema": "UserRepository",
+      "description": "User created repositories with projects and source files"
+    },
+    "/repo_projects/{projectId}": {
+      "schema": "UserRepoProject",
+      "description": "Projects uploaded into user repositories"
     },
     "/settings/{settingId}": {
       "schema": "SiteSettings",

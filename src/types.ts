@@ -187,3 +187,44 @@ export interface CommunityPost {
   tags?: string[];
 }
 
+export interface UserRepository {
+  id: string;
+  ownerId: string;
+  ownerName: string;
+  ownerUsername?: string;
+  ownerPhotoURL?: string;
+  name: string;
+  description: string;
+  category?: string;
+  tags?: string[];
+  visibility: 'public' | 'community_only' | 'private';
+  projectsCount: number;
+  isFeatured?: boolean;
+  isVerified?: boolean;
+  status?: 'active' | 'hidden' | 'flagged';
+  moderationNotes?: string;
+  createdAt: string;
+  updatedAt?: string;
+}
+
+export interface UserRepoProject {
+  id: string;
+  repoId: string;
+  repoName: string;
+  ownerId: string;
+  ownerName: string;
+  title: string;
+  description: string;
+  attachmentUrl?: string; // Data URL or device file upload link
+  attachmentName?: string;
+  attachmentType?: string;
+  attachmentSize?: number;
+  demoUrl?: string;
+  version?: string;
+  isPublic?: boolean;
+  status?: 'active' | 'hidden' | 'flagged';
+  moderationNotes?: string;
+  createdAt: string;
+  updatedAt?: string;
+}
+

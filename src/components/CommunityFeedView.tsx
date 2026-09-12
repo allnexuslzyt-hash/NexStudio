@@ -37,8 +37,8 @@ import {
 import { CommunityPost, PostComment } from '../types';
 import { CommunityPostCard } from './community/CommunityPostCard';
 import { CommunityProfileTab } from './community/CommunityProfileTab';
+import { CommunityFullProfileView } from './community/CommunityFullProfileView';
 import { CommunityMediaModal } from './community/CommunityMediaModal';
-import { UserProfileModal } from './community/UserProfileModal';
 import { ReportUserModal } from './community/ReportUserModal';
 import { processDeviceFile, formatFileSize, ProcessedFile } from '../lib/fileUploadHelper';
 
@@ -76,13 +76,8 @@ export const CommunityFeedView: React.FC<CommunityFeedViewProps> = ({ onBack }) 
     authorName?: string;
   }>({ isOpen: false });
 
-  // Modal para ver perfil completo de un usuario
-  const [selectedUserForProfile, setSelectedUserForProfile] = useState<{
-    id: string;
-    name?: string;
-    username?: string;
-    photoURL?: string;
-  } | null>(null);
+  // Estado para visualización de perfil a pantalla completa
+  const [viewingProfileUserId, setViewingProfileUserId] = useState<string | null>(null);
 
   // Modal para reportar usuario y crear ticket
   const [userToReport, setUserToReport] = useState<{
@@ -95,21 +90,12 @@ export const CommunityFeedView: React.FC<CommunityFeedViewProps> = ({ onBack }) 
 
   const handleOpenUserProfile = (
     authorId: string,
-    authorName?: string,
-    authorUsername?: string,
-    authorPhotoURL?: string
+    _authorName?: string,
+    _authorUsername?: string,
+    _authorPhotoURL?: string
   ) => {
-    if (user && authorId === user.uid) {
-      setActiveTab('profile');
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-    } else {
-      setSelectedUserForProfile({
-        id: authorId,
-        name: authorName,
-        username: authorUsername,
-        photoURL: authorPhotoURL,
-      });
-    }
+    setViewingProfileUserId(authorId);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const handleReportUser = (reported: {
@@ -470,6 +456,54 @@ export const CommunityFeedView: React.FC<CommunityFeedViewProps> = ({ onBack }) 
       .map(([tag]) => tag);
   }, [posts]);
 
+  // Si se está visualizando el perfil a pantalla completa de cualquier creador
+  if (viewingProfileUserId) {
+    return (
+      <div className="w-full min-h-screen bg-slate-50/50">
+        <CommunityFullProfileView
+          userId={viewingProfileUserId}
+          onBack={() => {
+            setViewingProfileUserId(null);
+            setActiveTab('feed');
+          }}
+          onReportUser={handleReportUser}
+          allPosts={posts}
+          postComments={postComments}
+          onLikePost={handleToggleLike}
+          onSharePost={handleShare}
+          onDeletePost={handleDeletePost}
+          onAddComment={handleAddComment}
+          onDeleteComment={handleDeleteComment}
+          onOpenLightbox={(url, title, author) =>
+            setLightboxData({ isOpen: true, imageUrl: url, title, authorName: author })
+          }
+          onFilterTag={(tag) => {
+            setViewingProfileUserId(null);
+            setActiveTab('feed');
+            setSelectedTag(tag);
+          }}
+          onPublishPost={handleCreatePost}
+        />
+
+        {/* Modal para Reportar Usuario y Crear Ticket Oficial */}
+        <ReportUserModal
+          isOpen={!!userToReport}
+          onClose={() => setUserToReport(null)}
+          reportedUser={userToReport}
+        />
+
+        {/* Lightbox para vista en grande de imágenes */}
+        <CommunityMediaModal
+          isOpen={lightboxData.isOpen}
+          onClose={() => setLightboxData({ isOpen: false })}
+          imageUrl={lightboxData.imageUrl}
+          title={lightboxData.title}
+          authorName={lightboxData.authorName}
+        />
+      </div>
+    );
+  }
+
   return (
     <div className="w-full min-h-screen bg-slate-50/50 px-3 sm:px-6 lg:px-10 py-6 text-slate-800 animate-in fade-in duration-300">
       {/* Toast flotante */}
@@ -544,16 +578,12 @@ export const CommunityFeedView: React.FC<CommunityFeedViewProps> = ({ onBack }) 
                 signInWithGoogle();
                 return;
               }
-              setActiveTab('profile');
+              setViewingProfileUserId(user.uid);
             }}
-            className={`flex-1 sm:flex-initial px-5 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all cursor-pointer flex items-center justify-center gap-2 min-h-[38px] ${
-              activeTab === 'profile'
-                ? 'bg-white text-slate-900 shadow-sm'
-                : 'text-slate-600 hover:text-slate-900'
-            }`}
+            className="flex-1 sm:flex-initial px-5 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all cursor-pointer flex items-center justify-center gap-2 min-h-[38px] text-slate-600 hover:text-slate-900"
           >
             <User className="w-4 h-4 text-indigo-600" />
-            <span>Mi Perfil & Publicar</span>
+            <span>Mi Perfil & Repositorios</span>
           </button>
         </div>
       </header>
@@ -844,38 +874,6 @@ export const CommunityFeedView: React.FC<CommunityFeedViewProps> = ({ onBack }) 
           </div>
         </div>
       )}
-
-      {/* Modal para ver Perfil Público de un Creador */}
-      <UserProfileModal
-        isOpen={!!selectedUserForProfile}
-        onClose={() => setSelectedUserForProfile(null)}
-        userId={selectedUserForProfile?.id || null}
-        initialName={selectedUserForProfile?.name}
-        initialUsername={selectedUserForProfile?.username}
-        initialPhotoURL={selectedUserForProfile?.photoURL}
-        allPosts={posts}
-        postComments={postComments}
-        onLikePost={handleToggleLike}
-        onSharePost={handleShare}
-        onDeletePost={handleDeletePost}
-        onAddComment={handleAddComment}
-        onDeleteComment={handleDeleteComment}
-        onOpenLightbox={(url, title, author) =>
-          setLightboxData({ isOpen: true, imageUrl: url, title, authorName: author })
-        }
-        onFilterTag={(tag) => {
-          setSelectedTag(tag);
-          setSelectedUserForProfile(null);
-        }}
-        onReportUser={(user) => {
-          setSelectedUserForProfile(null);
-          handleReportUser(user);
-        }}
-        onGoToOwnProfile={() => {
-          setSelectedUserForProfile(null);
-          setActiveTab('profile');
-        }}
-      />
 
       {/* Modal para Reportar Usuario y Crear Ticket Oficial */}
       <ReportUserModal
