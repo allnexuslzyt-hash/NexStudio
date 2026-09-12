@@ -217,7 +217,7 @@ export const GUIDE_ARTICLES: GuideArticle[] = [
         ],
         listItems: [
           'Logo de NexStudio: Te devuelve instantáneamente a la página principal estés donde estés.',
-          'Menú desplegable: Acceso directo a Proyectos, Creaciones y Herramientas.',
+          'Menú desplegable: Acceso directo a Oficiales (Proyectos, Creaciones y Herramientas) y Comunidad.',
           'Redes sociales: Menú desplegable minimalista para saltar a YouTube, Twitch, TikTok, Twitter/X y Discord sin rodeos.',
           'Botón de Ayuda: Tu centro de soporte integrado con buscador en tiempo real.',
         ],

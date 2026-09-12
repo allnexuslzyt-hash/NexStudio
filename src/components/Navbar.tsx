@@ -19,13 +19,14 @@ import {
   Settings,
   ShieldCheck,
   Sliders,
-  Headphones
+  Headphones,
+  Users
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useSettings } from '../context/SettingsContext';
 import { useAdmin } from '../context/AdminContext';
 import { useSupport } from '../context/SupportContext';
-import { DropdownMenu } from './DropdownMenu';
+import { DropdownMenu, DropdownMenuItem } from './DropdownMenu';
 import { RedesDropdown } from './RedesDropdown';
 
 interface NavbarProps {
@@ -55,29 +56,50 @@ export const Navbar: React.FC<NavbarProps> = ({
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [mobileRedesExpanded, setMobileRedesExpanded] = useState(false);
+  const [mobileOficialesExpanded, setMobileOficialesExpanded] = useState(true);
 
-  // Exact items requested: Proyectos, Creaciones, Herramientas
-  const menuItems = [
+  // Elementos dentro de Oficiales: Proyectos, Creaciones, Herramientas
+  const oficialesSubItems = [
     {
       id: 'proyectos',
       label: 'Proyectos',
       description: 'Explora los proyectos',
-      icon: <FolderKanban className="w-4 h-4" />,
+      icon: <FolderKanban className="w-4 h-4 text-indigo-600" />,
       onClick: () => onSelectView?.('proyectos'),
     },
     {
       id: 'creaciones',
       label: 'Creaciones',
       description: 'Galería de creaciones',
-      icon: <Palette className="w-4 h-4" />,
+      icon: <Palette className="w-4 h-4 text-violet-600" />,
       onClick: () => onSelectView?.('creaciones'),
     },
     {
       id: 'herramientas',
       label: 'Herramientas',
       description: 'Colección de utilidades',
-      icon: <Wrench className="w-4 h-4" />,
+      icon: <Wrench className="w-4 h-4 text-amber-600" />,
       onClick: () => onSelectView?.('herramientas'),
+    },
+  ];
+
+  // Menú con Comunidad y grupo Oficiales (que contiene proyectos, creaciones, herramientas)
+  const menuItems: DropdownMenuItem[] = [
+    {
+      id: 'oficiales',
+      label: 'Oficiales',
+      icon: <ShieldCheck className="w-4 h-4 text-indigo-600" />,
+      badge: 'Oficial',
+      isGroup: true,
+      defaultExpanded: true,
+      subItems: oficialesSubItems,
+    },
+    {
+      id: 'comunidad',
+      label: 'Comunidad',
+      description: 'Espacio de la comunidad',
+      icon: <Users className="w-4 h-4 text-sky-600" />,
+      onClick: () => onSelectView?.('comunidad'),
     },
   ];
 
@@ -314,19 +336,64 @@ export const Navbar: React.FC<NavbarProps> = ({
             <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400 px-3 py-1">
               Menú
             </p>
-            {menuItems.map((item) => (
-              <button
-                key={item.id}
-                onClick={() => {
-                  item.onClick();
-                  setMobileMenuOpen(false);
-                }}
-                className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-slate-700 hover:bg-slate-100 transition-colors min-h-[44px] cursor-pointer"
-              >
-                <span className="text-indigo-600">{item.icon}</span>
-                <span>{item.label}</span>
-              </button>
-            ))}
+
+            {/* Grupo Oficiales: Proyectos, Creaciones, Herramientas */}
+            <button
+              type="button"
+              id="mobile-menu-oficiales-toggle"
+              onClick={() => setMobileOficialesExpanded(!mobileOficialesExpanded)}
+              className="w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-sm font-semibold text-slate-800 hover:bg-slate-100 transition-colors min-h-[44px] cursor-pointer"
+            >
+              <div className="flex items-center gap-2.5">
+                <span className="p-1 rounded-md bg-indigo-50 text-indigo-600">
+                  <ShieldCheck className="w-4 h-4" />
+                </span>
+                <span>Oficiales</span>
+                <span className="text-[10px] uppercase tracking-wider font-bold px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-700 border border-indigo-200">
+                  Oficial
+                </span>
+              </div>
+              <ChevronDown
+                className={`w-4 h-4 text-slate-400 transition-transform duration-200 ${
+                  mobileOficialesExpanded ? 'rotate-180 text-indigo-600' : ''
+                }`}
+              />
+            </button>
+
+            {mobileOficialesExpanded && (
+              <div className="pl-4 ml-2 border-l border-slate-200 space-y-0.5 py-1">
+                {oficialesSubItems.map((item) => (
+                  <button
+                    key={item.id}
+                    id={`mobile-oficiales-${item.id}`}
+                    onClick={() => {
+                      item.onClick();
+                      setMobileMenuOpen(false);
+                    }}
+                    className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-slate-700 hover:bg-slate-100 transition-colors min-h-[40px] cursor-pointer"
+                  >
+                    <span>{item.icon}</span>
+                    <span>{item.label}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {/* Comunidad */}
+            <button
+              type="button"
+              id="mobile-menu-comunidad-btn"
+              onClick={() => {
+                onSelectView?.('comunidad');
+                setMobileMenuOpen(false);
+              }}
+              className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-semibold text-slate-800 hover:bg-slate-100 transition-colors min-h-[44px] cursor-pointer"
+            >
+              <span className="p-1 rounded-md bg-sky-50 text-sky-600">
+                <Users className="w-4 h-4" />
+              </span>
+              <span>Comunidad</span>
+            </button>
 
             {/* Redes desplegable en móvil */}
             <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400 px-3 pt-3 pb-1">
