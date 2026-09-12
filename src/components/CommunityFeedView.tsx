@@ -3,26 +3,24 @@ import { motion, AnimatePresence } from 'motion/react';
 import { 
   ArrowLeft,
   MessageCircle,
-  Heart,
-  Share2,
-  Send,
   Sparkles,
-  FolderKanban,
-  CheckCircle,
-  ShieldCheck,
-  X,
-  Trash2,
   Search,
   Filter,
   Flame,
   LogIn,
   Layers,
   Copy,
-  ExternalLink,
-  ChevronDown
+  User,
+  Send,
+  Image as ImageIcon,
+  FileUp,
+  X,
+  Check,
+  Globe,
+  Lock,
+  Users
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
-import { useAdmin } from '../context/AdminContext';
 import { db, handleFirestoreError, OperationType } from '../lib/firebase';
 import { 
   collection, 
@@ -36,317 +34,252 @@ import {
   serverTimestamp,
   updateDoc
 } from 'firebase/firestore';
-import { CommunityPost, PostComment, AdminProject } from '../types';
-import { ProjectDetailView } from './ProjectDetailView';
-import { DownloadModal } from './DownloadModal';
+import { CommunityPost, PostComment } from '../types';
+import { CommunityPostCard } from './community/CommunityPostCard';
+import { CommunityProfileTab } from './community/CommunityProfileTab';
+import { CommunityMediaModal } from './community/CommunityMediaModal';
+import { processDeviceFile, formatFileSize, ProcessedFile } from '../lib/fileUploadHelper';
 
 interface CommunityFeedViewProps {
   onBack: () => void;
 }
 
-// Semilla de publicaciones iniciales si Firestore está recién inicializado
-const SEED_POSTS: CommunityPost[] = [
-  {
-    id: 'seed-post-1',
-    authorId: 'allnexuslzyt_official',
-    authorName: 'Nexus Admin',
-    authorUsername: 'allnexuslzyt',
-    authorPhotoURL: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
-    authorRole: 'SuperAdmin',
-    content: '¡Bienvenidos al nuevo espacio social de NexStudio! 🚀 Aquí puedes compartir el avance de tus proyectos, descubrir creaciones de otros miembros y dejar tus comentarios y sugerencias.',
-    projectId: 'p1',
-    projectTitle: 'Proyecto 1: Asistente Web En HTML',
-    projectCategory: 'Inteligencia Artificial',
-    projectTag: 'Oficial',
-    likes: ['allnexuslzyt_official'],
-    likesCount: 12,
-    commentsCount: 2,
-    sharesCount: 5,
-    createdAt: new Date(Date.now() - 3600000 * 4).toISOString(),
-    tags: ['nexstudio', 'bienvenida', 'proyectos'],
-  },
-  {
-    id: 'seed-post-2',
-    authorId: 'creator_sofia',
-    authorName: 'Sofía Martínez',
-    authorUsername: 'sofia_code',
-    authorPhotoURL: 'https://api.dicebear.com/7.x/identicon/svg?seed=sofia_code',
-    authorRole: 'Creador Digital',
-    content: 'Acabo de probar el Asistente Web en HTML y las descargas en un clic. La interfaz está súper cuidada y la navegación es instantánea. ¡Deseando ver qué nuevas utilidades se vienen! ✨ #nexstudio #diseño',
-    likes: [],
-    likesCount: 7,
-    commentsCount: 1,
-    sharesCount: 2,
-    createdAt: new Date(Date.now() - 3600000 * 12).toISOString(),
-    tags: ['feedback', 'creadores'],
-  }
-];
-
 export const CommunityFeedView: React.FC<CommunityFeedViewProps> = ({ onBack }) => {
   const { user, profile, isAdmin, signInWithGoogle } = useAuth();
-  const { projects } = useAdmin();
 
-  // Estados principales
-  const [posts, setPosts] = useState<CommunityPost[]>(SEED_POSTS);
-  const [loading, setLoading] = useState<boolean>(true);
-  const [activeTab, setActiveTab] = useState<'todos' | 'proyectos' | 'mis_posts'>('todos');
+  // Pestañas principales de la Comunidad:
+  // 'feed' = Explorar Comunidad a pantalla completa
+  // 'profile' = Pestaña exclusiva para publicar, ver tus posts y personalizar perfil/banner/visibilidad
+  const [activeTab, setActiveTab] = useState<'feed' | 'profile'>('feed');
+
+  // Estado de publicaciones reales de Firestore (SIN publicaciones de mentira)
+  const [posts, setPosts] = useState<CommunityPost[]>([]);
+  const [postComments, setPostComments] = useState<Record<string, PostComment[]>>({});
+  const [isLoading, setIsLoading] = useState<boolean>(true);
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [selectedTag, setSelectedTag] = useState<string | null>(null);
 
-  // Estado del creador de publicaciones
-  const [newContent, setNewContent] = useState<string>('');
-  const [selectedProjectId, setSelectedProjectId] = useState<string>('');
-  const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
-  const [projectSelectorOpen, setProjectSelectorOpen] = useState<boolean>(false);
+  // Estados del compositor rápido del feed principal
+  const [quickPostContent, setQuickPostContent] = useState('');
+  const [quickPostVisibility, setQuickPostVisibility] = useState<'public' | 'community_only' | 'private'>('public');
+  const [quickAttachment, setQuickAttachment] = useState<ProcessedFile | null>(null);
+  const [isUploadingQuickFile, setIsUploadingQuickFile] = useState(false);
+  const [isSubmittingQuick, setIsSubmittingQuick] = useState(false);
 
-  // Estados para ver detalle de proyecto desde un post
-  const [viewingProjectId, setViewingProjectId] = useState<string | null>(null);
-  const [downloadTarget, setDownloadTarget] = useState<{
+  // Lightbox modal para ver imágenes en grande
+  const [lightboxData, setLightboxData] = useState<{
     isOpen: boolean;
-    title: string;
-    url: string;
-    waitTime: number;
-  }>({
-    isOpen: false,
-    title: '',
-    url: '',
-    waitTime: 3,
-  });
+    imageUrl?: string;
+    title?: string;
+    authorName?: string;
+  }>({ isOpen: false });
 
-  // Estado de comentarios expandidos por post ID
-  const [expandedComments, setExpandedComments] = useState<Record<string, boolean>>({});
-  const [postComments, setPostComments] = useState<Record<string, PostComment[]>>({
-    'seed-post-1': [
-      {
-        id: 'c1',
-        postId: 'seed-post-1',
-        authorId: 'carlos_m',
-        authorName: 'Carlos M.',
-        authorUsername: 'carlosm',
-        authorPhotoURL: 'https://api.dicebear.com/7.x/identicon/svg?seed=carlosm',
-        content: '¡Gran trabajo con esta comunidad! Ya tenía ganas de poder interactuar por aquí.',
-        createdAt: new Date(Date.now() - 3600000 * 2).toISOString(),
-      },
-      {
-        id: 'c2',
-        postId: 'seed-post-1',
-        authorId: 'allnexuslzyt_official',
-        authorName: 'Nexus Admin',
-        authorUsername: 'allnexuslzyt',
-        authorPhotoURL: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
-        content: '¡Gracias a todos por el apoyo constante! Seguiremos mejorando.',
-        createdAt: new Date(Date.now() - 3600000 * 1).toISOString(),
-      }
-    ],
-    'seed-post-2': [
-      {
-        id: 'c3',
-        postId: 'seed-post-2',
-        authorId: 'laura_dev',
-        authorName: 'Laura G.',
-        authorUsername: 'lauradev',
-        content: '¡Totalmente de acuerdo Sofía! La respuesta táctil se siente genial.',
-        createdAt: new Date(Date.now() - 3600000 * 5).toISOString(),
-      }
-    ]
-  });
-  const [newCommentText, setNewCommentText] = useState<Record<string, string>>({});
-  const [submittingComment, setSubmittingComment] = useState<Record<string, boolean>>({});
-
-  // Toast de notificación
+  // Mensaje flotante de notificación
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
-    setTimeout(() => setToastMessage(null), 3000);
+    setTimeout(() => setToastMessage(null), 3500);
   };
 
-  // Sincronización en tiempo real de publicaciones desde Firestore
+  // 1. Cargar publicaciones reales en tiempo real desde Firestore (omitiendo posts falsos/seed)
   useEffect(() => {
-    let unsubscribe: (() => void) | null = null;
+    setIsLoading(true);
     const postsRef = collection(db, 'community_posts');
+    const q = query(postsRef, orderBy('createdAt', 'desc'));
 
-    try {
-      unsubscribe = onSnapshot(
-        postsRef,
-        (snapshot) => {
-          if (!snapshot.empty) {
-            const fetchedPosts = snapshot.docs.map((docSnap) => {
-              const data = docSnap.data();
-              return {
-                id: docSnap.id,
-                authorId: data.authorId || '',
-                authorName: data.authorName || 'Usuario',
-                authorUsername: data.authorUsername || 'usuario',
-                authorPhotoURL: data.authorPhotoURL || '',
-                authorRole: data.authorRole || '',
-                content: data.content || '',
-                projectId: data.projectId || '',
-                projectTitle: data.projectTitle || '',
-                projectCategory: data.projectCategory || '',
-                projectTag: data.projectTag || '',
-                projectLink: data.projectLink || '',
-                likes: Array.isArray(data.likes) ? data.likes : [],
-                likesCount: typeof data.likesCount === 'number' ? data.likesCount : (data.likes?.length || 0),
-                commentsCount: typeof data.commentsCount === 'number' ? data.commentsCount : 0,
-                sharesCount: typeof data.sharesCount === 'number' ? data.sharesCount : 0,
-                createdAt: data.createdAt || new Date().toISOString(),
-                tags: Array.isArray(data.tags) ? data.tags : [],
-              } as CommunityPost;
+    const unsubscribe = onSnapshot(
+      q,
+      (snapshot) => {
+        const fetchedPosts: CommunityPost[] = [];
+        snapshot.forEach((docSnap) => {
+          const data = docSnap.data() as CommunityPost;
+          // Filtrar cualquier post de prueba o semilla falsa anterior
+          if (!data.id.startsWith('seed-post-')) {
+            fetchedPosts.push({
+              ...data,
+              id: docSnap.id,
+              likes: Array.isArray(data.likes) ? data.likes : [],
+              likesCount: typeof data.likesCount === 'number' ? data.likesCount : (data.likes?.length || 0),
+              commentsCount: typeof data.commentsCount === 'number' ? data.commentsCount : 0,
+              sharesCount: typeof data.sharesCount === 'number' ? data.sharesCount : 0,
             });
-
-            // Ordenar por fecha descendente
-            fetchedPosts.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-            setPosts(fetchedPosts);
-          } else {
-            // Si la colección está vacía en Firestore, guardar las semillas en Firestore
-            setPosts(SEED_POSTS);
           }
-          setLoading(false);
-        },
-        (error) => {
-          console.warn('Firestore onSnapshot community_posts error (usando fallback local):', error);
-          setLoading(false);
-        }
-      );
-    } catch (e) {
-      console.warn('Error configurando listener de comunidad:', e);
-      setLoading(false);
-    }
+        });
 
-    return () => {
-      if (unsubscribe) unsubscribe();
-    };
+        // Ordenar por fecha descendente
+        fetchedPosts.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+        setPosts(fetchedPosts);
+        setIsLoading(false);
+      },
+      (err) => {
+        console.warn('Error en snapshot de community_posts:', err);
+        handleFirestoreError(err, OperationType.GET, 'community_posts');
+        setIsLoading(false);
+      }
+    );
+
+    return () => unsubscribe();
   }, []);
 
-  // Escuchar comentarios para un post cuando se expande
-  const toggleComments = async (postId: string) => {
-    const nextState = !expandedComments[postId];
-    setExpandedComments((prev) => ({ ...prev, [postId]: nextState }));
+  // 2. Cargar comentarios en tiempo real para las publicaciones
+  useEffect(() => {
+    const commentsRef = collection(db, 'post_comments');
+    const q = query(commentsRef, orderBy('createdAt', 'asc'));
 
-    if (nextState) {
-      try {
-        const commentsRef = collection(db, 'community_posts', postId, 'comments');
-        const snap = await getDocs(commentsRef);
-        if (!snap.empty) {
-          const list: PostComment[] = snap.docs.map((docSnap) => {
-            const data = docSnap.data();
-            return {
-              id: docSnap.id,
-              postId,
-              authorId: data.authorId || '',
-              authorName: data.authorName || 'Usuario',
-              authorUsername: data.authorUsername || 'usuario',
-              authorPhotoURL: data.authorPhotoURL || '',
-              content: data.content || '',
-              createdAt: data.createdAt || new Date().toISOString(),
-            };
-          });
-          list.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
-          setPostComments((prev) => ({ ...prev, [postId]: list }));
-        }
-      } catch (e) {
-        console.warn('No se pudieron obtener comentarios de Firestore:', e);
+    const unsubscribe = onSnapshot(
+      q,
+      (snapshot) => {
+        const grouped: Record<string, PostComment[]> = {};
+        snapshot.forEach((docSnap) => {
+          const data = docSnap.data() as PostComment;
+          if (!grouped[data.postId]) grouped[data.postId] = [];
+          grouped[data.postId].push({ ...data, id: docSnap.id });
+        });
+        setPostComments(grouped);
+      },
+      (err) => {
+        console.warn('Error cargando comentarios:', err);
       }
-    }
-  };
+    );
 
-  // Crear una nueva publicación (solo usuarios que han iniciado sesión)
-  const handlePublishPost = async (e: React.FormEvent) => {
-    e.preventDefault();
+    return () => unsubscribe();
+  }, []);
+
+  // Función unificada para publicar una nueva publicación con archivo del dispositivo
+  const handleCreatePost = async (params: {
+    content: string;
+    attachment?: ProcessedFile | null;
+    visibility: 'public' | 'community_only' | 'private';
+  }) => {
     if (!user) {
-      showToast('Debes iniciar sesión con Google para publicar.');
+      signInWithGoogle();
       return;
     }
 
-    const trimmed = newContent.trim();
-    if (!trimmed) return;
-
-    setIsSubmitting(true);
     const newPostId = `post_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
-    
-    // Si hay un proyecto adjunto seleccionado
-    const attachedProject = selectedProjectId 
-      ? projects.find((p) => p.id === selectedProjectId)
-      : null;
+    const postDocRef = doc(db, 'community_posts', newPostId);
 
-    // Detectar hashtags en el texto
-    const hashtags = (trimmed.match(/#[a-zA-Z0-9_]+/g) || []).map((t) => t.substring(1).toLowerCase());
+    // Extraer hashtags del contenido (#ejemplo)
+    const detectedTags = (params.content.match(/#[\w\u00C0-\u017F]+/g) || []).map((t) =>
+      t.substring(1).toLowerCase()
+    );
 
-    const postPayload: CommunityPost = {
+    const newPost: CommunityPost = {
       id: newPostId,
       authorId: user.uid,
-      authorName: profile?.displayName || user.displayName || 'Usuario NexStudio',
-      authorUsername: profile?.username || user.email?.split('@')[0] || 'usuario',
+      authorName: profile?.displayName || user.displayName || 'Creador NexStudio',
+      authorUsername: profile?.username || user.email?.split('@')[0] || 'creador',
       authorPhotoURL: profile?.photoURL || user.photoURL || `https://api.dicebear.com/7.x/identicon/svg?seed=${user.uid}`,
-      authorRole: profile?.role || (isAdmin ? 'SuperAdmin' : 'Creador Digital'),
-      content: trimmed,
-      projectId: attachedProject?.id || '',
-      projectTitle: attachedProject?.title || '',
-      projectCategory: attachedProject?.category || '',
-      projectTag: attachedProject?.tag || '',
-      projectLink: attachedProject?.downloadUrl || '',
+      authorRole: isAdmin ? 'SuperAdmin' : (profile?.role || 'Creador Digital'),
+      content: params.content,
+      attachmentUrl: params.attachment?.dataUrl || undefined,
+      attachmentName: params.attachment?.name || undefined,
+      attachmentType: params.attachment?.type || undefined,
+      attachmentSize: params.attachment?.size || undefined,
+      visibility: params.visibility || 'public',
       likes: [],
       likesCount: 0,
       commentsCount: 0,
       sharesCount: 0,
       createdAt: new Date().toISOString(),
-      tags: hashtags,
+      tags: detectedTags.length > 0 ? detectedTags : undefined,
     };
 
-    // Actualización optimista local
-    setPosts((prev) => [postPayload, ...prev]);
-    setNewContent('');
-    setSelectedProjectId('');
-    setProjectSelectorOpen(false);
-
     try {
-      const docRef = doc(db, 'community_posts', newPostId);
-      await setDoc(docRef, postPayload);
-      showToast('¡Publicación compartida con la comunidad!');
+      await setDoc(postDocRef, newPost);
+      showToast('¡Publicación compartida con éxito en la comunidad!');
     } catch (err) {
-      console.warn('Error guardando publicación en Firestore:', err);
-      showToast('Publicado localmente.');
-    } finally {
-      setIsSubmitting(false);
+      console.error('Error al crear publicación en Firestore:', err);
+      handleFirestoreError(err, OperationType.WRITE, `community_posts/${newPostId}`);
+      // Agregar en estado local como fallback para experiencia fluida
+      setPosts((prev) => [newPost, ...prev]);
+      showToast('Publicación creada localmente.');
     }
   };
 
-  // Acción de Like / Me gusta
+  // Manejar envío del publicador rápido del feed
+  const handleQuickSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const trimmed = quickPostContent.trim();
+    if (!trimmed && !quickAttachment) return;
+
+    setIsSubmittingQuick(true);
+    try {
+      await handleCreatePost({
+        content: trimmed,
+        attachment: quickAttachment,
+        visibility: quickPostVisibility,
+      });
+      setQuickPostContent('');
+      setQuickAttachment(null);
+    } finally {
+      setIsSubmittingQuick(false);
+    }
+  };
+
+  // Subir archivo desde dispositivo en el compositor rápido
+  const handleQuickFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsUploadingQuickFile(true);
+    try {
+      const processed = await processDeviceFile(file);
+      setQuickAttachment(processed);
+    } catch (err: any) {
+      alert(err.message || 'Error al procesar el archivo del dispositivo.');
+    } finally {
+      setIsUploadingQuickFile(false);
+      if (e.target) e.target.value = '';
+    }
+  };
+
+  // Manejador de Likes con persistencia en Firestore
   const handleToggleLike = async (postId: string) => {
     if (!user) {
-      showToast('Inicia sesión con Google para dar Me Gusta.');
+      signInWithGoogle();
       return;
     }
 
-    const currentPost = posts.find((p) => p.id === postId);
-    if (!currentPost) return;
+    const post = posts.find((p) => p.id === postId);
+    if (!post) return;
 
-    const hasLiked = currentPost.likes.includes(user.uid);
-    const updatedLikes = hasLiked
-      ? currentPost.likes.filter((uid) => uid !== user.uid)
-      : [...currentPost.likes, user.uid];
-    const newCount = updatedLikes.length;
+    const alreadyLiked = post.likes.includes(user.uid);
+    const updatedLikes = alreadyLiked
+      ? post.likes.filter((uid) => uid !== user.uid)
+      : [...post.likes, user.uid];
 
-    // Actualización optimista
+    const updatedCount = updatedLikes.length;
+
+    // Actualización optimista local
     setPosts((prev) =>
-      prev.map((p) => (p.id === postId ? { ...p, likes: updatedLikes, likesCount: newCount } : p))
+      prev.map((p) =>
+        p.id === postId ? { ...p, likes: updatedLikes, likesCount: updatedCount } : p
+      )
     );
 
     try {
       const postRef = doc(db, 'community_posts', postId);
       await updateDoc(postRef, {
         likes: updatedLikes,
-        likesCount: newCount,
+        likesCount: updatedCount,
       });
     } catch (err) {
       console.warn('Error actualizando like en Firestore:', err);
     }
   };
 
-  // Acción de Compartir / Repost
-  const handleSharePost = async (post: CommunityPost) => {
-    // Incrementar contador de compartidos
+  // Manejador para compartir publicación
+  const handleShare = async (post: CommunityPost) => {
+    const shareUrl = `${window.location.origin}?view=comunidad#${post.id}`;
+    const shareText = `"${post.content.substring(0, 100)}..." por ${post.authorName} en NexStudio`;
+
+    if (navigator.clipboard) {
+      await navigator.clipboard.writeText(`${shareText}\n${shareUrl}`);
+      showToast('¡Enlace de la publicación copiado al portapapeles!');
+    }
+
     const updatedShares = (post.sharesCount || 0) + 1;
     setPosts((prev) =>
       prev.map((p) => (p.id === post.id ? { ...p, sharesCount: updatedShares } : p))
@@ -354,39 +287,32 @@ export const CommunityFeedView: React.FC<CommunityFeedViewProps> = ({ onBack }) 
 
     try {
       const postRef = doc(db, 'community_posts', post.id);
-      await updateDoc(postRef, {
-        sharesCount: updatedShares,
-      });
-    } catch (err) {
-      console.warn('Error actualizando shares en Firestore:', err);
-    }
-
-    // Copiar enlace al portapapeles
-    const shareUrl = `${window.location.origin}/#comunidad-${post.id}`;
-    if (navigator.clipboard) {
-      try {
-        await navigator.clipboard.writeText(`"${post.content}" - ${post.authorName} en NexStudio: ${shareUrl}`);
-        showToast('¡Enlace y cita del post copiados al portapapeles!');
-        return;
-      } catch (e) {}
-    }
-    showToast('¡Publicación compartida con éxito!');
+      await updateDoc(postRef, { sharesCount: updatedShares });
+    } catch (e) {}
   };
 
-  // Publicar un nuevo comentario
-  const handleAddComment = async (postId: string) => {
-    if (!user) {
-      showToast('Debes iniciar sesión con Google para comentar.');
-      return;
+  // Manejador para eliminar publicación
+  const handleDeletePost = async (postId: string) => {
+    if (!window.confirm('¿Estás seguro de que deseas eliminar esta publicación?')) return;
+
+    setPosts((prev) => prev.filter((p) => p.id !== postId));
+    try {
+      await deleteDoc(doc(db, 'community_posts', postId));
+      showToast('Publicación eliminada correctamente.');
+    } catch (err) {
+      console.error('Error eliminando publicación:', err);
+      handleFirestoreError(err, OperationType.DELETE, `community_posts/${postId}`);
     }
+  };
 
-    const text = (newCommentText[postId] || '').trim();
-    if (!text) return;
-
-    setSubmittingComment((prev) => ({ ...prev, [postId]: true }));
+  // Manejador para agregar comentario
+  const handleAddComment = async (postId: string, text: string) => {
+    if (!user) return;
 
     const commentId = `comment_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
-    const commentPayload: PostComment = {
+    const commentRef = doc(db, 'post_comments', commentId);
+
+    const newComment: PostComment = {
       id: commentId,
       postId,
       authorId: user.uid,
@@ -397,140 +323,93 @@ export const CommunityFeedView: React.FC<CommunityFeedViewProps> = ({ onBack }) 
       createdAt: new Date().toISOString(),
     };
 
-    // Optimista
-    setPostComments((prev) => ({
-      ...prev,
-      [postId]: [...(prev[postId] || []), commentPayload],
-    }));
-    setPosts((prev) =>
-      prev.map((p) => (p.id === postId ? { ...p, commentsCount: (p.commentsCount || 0) + 1 } : p))
-    );
-    setNewCommentText((prev) => ({ ...prev, [postId]: '' }));
-
     try {
-      const commentRef = doc(db, 'community_posts', postId, 'comments', commentId);
-      await setDoc(commentRef, commentPayload);
-
-      // Actualizar contador en post
-      const postRef = doc(db, 'community_posts', postId);
-      const currentPost = posts.find((p) => p.id === postId);
-      const nextCount = (currentPost?.commentsCount || 0) + 1;
-      await updateDoc(postRef, {
-        commentsCount: nextCount,
-      });
-      showToast('Comentario añadido.');
-    } catch (err) {
-      console.warn('Error guardando comentario en Firestore:', err);
-    } finally {
-      setSubmittingComment((prev) => ({ ...prev, [postId]: false }));
-    }
-  };
-
-  // Eliminar publicación (autor o admin)
-  const handleDeletePost = async (postId: string) => {
-    if (!confirm('¿Seguro que deseas eliminar esta publicación?')) return;
-
-    // Optimista
-    setPosts((prev) => prev.filter((p) => p.id !== postId));
-
-    try {
-      const postRef = doc(db, 'community_posts', postId);
-      await deleteDoc(postRef);
-      showToast('Publicación eliminada.');
-    } catch (err) {
-      console.warn('Error eliminando publicación de Firestore:', err);
-    }
-  };
-
-  // Eliminar comentario (autor o admin)
-  const handleDeleteComment = async (postId: string, commentId: string) => {
-    setPostComments((prev) => ({
-      ...prev,
-      [postId]: (prev[postId] || []).filter((c) => c.id !== commentId),
-    }));
-    setPosts((prev) =>
-      prev.map((p) =>
-        p.id === postId ? { ...p, commentsCount: Math.max(0, (p.commentsCount || 1) - 1) } : p
-      )
-    );
-
-    try {
-      const commentRef = doc(db, 'community_posts', postId, 'comments', commentId);
-      await deleteDoc(commentRef);
-      const postRef = doc(db, 'community_posts', postId);
-      const currentPost = posts.find((p) => p.id === postId);
-      await updateDoc(postRef, {
-        commentsCount: Math.max(0, (currentPost?.commentsCount || 1) - 1),
-      });
-    } catch (err) {
-      console.warn('Error eliminando comentario:', err);
-    }
-  };
-
-  // Filtrado de publicaciones
-  const filteredPosts = useMemo(() => {
-    return posts.filter((post) => {
-      // Filtro por pestaña
-      if (activeTab === 'proyectos' && !post.projectId) return false;
-      if (activeTab === 'mis_posts') {
-        if (!user) return false;
-        if (post.authorId !== user.uid) return false;
+      await setDoc(commentRef, newComment);
+      const targetPost = posts.find((p) => p.id === postId);
+      if (targetPost) {
+        const postRef = doc(db, 'community_posts', postId);
+        await updateDoc(postRef, {
+          commentsCount: (targetPost.commentsCount || 0) + 1,
+        });
       }
+      showToast('Respuesta publicada.');
+    } catch (err) {
+      console.error('Error al agregar comentario:', err);
+      handleFirestoreError(err, OperationType.WRITE, `post_comments/${commentId}`);
+    }
+  };
 
-      // Filtro por tag seleccionado
-      if (selectedTag && (!post.tags || !post.tags.includes(selectedTag))) {
+  // Manejador para eliminar comentario
+  const handleDeleteComment = async (postId: string, commentId: string) => {
+    try {
+      await deleteDoc(doc(db, 'post_comments', commentId));
+      const targetPost = posts.find((p) => p.id === postId);
+      if (targetPost && targetPost.commentsCount > 0) {
+        const postRef = doc(db, 'community_posts', postId);
+        await updateDoc(postRef, {
+          commentsCount: Math.max(0, targetPost.commentsCount - 1),
+        });
+      }
+      showToast('Comentario eliminado.');
+    } catch (err) {
+      console.error('Error al eliminar comentario:', err);
+    }
+  };
+
+  // Publicaciones creadas por el usuario autenticado
+  const userPosts = useMemo(() => {
+    if (!user) return [];
+    return posts.filter((p) => p.authorId === user.uid);
+  }, [posts, user]);
+
+  // Filtrado de publicaciones visibles en el feed
+  const filteredFeedPosts = useMemo(() => {
+    return posts.filter((post) => {
+      // Si la publicación es privada, solo la ve el autor o el admin
+      if (post.visibility === 'private' && post.authorId !== user?.uid && !isAdmin) {
+        return false;
+      }
+      // Si es solo para la comunidad y no ha iniciado sesión
+      if (post.visibility === 'community_only' && !user) {
         return false;
       }
 
-      // Filtro por búsqueda de texto
+      // Filtro por etiqueta
+      if (selectedTag) {
+        const hasTag = post.tags?.some((t) => t.toLowerCase() === selectedTag.toLowerCase());
+        if (!hasTag) return false;
+      }
+
+      // Filtro por búsqueda
       if (searchQuery.trim()) {
-        const query = searchQuery.toLowerCase();
-        const matchesContent = post.content.toLowerCase().includes(query);
-        const matchesAuthor = post.authorName.toLowerCase().includes(query) || (post.authorUsername && post.authorUsername.toLowerCase().includes(query));
-        const matchesProject = post.projectTitle && post.projectTitle.toLowerCase().includes(query);
-        const matchesTags = post.tags && post.tags.some((t) => t.toLowerCase().includes(query));
-        if (!matchesContent && !matchesAuthor && !matchesProject && !matchesTags) {
-          return false;
-        }
+        const q = searchQuery.toLowerCase();
+        const matchText = post.content.toLowerCase().includes(q);
+        const matchAuthor = post.authorName.toLowerCase().includes(q) || (post.authorUsername && post.authorUsername.toLowerCase().includes(q));
+        const matchFile = post.attachmentName?.toLowerCase().includes(q);
+        return matchText || matchAuthor || matchFile;
       }
 
       return true;
     });
-  }, [posts, activeTab, user, selectedTag, searchQuery]);
+  }, [posts, user, isAdmin, selectedTag, searchQuery]);
 
-  // Formateador de tiempo relativo amigable
-  const formatTimeAgo = (dateStr: string) => {
-    try {
-      const past = new Date(dateStr).getTime();
-      const now = Date.now();
-      const diffSec = Math.max(0, Math.floor((now - past) / 1000));
-      if (diffSec < 60) return 'hace unos momentos';
-      const diffMin = Math.floor(diffSec / 60);
-      if (diffMin < 60) return `hace ${diffMin}m`;
-      const diffHours = Math.floor(diffMin / 60);
-      if (diffHours < 24) return `hace ${diffHours}h`;
-      const diffDays = Math.floor(diffHours / 24);
-      if (diffDays < 7) return `hace ${diffDays}d`;
-      return new Date(dateStr).toLocaleDateString('es-ES', { month: 'short', day: 'numeric' });
-    } catch (e) {
-      return 'recientemente';
-    }
-  };
-
-  // Si se abre el detalle del proyecto desde un post
-  if (viewingProjectId) {
-    const activeProject = projects.find((p) => p.id === viewingProjectId) || projects[0];
-    return (
-      <ProjectDetailView
-        project={activeProject}
-        onBack={() => setViewingProjectId(null)}
-      />
-    );
-  }
+  // Hashtags populares
+  const popularTags = useMemo(() => {
+    const counts: Record<string, number> = {};
+    posts.forEach((p) => {
+      p.tags?.forEach((t) => {
+        counts[t] = (counts[t] || 0) + 1;
+      });
+    });
+    return Object.entries(counts)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 8)
+      .map(([tag]) => tag);
+  }, [posts]);
 
   return (
-    <div className="w-full max-w-4xl mx-auto px-4 sm:px-6 py-8 sm:py-12 animate-in fade-in duration-300">
-      {/* Toast Notification Flotante */}
+    <div className="w-full min-h-screen bg-slate-50/50 px-3 sm:px-6 lg:px-10 py-6 text-slate-800 animate-in fade-in duration-300">
+      {/* Toast flotante */}
       <AnimatePresence>
         {toastMessage && (
           <motion.div
@@ -545,585 +424,361 @@ export const CommunityFeedView: React.FC<CommunityFeedViewProps> = ({ onBack }) 
         )}
       </AnimatePresence>
 
-      {/* Top Bar with Back Button */}
-      <div className="flex items-center justify-between gap-4 mb-6">
-        <button
-          type="button"
-          id="btn-back-from-comunidad"
-          onClick={onBack}
-          className="inline-flex items-center gap-2 px-4 py-2 text-xs font-semibold text-slate-600 hover:text-slate-900 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-xl transition-colors cursor-pointer min-h-[44px]"
-        >
-          <ArrowLeft className="w-4 h-4" />
-          <span>Volver a Inicio</span>
-        </button>
+      {/* Lightbox para vista en grande de imágenes */}
+      <CommunityMediaModal
+        isOpen={lightboxData.isOpen}
+        onClose={() => setLightboxData({ isOpen: false })}
+        imageUrl={lightboxData.imageUrl}
+        title={lightboxData.title}
+        authorName={lightboxData.authorName}
+      />
 
-        <div className="flex items-center gap-2">
-          <span className="text-xs font-semibold text-indigo-700 bg-indigo-50 border border-indigo-200 px-3 py-1 rounded-full flex items-center gap-1.5">
-            <span className="w-2 h-2 rounded-full bg-indigo-600 animate-pulse" />
-            <span>Red Social de Creadores</span>
-          </span>
-        </div>
-      </div>
+      {/* Barra Superior Completa */}
+      <header className="w-full flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4 pb-6 mb-6 border-b border-slate-200">
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            id="btn-back-to-workspace"
+            onClick={onBack}
+            className="inline-flex items-center gap-2 px-3.5 py-2 text-xs font-bold text-slate-700 hover:text-slate-900 bg-white hover:bg-slate-100 border border-slate-200 rounded-xl transition-colors cursor-pointer min-h-[40px] shadow-xs"
+          >
+            <ArrowLeft className="w-4 h-4" />
+            <span>Volver a Inicio</span>
+          </button>
 
-      {/* Header Section */}
-      <div className="mb-8 text-left">
-        <div className="flex items-center gap-3 mb-2">
-          <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-indigo-600 via-violet-600 to-sky-500 flex items-center justify-center text-white shadow-md shadow-indigo-600/20 shrink-0">
-            <MessageCircle className="w-5 h-5" />
-          </div>
           <div>
-            <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">
-              Comunidad NexStudio
+            <h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight flex items-center gap-2">
+              <span className="w-3 h-3 rounded-full bg-indigo-600 animate-pulse" />
+              <span>Comunidad NexStudio</span>
             </h1>
-            <p className="text-xs sm:text-sm text-slate-600">
-              Un espacio al estilo X para compartir proyectos, consultar dudas y reaccionar a creaciones.
+            <p className="text-xs text-slate-500 hidden sm:block">
+              Espacio social a pantalla completa para compartir archivos reales y conectar con creadores.
             </p>
           </div>
         </div>
-      </div>
 
-      {/* Composer Box (Estilo X) */}
-      <div className="mb-8 p-4 sm:p-5 rounded-2xl bg-white border border-slate-200 shadow-xs">
-        {user ? (
-          <form onSubmit={handlePublishPost} className="space-y-3">
-            <div className="flex items-start gap-3">
-              {/* Avatar de usuario */}
-              <img
-                src={profile?.photoURL || user.photoURL || `https://api.dicebear.com/7.x/identicon/svg?seed=${user.uid}`}
-                alt={profile?.displayName || user.displayName || 'Usuario'}
-                className="w-10 h-10 rounded-xl border border-slate-200 object-cover bg-slate-100 shrink-0 mt-0.5"
-                referrerPolicy="no-referrer"
-              />
+        {/* PESTAÑAS PRINCIPALES: EXPLORAR FEED vs MI PERFIL & PUBLICAR */}
+        <div className="flex items-center gap-2 bg-slate-200/80 p-1 rounded-2xl">
+          <button
+            type="button"
+            id="tab-comunidad-feed"
+            onClick={() => setActiveTab('feed')}
+            className={`flex-1 sm:flex-initial px-5 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all cursor-pointer flex items-center justify-center gap-2 min-h-[38px] ${
+              activeTab === 'feed'
+                ? 'bg-white text-slate-900 shadow-sm'
+                : 'text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            <Globe className="w-4 h-4 text-indigo-600" />
+            <span>Explorar Feed ({posts.length})</span>
+          </button>
 
-              <div className="flex-1 min-w-0">
-                <textarea
-                  id="community-composer-textarea"
-                  value={newContent}
-                  onChange={(e) => setNewContent(e.target.value)}
-                  placeholder="¿Qué estás desarrollando o diseñando hoy en NexStudio?"
-                  rows={3}
-                  maxLength={500}
-                  className="w-full text-sm text-slate-800 placeholder-slate-400 bg-transparent border-none focus:outline-none resize-none"
-                />
+          <button
+            type="button"
+            id="tab-comunidad-profile"
+            onClick={() => {
+              if (!user) {
+                signInWithGoogle();
+                return;
+              }
+              setActiveTab('profile');
+            }}
+            className={`flex-1 sm:flex-initial px-5 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all cursor-pointer flex items-center justify-center gap-2 min-h-[38px] ${
+              activeTab === 'profile'
+                ? 'bg-white text-slate-900 shadow-sm'
+                : 'text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            <User className="w-4 h-4 text-indigo-600" />
+            <span>Mi Perfil & Publicar</span>
+          </button>
+        </div>
+      </header>
 
-                {/* Vista previa del proyecto adjunto si se ha seleccionado */}
-                {selectedProjectId && (
-                  <div className="mb-3 p-3 rounded-xl bg-indigo-50/70 border border-indigo-200/80 flex items-center justify-between gap-3">
-                    <div className="flex items-center gap-2.5 min-w-0">
-                      <div className="p-1.5 rounded-lg bg-indigo-100 text-indigo-700 shrink-0">
-                        <FolderKanban className="w-4 h-4" />
-                      </div>
-                      <div className="min-w-0">
-                        <p className="text-xs font-bold text-slate-900 truncate">
-                          {projects.find((p) => p.id === selectedProjectId)?.title || 'Proyecto Seleccionado'}
-                        </p>
-                        <p className="text-[10px] text-indigo-700 font-medium">
-                          Adjunto a tu publicación
-                        </p>
-                      </div>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => setSelectedProjectId('')}
-                      className="p-1 text-slate-400 hover:text-rose-600 rounded-lg transition-colors cursor-pointer"
-                      title="Quitar proyecto"
-                    >
-                      <X className="w-4 h-4" />
-                    </button>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Barra de herramientas inferior del compositor */}
-            <div className="pt-3 border-t border-slate-100 flex flex-wrap items-center justify-between gap-3">
-              <div className="relative">
-                <button
-                  type="button"
-                  id="btn-attach-project-toggle"
-                  onClick={() => setProjectSelectorOpen(!projectSelectorOpen)}
-                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors cursor-pointer min-h-[36px] ${
-                    selectedProjectId
-                      ? 'bg-indigo-100 text-indigo-700 border border-indigo-200'
-                      : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
-                  }`}
-                >
-                  <FolderKanban className="w-3.5 h-3.5 text-indigo-600" />
-                  <span>{selectedProjectId ? 'Proyecto adjunto' : 'Adjuntar proyecto'}</span>
-                  <ChevronDown className="w-3 h-3 text-slate-400" />
-                </button>
-
-                {/* Dropdown Selector de Proyectos para adjuntar */}
-                {projectSelectorOpen && (
-                  <div className="absolute left-0 mt-2 w-72 bg-white border border-slate-200 rounded-xl shadow-xl z-20 p-2 space-y-1 animate-in fade-in zoom-in-95 duration-150">
-                    <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400 px-2 py-1">
-                      Selecciona un proyecto
-                    </p>
-                    {projects.map((p) => (
-                      <button
-                        key={p.id}
-                        type="button"
-                        onClick={() => {
-                          setSelectedProjectId(p.id);
-                          setProjectSelectorOpen(false);
-                        }}
-                        className={`w-full text-left px-2.5 py-2 rounded-lg text-xs font-medium flex items-center justify-between transition-colors cursor-pointer ${
-                          selectedProjectId === p.id
-                            ? 'bg-indigo-50 text-indigo-900 font-bold'
-                            : 'hover:bg-slate-100 text-slate-800'
-                        }`}
-                      >
-                        <span className="truncate">{p.title}</span>
-                        {selectedProjectId === p.id && (
-                          <CheckCircle className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
-                        )}
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              <div className="flex items-center gap-3">
-                <span className="text-[11px] text-slate-400 font-medium">
-                  {500 - newContent.length} caracteres
-                </span>
-
-                <button
-                  type="submit"
-                  id="btn-publish-community-post"
-                  disabled={isSubmitting || !newContent.trim()}
-                  className="px-5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed text-white text-xs sm:text-sm font-bold shadow-md shadow-indigo-600/20 hover:shadow-lg transition-all flex items-center gap-2 cursor-pointer min-h-[38px]"
-                >
-                  <span>Publicar</span>
-                  <Send className="w-3.5 h-3.5" />
-                </button>
-              </div>
-            </div>
-          </form>
+      {/* CONTENIDO SEGÚN LA PESTAÑA SELECCIONADA */}
+      {activeTab === 'profile' ? (
+        /* PESTAÑA EXCLUSIVA: PERFIL, BANNER, VISIBILIDAD, PUBLICADOR Y TUS POSTS */
+        user ? (
+          <div className="w-full">
+            <CommunityProfileTab
+              userPosts={userPosts}
+              onPublishPost={handleCreatePost}
+              onLikePost={handleToggleLike}
+              onSharePost={handleShare}
+              onDeletePost={handleDeletePost}
+              onAddComment={handleAddComment}
+              onDeleteComment={handleDeleteComment}
+              postComments={postComments}
+              onOpenLightbox={(url, title, author) =>
+                setLightboxData({ isOpen: true, imageUrl: url, title, authorName: author })
+              }
+            />
+          </div>
         ) : (
-          /* Mensaje para usuarios no autenticados */
-          <div className="py-4 px-2 text-center flex flex-col sm:flex-row items-center justify-between gap-4">
-            <div className="text-left">
-              <h3 className="text-sm font-bold text-slate-900">
-                Únete a la conversación en NexStudio
-              </h3>
-              <p className="text-xs text-slate-500">
-                Inicia sesión con Google para compartir tus propios proyectos, dar like y comentar.
-              </p>
-            </div>
+          /* Invitación a iniciar sesión si no está autenticado */
+          <div className="w-full py-20 text-center rounded-3xl bg-white border border-slate-200 p-8 shadow-xs max-w-2xl mx-auto">
+            <User className="w-16 h-16 text-indigo-600 mx-auto mb-4" />
+            <h3 className="text-xl font-bold text-slate-900 mb-2">
+              Inicia sesión para acceder a tu perfil y publicar
+            </h3>
+            <p className="text-sm text-slate-500 mb-6">
+              Personaliza tu banner de creador, gestiona tu visibilidad y comparte archivos directamente desde tu dispositivo.
+            </p>
             <button
               type="button"
-              id="btn-login-for-community"
+              id="btn-login-to-profile"
               onClick={signInWithGoogle}
-              className="px-4 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold transition-all shadow-sm flex items-center gap-2 cursor-pointer shrink-0 min-h-[40px]"
+              className="px-6 py-3 rounded-2xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-sm shadow-md shadow-indigo-600/20 transition-all cursor-pointer inline-flex items-center gap-2"
             >
-              <LogIn className="w-3.5 h-3.5 text-amber-400" />
+              <LogIn className="w-4 h-4" />
               <span>Iniciar Sesión con Google</span>
             </button>
           </div>
-        )}
-      </div>
+        )
+      ) : (
+        /* PESTAÑA EXPLORAR: FEED GLOBAL ADAPTADO A TODA LA PANTALLA */
+        <div className="w-full space-y-6">
+          {/* Compositor Rápido para usuarios autenticados (opcional en el feed) */}
+          {user ? (
+            <div className="w-full p-4 sm:p-6 rounded-2xl bg-white border border-slate-200 shadow-xs text-left">
+              <div className="flex items-start gap-3">
+                <img
+                  src={profile?.photoURL || user.photoURL || `https://api.dicebear.com/7.x/identicon/svg?seed=${user.uid}`}
+                  alt={user.displayName || 'Usuario'}
+                  className="w-10 h-10 rounded-xl object-cover border border-slate-200 bg-slate-100 shrink-0"
+                  referrerPolicy="no-referrer"
+                />
+                <div className="flex-1 min-w-0">
+                  <textarea
+                    value={quickPostContent}
+                    onChange={(e) => setQuickPostContent(e.target.value)}
+                    placeholder="¿Qué estás creando? Comparte una reflexión o sube fotos/archivos de tu dispositivo..."
+                    rows={2}
+                    maxLength={800}
+                    className="w-full text-sm text-slate-800 placeholder-slate-400 bg-transparent border-none focus:outline-none resize-none leading-relaxed"
+                  />
 
-      {/* Barra de Filtros y Búsqueda */}
-      <div className="mb-6 space-y-4">
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
-          {/* Pestañas de Feed */}
-          <div className="flex items-center p-1 rounded-xl bg-slate-100 border border-slate-200">
-            <button
-              type="button"
-              id="tab-comunidad-todos"
-              onClick={() => setActiveTab('todos')}
-              className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                activeTab === 'todos'
-                  ? 'bg-white text-slate-900 shadow-xs'
-                  : 'text-slate-600 hover:text-slate-900'
-              }`}
-            >
-              Para ti
-            </button>
-            <button
-              type="button"
-              id="tab-comunidad-proyectos"
-              onClick={() => setActiveTab('proyectos')}
-              className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                activeTab === 'proyectos'
-                  ? 'bg-white text-slate-900 shadow-xs'
-                  : 'text-slate-600 hover:text-slate-900'
-              }`}
-            >
-              Proyectos Compartidos
-            </button>
-            {user && (
-              <button
-                type="button"
-                id="tab-comunidad-misposts"
-                onClick={() => setActiveTab('mis_posts')}
-                className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                  activeTab === 'mis_posts'
-                    ? 'bg-white text-slate-900 shadow-xs'
-                    : 'text-slate-600 hover:text-slate-900'
-                }`}
-              >
-                Mis Publicaciones
-              </button>
-            )}
-          </div>
-
-          {/* Campo de Búsqueda */}
-          <div className="relative flex-1 max-w-xs">
-            <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-            <input
-              type="text"
-              id="input-search-community"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Buscar posts, proyectos o @usuarios..."
-              className="w-full pl-9 pr-3 py-1.5 text-xs text-slate-800 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 min-h-[38px]"
-            />
-          </div>
-        </div>
-
-        {/* Tags de Tendencia */}
-        <div className="flex flex-wrap items-center gap-1.5 text-xs">
-          <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1 mr-1">
-            <Flame className="w-3.5 h-3.5 text-amber-500" />
-            Tendencias:
-          </span>
-          {['nexstudio', 'proyectos', 'diseño', 'bienvenida', 'feedback'].map((tag) => (
-            <button
-              key={tag}
-              type="button"
-              onClick={() => setSelectedTag(selectedTag === tag ? null : tag)}
-              className={`px-2.5 py-1 rounded-full text-[11px] font-semibold transition-colors cursor-pointer ${
-                selectedTag === tag
-                  ? 'bg-indigo-600 text-white'
-                  : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
-              }`}
-            >
-              #{tag}
-            </button>
-          ))}
-          {selectedTag && (
-            <button
-              type="button"
-              onClick={() => setSelectedTag(null)}
-              className="text-[11px] font-semibold text-rose-600 hover:underline ml-1"
-            >
-              Limpiar filtro
-            </button>
-          )}
-        </div>
-      </div>
-
-      {/* Lista del Feed de Publicaciones */}
-      <div className="space-y-4">
-        {loading ? (
-          <div className="py-12 text-center text-slate-500 text-sm">
-            <div className="w-8 h-8 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin mx-auto mb-3" />
-            Cargando la comunidad...
-          </div>
-        ) : filteredPosts.length === 0 ? (
-          <div className="py-16 text-center rounded-2xl bg-slate-50 border border-slate-200 p-8">
-            <MessageCircle className="w-10 h-10 text-slate-300 mx-auto mb-3" />
-            <h3 className="text-base font-bold text-slate-800 mb-1">
-              No hay publicaciones disponibles
-            </h3>
-            <p className="text-xs text-slate-500 max-w-sm mx-auto mb-4">
-              {activeTab === 'mis_posts'
-                ? 'Aún no has compartido ninguna publicación. ¡Sé el primero en publicar tu proyecto!'
-                : 'No se encontraron publicaciones con los filtros aplicados.'}
-            </p>
-            {user && (
-              <button
-                type="button"
-                onClick={() => {
-                  setActiveTab('todos');
-                  setSelectedTag(null);
-                  setSearchQuery('');
-                }}
-                className="px-4 py-2 rounded-xl bg-indigo-600 text-white text-xs font-bold hover:bg-indigo-500 transition-colors"
-              >
-                Ver todo el feed
-              </button>
-            )}
-          </div>
-        ) : (
-          filteredPosts.map((post) => {
-            const hasLiked = user ? post.likes.includes(user.uid) : false;
-            const isAuthor = user ? post.authorId === user.uid : false;
-            const commentsList = postComments[post.id] || [];
-            const isExpanded = Boolean(expandedComments[post.id]);
-
-            return (
-              <motion.article
-                key={post.id}
-                id={`community-post-${post.id}`}
-                layout
-                initial={{ opacity: 0, y: 12 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="p-4 sm:p-5 rounded-2xl bg-white border border-slate-200 hover:border-slate-300 shadow-xs transition-colors text-left"
-              >
-                {/* Cabecera del Post: Autor, @username, Badge, Fecha */}
-                <div className="flex items-start justify-between gap-3 mb-3">
-                  <div className="flex items-center gap-3">
-                    <img
-                      src={post.authorPhotoURL || `https://api.dicebear.com/7.x/identicon/svg?seed=${post.authorId}`}
-                      alt={post.authorName}
-                      className="w-10 h-10 rounded-xl object-cover border border-slate-200 bg-slate-100 shrink-0"
-                      referrerPolicy="no-referrer"
-                    />
-                    <div>
-                      <div className="flex items-center gap-1.5 flex-wrap">
-                        <span className="text-sm font-bold text-slate-900">
-                          {post.authorName}
+                  {/* Previsualización en grande del archivo seleccionado en el compositor rápido */}
+                  {quickAttachment && (
+                    <div className="mt-3 p-3 rounded-xl bg-slate-50 border border-slate-200">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
+                          <Check className="w-3.5 h-3.5 text-emerald-600" />
+                          {quickAttachment.name} ({formatFileSize(quickAttachment.size)})
                         </span>
-                        {post.authorRole === 'SuperAdmin' && (
-                          <span className="text-[10px] uppercase tracking-wider font-extrabold px-1.5 py-0.2 rounded bg-indigo-100 text-indigo-700 border border-indigo-200 flex items-center gap-1">
-                            <ShieldCheck className="w-3 h-3 text-indigo-600" />
-                            Admin
-                          </span>
-                        )}
-                        <span className="text-xs text-slate-500">
-                          @{post.authorUsername || 'creador'}
-                        </span>
-                        <span className="text-xs text-slate-400">·</span>
-                        <span className="text-xs text-slate-500">
-                          {formatTimeAgo(post.createdAt)}
-                        </span>
+                        <button
+                          type="button"
+                          onClick={() => setQuickAttachment(null)}
+                          className="p-1 text-slate-400 hover:text-rose-600 rounded transition-colors cursor-pointer"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
                       </div>
-                    </div>
-                  </div>
 
-                  {/* Acciones de Autor / Administrador */}
-                  {(isAuthor || isAdmin) && (
-                    <button
-                      type="button"
-                      id={`btn-delete-post-${post.id}`}
-                      onClick={() => handleDeletePost(post.id)}
-                      className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
-                      title="Eliminar publicación"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  )}
-                </div>
-
-                {/* Contenido del Post */}
-                <p className="text-sm text-slate-800 leading-relaxed whitespace-pre-line mb-3">
-                  {post.content}
-                </p>
-
-                {/* Tags si existen */}
-                {post.tags && post.tags.length > 0 && (
-                  <div className="flex flex-wrap gap-1 mb-3">
-                    {post.tags.map((t) => (
-                      <span
-                        key={t}
-                        onClick={() => setSelectedTag(t)}
-                        className="text-xs font-semibold text-indigo-600 hover:underline cursor-pointer"
-                      >
-                        #{t}
-                      </span>
-                    ))}
-                  </div>
-                )}
-
-                {/* Tarjeta de Proyecto Adjunto (si existe) */}
-                {post.projectId && (
-                  <div className="mb-4 p-3.5 rounded-xl bg-slate-50 border border-slate-200 hover:border-indigo-300 transition-colors flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-                    <div className="flex items-center gap-3">
-                      <div className="w-9 h-9 rounded-xl bg-indigo-100 text-indigo-700 flex items-center justify-center shrink-0">
-                        <FolderKanban className="w-5 h-5" />
-                      </div>
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs font-bold uppercase tracking-wider text-indigo-600">
-                            Proyecto Compartido
-                          </span>
-                          {post.projectTag && (
-                            <span className="text-[10px] font-semibold px-1.5 py-0.2 rounded bg-slate-200 text-slate-700">
-                              {post.projectTag}
-                            </span>
-                          )}
+                      {quickAttachment.type === 'image' && (
+                        <div className="max-h-[300px] overflow-hidden rounded-lg bg-slate-900 flex items-center justify-center">
+                          <img
+                            src={quickAttachment.dataUrl}
+                            alt="Previsualización"
+                            className="max-h-[300px] w-auto object-contain"
+                          />
                         </div>
-                        <h4 className="text-sm font-bold text-slate-900">
-                          {post.projectTitle || 'Proyecto de NexStudio'}
-                        </h4>
-                      </div>
+                      )}
+                    </div>
+                  )}
+
+                  <div className="flex flex-wrap items-center justify-between gap-3 pt-3 mt-2 border-t border-slate-100">
+                    <div className="flex items-center gap-2">
+                      <label 
+                        className="px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer min-h-[36px]"
+                        title="Subir fotos o archivos exclusivamente desde tu dispositivo"
+                      >
+                        <FileUp className="w-4 h-4 text-indigo-600" />
+                        <span>Subir desde dispositivo</span>
+                        <input
+                          type="file"
+                          className="hidden"
+                          onChange={handleQuickFileUpload}
+                          disabled={isUploadingQuickFile}
+                        />
+                      </label>
+
+                      <select
+                        value={quickPostVisibility}
+                        onChange={(e) => setQuickPostVisibility(e.target.value as any)}
+                        className="px-2.5 py-1.5 text-xs font-semibold text-slate-700 bg-slate-100 border border-slate-200 rounded-xl focus:outline-none min-h-[36px] cursor-pointer"
+                      >
+                        <option value="public">🌍 Pública</option>
+                        <option value="community_only">👥 Solo Comunidad</option>
+                        <option value="private">🔒 Privada</option>
+                      </select>
                     </div>
 
-                    <div className="flex items-center gap-2 w-full sm:w-auto">
+                    <div className="flex items-center gap-3">
                       <button
                         type="button"
-                        id={`btn-view-attached-project-${post.projectId}`}
-                        onClick={() => setViewingProjectId(post.projectId!)}
-                        className="flex-1 sm:flex-initial px-3.5 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold transition-colors cursor-pointer flex items-center justify-center gap-1.5 min-h-[36px]"
+                        onClick={() => setActiveTab('profile')}
+                        className="text-xs font-semibold text-indigo-600 hover:underline cursor-pointer hidden sm:inline"
                       >
-                        <span>Ver Proyecto</span>
-                        <ExternalLink className="w-3 h-3" />
+                        Ir a Personalizar Banner y Perfil →
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={handleQuickSubmit}
+                        disabled={isSubmittingQuick || (!quickPostContent.trim() && !quickAttachment)}
+                        className="px-5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white text-xs font-bold transition-all cursor-pointer min-h-[36px] flex items-center gap-1.5 shadow-sm"
+                      >
+                        <Send className="w-3.5 h-3.5" />
+                        <span>{isSubmittingQuick ? 'Publicando...' : 'Publicar'}</span>
                       </button>
                     </div>
                   </div>
-                )}
-
-                {/* Barra de Acciones: Like, Comentarios, Compartir */}
-                <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-slate-500 text-xs">
-                  {/* Comentarios */}
-                  <button
-                    type="button"
-                    id={`btn-comment-toggle-${post.id}`}
-                    onClick={() => toggleComments(post.id)}
-                    className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg hover:bg-indigo-50 hover:text-indigo-600 transition-colors cursor-pointer min-h-[36px]"
-                  >
-                    <MessageCircle className="w-4 h-4" />
-                    <span>{post.commentsCount || 0}</span>
-                  </button>
-
-                  {/* Me gusta / Like */}
-                  <button
-                    type="button"
-                    id={`btn-like-${post.id}`}
-                    onClick={() => handleToggleLike(post.id)}
-                    className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg transition-all cursor-pointer min-h-[36px] ${
-                      hasLiked
-                        ? 'text-rose-600 font-bold hover:bg-rose-50'
-                        : 'hover:bg-rose-50 hover:text-rose-600'
-                    }`}
-                  >
-                    <Heart className={`w-4 h-4 ${hasLiked ? 'fill-rose-600' : ''}`} />
-                    <span>{post.likesCount || 0}</span>
-                  </button>
-
-                  {/* Compartir / Repost */}
-                  <button
-                    type="button"
-                    id={`btn-share-${post.id}`}
-                    onClick={() => handleSharePost(post)}
-                    className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg hover:bg-sky-50 hover:text-sky-600 transition-colors cursor-pointer min-h-[36px]"
-                  >
-                    <Share2 className="w-4 h-4" />
-                    <span>{post.sharesCount || 0}</span>
-                  </button>
                 </div>
+              </div>
+            </div>
+          ) : (
+            /* Banner invitando a unirse */
+            <div className="w-full p-4 sm:p-5 rounded-2xl bg-gradient-to-r from-indigo-50 via-sky-50 to-white border border-indigo-100 flex flex-col sm:flex-row items-center justify-between gap-4 text-left">
+              <div>
+                <h3 className="text-sm font-bold text-slate-900">
+                  ¿Quieres publicar y subir tus propios archivos y proyectos?
+                </h3>
+                <p className="text-xs text-slate-600 mt-0.5">
+                  Inicia sesión con Google para personalizar tu perfil, cambiar tu banner y compartir en la comunidad.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={signInWithGoogle}
+                className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold transition-all cursor-pointer min-h-[38px] flex items-center gap-2 shrink-0 shadow-xs"
+              >
+                <LogIn className="w-3.5 h-3.5" />
+                <span>Iniciar Sesión con Google</span>
+              </button>
+            </div>
+          )}
 
-                {/* Sección Expandible de Comentarios */}
-                {isExpanded && (
-                  <div className="mt-4 pt-4 border-t border-slate-100 space-y-3">
-                    <p className="text-xs font-bold text-slate-700 uppercase tracking-wider">
-                      Respuestas ({commentsList.length})
-                    </p>
+          {/* Barra de Filtros y Búsqueda */}
+          <div className="w-full flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-white p-3 rounded-2xl border border-slate-200">
+            <div className="relative flex-1">
+              <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Buscar por texto, usuario o archivos..."
+                className="w-full pl-9 pr-4 py-2 text-xs sm:text-sm text-slate-800 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+              />
+              {searchQuery && (
+                <button
+                  type="button"
+                  onClick={() => setSearchQuery('')}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
 
-                    {/* Lista de comentarios existentes */}
-                    {commentsList.length === 0 ? (
-                      <p className="text-xs text-slate-400 italic">
-                        Sé el primero en responder a esta publicación.
-                      </p>
-                    ) : (
-                      <div className="space-y-2.5">
-                        {commentsList.map((comm) => {
-                          const canDeleteComm = user && (comm.authorId === user.uid || isAdmin || isAuthor);
-                          return (
-                            <div
-                              key={comm.id}
-                              className="p-3 rounded-xl bg-slate-50 border border-slate-100 flex items-start justify-between gap-2"
-                            >
-                              <div className="flex items-start gap-2.5">
-                                <img
-                                  src={comm.authorPhotoURL || `https://api.dicebear.com/7.x/identicon/svg?seed=${comm.authorId}`}
-                                  alt={comm.authorName}
-                                  className="w-7 h-7 rounded-lg object-cover bg-white border border-slate-200 shrink-0 mt-0.5"
-                                  referrerPolicy="no-referrer"
-                                />
-                                <div>
-                                  <div className="flex items-center gap-1.5">
-                                    <span className="text-xs font-bold text-slate-900">
-                                      {comm.authorName}
-                                    </span>
-                                    <span className="text-[11px] text-slate-400">
-                                      @{comm.authorUsername || 'creador'}
-                                    </span>
-                                    <span className="text-[10px] text-slate-400">
-                                      · {formatTimeAgo(comm.createdAt)}
-                                    </span>
-                                  </div>
-                                  <p className="text-xs text-slate-700 mt-0.5 leading-relaxed">
-                                    {comm.content}
-                                  </p>
-                                </div>
-                              </div>
+            {selectedTag && (
+              <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-indigo-50 border border-indigo-200 text-xs font-bold text-indigo-700">
+                <span>Tag: #{selectedTag}</span>
+                <button
+                  type="button"
+                  onClick={() => setSelectedTag(null)}
+                  className="hover:text-rose-600"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            )}
+          </div>
 
-                              {canDeleteComm && (
-                                <button
-                                  type="button"
-                                  onClick={() => handleDeleteComment(post.id, comm.id)}
-                                  className="p-1 text-slate-400 hover:text-rose-600 rounded transition-colors cursor-pointer"
-                                  title="Eliminar respuesta"
-                                >
-                                  <X className="w-3.5 h-3.5" />
-                                </button>
-                              )}
-                            </div>
-                          );
-                        })}
-                      </div>
-                    )}
+          {/* Hashtags Populares */}
+          {popularTags.length > 0 && (
+            <div className="flex items-center gap-2 overflow-x-auto pb-1 text-xs">
+              <span className="text-slate-400 font-bold uppercase text-[10px] shrink-0">
+                Tendencias:
+              </span>
+              {popularTags.map((tag) => (
+                <button
+                  key={tag}
+                  type="button"
+                  onClick={() => setSelectedTag(tag === selectedTag ? null : tag)}
+                  className={`px-3 py-1 rounded-lg font-semibold shrink-0 transition-colors cursor-pointer ${
+                    selectedTag === tag
+                      ? 'bg-indigo-600 text-white font-bold'
+                      : 'bg-white border border-slate-200 text-slate-600 hover:border-slate-300'
+                  }`}
+                >
+                  #{tag}
+                </button>
+              ))}
+            </div>
+          )}
 
-                    {/* Mini Formulario de Respuesta para usuarios logueados */}
-                    {user ? (
-                      <div className="flex items-center gap-2 pt-2">
-                        <input
-                          type="text"
-                          id={`input-comment-${post.id}`}
-                          value={newCommentText[post.id] || ''}
-                          onChange={(e) =>
-                            setNewCommentText((prev) => ({ ...prev, [post.id]: e.target.value }))
-                          }
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter') {
-                              e.preventDefault();
-                              handleAddComment(post.id);
-                            }
-                          }}
-                          placeholder="Escribe tu respuesta..."
-                          className="flex-1 px-3 py-2 text-xs text-slate-800 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 min-h-[38px]"
-                        />
-                        <button
-                          type="button"
-                          id={`btn-send-comment-${post.id}`}
-                          onClick={() => handleAddComment(post.id)}
-                          disabled={submittingComment[post.id] || !(newCommentText[post.id] || '').trim()}
-                          className="px-3.5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white text-xs font-bold transition-all cursor-pointer min-h-[38px] flex items-center justify-center shrink-0"
-                        >
-                          <Send className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-                    ) : (
-                      <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200 text-center">
-                        <button
-                          type="button"
-                          onClick={signInWithGoogle}
-                          className="text-xs font-semibold text-indigo-600 hover:underline cursor-pointer"
-                        >
-                          Inicia sesión con Google para responder a esta publicación
-                        </button>
-                      </div>
-                    )}
-                  </div>
+          {/* LISTA DE PUBLICACIONES REALES (ADAPTADAS A TODA LA PANTALLA) */}
+          <div className="w-full space-y-4">
+            {isLoading ? (
+              <div className="w-full py-20 text-center">
+                <div className="w-8 h-8 border-3 border-indigo-600 border-t-transparent rounded-full animate-spin mx-auto mb-3" />
+                <p className="text-xs text-slate-500 font-medium">
+                  Cargando publicaciones reales de la comunidad...
+                </p>
+              </div>
+            ) : filteredFeedPosts.length === 0 ? (
+              /* Estado vacío limpio: SIN publicaciones de mentira */
+              <div className="w-full py-20 text-center rounded-3xl bg-white border border-slate-200 p-8 shadow-xs">
+                <MessageCircle className="w-12 h-12 text-slate-300 mx-auto mb-3" />
+                <h3 className="text-base font-bold text-slate-800 mb-1">
+                  Aún no hay publicaciones en la comunidad
+                </h3>
+                <p className="text-xs sm:text-sm text-slate-500 max-w-md mx-auto mb-6">
+                  ¡Sé el primero en compartir un proyecto, capturas o archivos subidos directamente desde tu dispositivo!
+                </p>
+                {user ? (
+                  <button
+                    type="button"
+                    id="btn-first-publish"
+                    onClick={() => setActiveTab('profile')}
+                    className="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs shadow-md transition-all cursor-pointer inline-flex items-center gap-2"
+                  >
+                    <Send className="w-3.5 h-3.5" />
+                    <span>Crear Primera Publicación</span>
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={signInWithGoogle}
+                    className="px-5 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs transition-all cursor-pointer inline-flex items-center gap-2"
+                  >
+                    <LogIn className="w-3.5 h-3.5" />
+                    <span>Inicia sesión para publicar</span>
+                  </button>
                 )}
-              </motion.article>
-            );
-          })
-        )}
-      </div>
-
-      {/* Modal de Descarga de Proyecto si se ejecuta desde aquí */}
-      <DownloadModal
-        isOpen={downloadTarget.isOpen}
-        onClose={() => setDownloadTarget((prev) => ({ ...prev, isOpen: false }))}
-        projectTitle={downloadTarget.title}
-        downloadUrl={downloadTarget.url}
-        waitTimeSeconds={downloadTarget.waitTime}
-      />
+              </div>
+            ) : (
+              filteredFeedPosts.map((post) => (
+                <CommunityPostCard
+                  key={post.id}
+                  post={post}
+                  onLike={handleToggleLike}
+                  onShare={handleShare}
+                  onDelete={handleDeletePost}
+                  onAddComment={handleAddComment}
+                  onDeleteComment={handleDeleteComment}
+                  comments={postComments[post.id] || []}
+                  onOpenLightbox={(url, title, author) =>
+                    setLightboxData({ isOpen: true, imageUrl: url, title, authorName: author })
+                  }
+                  onFilterTag={(tag) => setSelectedTag(tag)}
+                />
+              ))
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 };

@@ -29,6 +29,22 @@
           "type": "string",
           "description": "Unique alphanumeric username without symbols or numbers"
         },
+        "bannerUrl": {
+          "type": "string",
+          "description": "Custom banner background URL or data URI"
+        },
+        "visibility": {
+          "type": "string",
+          "description": "Profile visibility setting: public, community_only, or private"
+        },
+        "website": {
+          "type": "string",
+          "description": "Personal website, portfolio or social link"
+        },
+        "customStatus": {
+          "type": "string",
+          "description": "User status message in community"
+        },
         "onboardingCompleted": {
           "type": "boolean",
           "description": "Flag indicating if user completed initial username/profile onboarding"
@@ -200,6 +216,26 @@
         "content": {
           "type": "string",
           "description": "Post text content, reflections or project summary"
+        },
+        "attachmentUrl": {
+          "type": "string",
+          "description": "Base64 data URI or download URL of file or image uploaded from device"
+        },
+        "attachmentName": {
+          "type": "string",
+          "description": "Filename of device attachment"
+        },
+        "attachmentType": {
+          "type": "string",
+          "description": "Type of attachment: image, video, document, audio, or file"
+        },
+        "attachmentSize": {
+          "type": "number",
+          "description": "Size in bytes of uploaded device attachment"
+        },
+        "visibility": {
+          "type": "string",
+          "description": "Post visibility: public, community_only, or private"
         },
         "projectId": {
           "type": "string",

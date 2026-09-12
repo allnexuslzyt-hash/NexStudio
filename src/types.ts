@@ -7,8 +7,12 @@ export interface UserProfile {
   displayName: string;
   username?: string;
   photoURL?: string;
+  bannerUrl?: string;
   role?: string;
   bio?: string;
+  customStatus?: string;
+  website?: string;
+  visibility?: 'public' | 'community_only' | 'private';
   createdAt?: string;
   lastLogin?: string;
   status?: UserStatus;
@@ -164,6 +168,11 @@ export interface CommunityPost {
   authorPhotoURL?: string;
   authorRole?: string;
   content: string;
+  attachmentUrl?: string; // Data URL or storage link from device upload
+  attachmentName?: string;
+  attachmentType?: 'image' | 'video' | 'audio' | 'document' | 'file';
+  attachmentSize?: number;
+  visibility?: 'public' | 'community_only' | 'private';
   projectId?: string;
   projectTitle?: string;
   projectCategory?: string;

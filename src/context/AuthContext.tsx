@@ -265,8 +265,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     displayName?: string; 
     username?: string; 
     photoURL?: string;
+    bannerUrl?: string;
     onboardingCompleted?: boolean;
     bio?: string;
+    customStatus?: string;
+    website?: string;
+    visibility?: 'public' | 'community_only' | 'private';
   }) => {
     if (!user) return;
     const userDocRef = doc(db, 'users', user.uid);
@@ -291,8 +295,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (data.displayName !== undefined) updatePayload.displayName = data.displayName;
       if (data.username !== undefined) updatePayload.username = data.username;
       if (data.photoURL !== undefined) updatePayload.photoURL = data.photoURL;
+      if (data.bannerUrl !== undefined) updatePayload.bannerUrl = data.bannerUrl;
       if (data.onboardingCompleted !== undefined) updatePayload.onboardingCompleted = data.onboardingCompleted;
       if (data.bio !== undefined) updatePayload.bio = data.bio;
+      if (data.customStatus !== undefined) updatePayload.customStatus = data.customStatus;
+      if (data.website !== undefined) updatePayload.website = data.website;
+      if (data.visibility !== undefined) updatePayload.visibility = data.visibility;
 
       if (data.onboardingCompleted) {
         try {

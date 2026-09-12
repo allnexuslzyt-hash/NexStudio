@@ -83,6 +83,11 @@ service cloud.firestore {
              data.content is string &&
              data.content.size() > 0 &&
              data.content.size() <= 1000 &&
+             (!('attachmentUrl' in data) || data.attachmentUrl is string) &&
+             (!('attachmentName' in data) || data.attachmentName is string) &&
+             (!('attachmentType' in data) || data.attachmentType is string) &&
+             (!('attachmentSize' in data) || data.attachmentSize is number) &&
+             (!('visibility' in data) || data.visibility is string) &&
              (!('likes' in data) || (data.likes is list && data.likes.size() <= 1000)) &&
              (!('likesCount' in data) || data.likesCount is number) &&
              (!('commentsCount' in data) || data.commentsCount is number) &&
@@ -91,7 +96,7 @@ service cloud.firestore {
 
     // Users Collection
     match /users/{userId} {
-      allow get: if isOwner(userId) || isAdmin();
+      allow get: if isOwner(userId) || isAdmin() || isSignedIn();
       allow list: if isAdmin();
       allow create: if (isOwner(userId) && isValidId(userId) && isValidUserProfile(incoming()) && incoming().userId == request.auth.uid) || isAdmin();
       allow update: if (isOwner(userId) && isValidUserProfile(incoming()) && incoming().userId == request.auth.uid) || isAdmin();

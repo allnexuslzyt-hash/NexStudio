@@ -75,7 +75,11 @@ const WorkspaceContent: React.FC = () => {
       <SignInPromptBanner />
 
       {/* Main Content Area */}
-      <main className="w-full flex-1 flex flex-col items-center justify-center p-4 sm:p-8 relative overflow-hidden bg-white">
+      <main className={`w-full flex-1 flex flex-col relative overflow-hidden bg-white ${
+        activeView === 'comunidad' 
+          ? 'p-0 items-stretch justify-start min-h-[calc(100vh-64px)]' 
+          : 'items-center justify-center p-4 sm:p-8'
+      }`}>
         {activeView === 'admin' ? (
           /* Centro de Mando de Administrador (Exclusivo allnexuslzyt@gmail.com / SuperAdmin) */
           <AdminCommandCenter onBack={() => setActiveView('workspace')} />
