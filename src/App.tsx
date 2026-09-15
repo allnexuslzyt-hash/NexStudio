@@ -136,18 +136,6 @@ const WorkspaceContent: React.FC = () => {
               <p className="text-base sm:text-lg text-slate-600 font-normal max-w-xl mx-auto leading-relaxed">
                 Todos mis proyectos, funciones, archivos y mucho mas.
               </p>
-
-              {user && (
-                <motion.div
-                  initial={{ opacity: 0, scale: 0.95 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  transition={{ delay: 0.15 }}
-                  className="mt-6 px-4 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-600 flex items-center gap-2 shadow-xs"
-                >
-                  <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
-                  <span>Conectado como <strong className="text-slate-900">{user.displayName || user.email}</strong></span>
-                </motion.div>
-              )}
             </motion.div>
           </>
         )}

@@ -81,18 +81,9 @@ export const CommunityProfileTab: React.FC<CommunityProfileTabProps> = ({
   const [profileSaveSuccess, setProfileSaveSuccess] = useState(false);
   const [profileError, setProfileError] = useState<string | null>(null);
 
-  // Estados para el publicador exclusivo
-  const [newContent, setNewContent] = useState('');
-  const [postVisibility, setPostVisibility] = useState<'public' | 'community_only' | 'private'>('public');
-  const [selectedAttachment, setSelectedAttachment] = useState<ProcessedFile | null>(null);
-  const [isUploadingAttachment, setIsUploadingAttachment] = useState(false);
-  const [isSubmittingPost, setIsSubmittingPost] = useState(false);
-  const [postFeedback, setPostFeedback] = useState<string | null>(null);
-
   // Referencias a inputs de archivos del dispositivo
   const bannerFileInputRef = useRef<HTMLInputElement>(null);
   const avatarFileInputRef = useRef<HTMLInputElement>(null);
-  const postFileInputRef = useRef<HTMLInputElement>(null);
 
   // Subir imagen de Banner desde el dispositivo
   const handleBannerDeviceUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -118,24 +109,6 @@ export const CommunityProfileTab: React.FC<CommunityProfileTabProps> = ({
     } catch (err: any) {
       alert(err.message || 'Error al procesar la foto de avatar.');
     } finally {
-      if (e.target) e.target.value = '';
-    }
-  };
-
-  // Subir archivo o imagen para publicación desde el dispositivo
-  const handlePostDeviceFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    setIsUploadingAttachment(true);
-    setPostFeedback(null);
-    try {
-      const processed = await processDeviceFile(file);
-      setSelectedAttachment(processed);
-    } catch (err: any) {
-      setPostFeedback(err.message || 'Error al cargar el archivo desde tu dispositivo.');
-    } finally {
-      setIsUploadingAttachment(false);
       if (e.target) e.target.value = '';
     }
   };
@@ -168,33 +141,6 @@ export const CommunityProfileTab: React.FC<CommunityProfileTabProps> = ({
       setProfileError(err?.message || 'Error al guardar los cambios del perfil.');
     } finally {
       setIsSavingProfile(false);
-    }
-  };
-
-  // Enviar publicación desde la pestaña exclusiva
-  const handlePublish = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const trimmed = newContent.trim();
-    if (!trimmed && !selectedAttachment) return;
-
-    setIsSubmittingPost(true);
-    setPostFeedback(null);
-
-    try {
-      await onPublishPost({
-        content: trimmed,
-        attachment: selectedAttachment,
-        visibility: postVisibility,
-      });
-
-      setNewContent('');
-      setSelectedAttachment(null);
-      setPostFeedback('¡Publicación creada exitosamente en tu perfil y comunidad!');
-      setTimeout(() => setPostFeedback(null), 3000);
-    } catch (err: any) {
-      setPostFeedback(err?.message || 'Error al publicar.');
-    } finally {
-      setIsSubmittingPost(false);
     }
   };
 
@@ -535,141 +481,7 @@ export const CommunityProfileTab: React.FC<CommunityProfileTabProps> = ({
         </div>
       </div>
 
-      {/* 2. PESTAÑA EXCLUSIVA PARA PUBLICAR */}
-      <div className="w-full p-6 sm:p-8 rounded-3xl bg-white border border-slate-200 shadow-xs text-left">
-        <div className="flex items-center gap-2.5 mb-4">
-          <div className="w-8 h-8 rounded-xl bg-indigo-100 text-indigo-700 flex items-center justify-center shrink-0">
-            <Send className="w-4 h-4" />
-          </div>
-          <div>
-            <h3 className="text-base font-extrabold text-slate-900 tracking-tight">
-              Crear Nueva Publicación
-            </h3>
-            <p className="text-xs text-slate-500">
-              Comparte proyectos, archivos o reflexiones directamente desde tu dispositivo.
-            </p>
-          </div>
-        </div>
-
-        <form onSubmit={handlePublish} className="space-y-4">
-          {/* Textarea adaptada a toda la pantalla */}
-          <div className="w-full p-3 rounded-2xl bg-slate-50 border border-slate-200 focus-within:border-indigo-500 focus-within:bg-white transition-colors">
-            <textarea
-              value={newContent}
-              onChange={(e) => setNewContent(e.target.value)}
-              placeholder="¿Qué estás desarrollando? Escribe aquí y sube fotos o archivos de tu dispositivo..."
-              rows={4}
-              maxLength={800}
-              className="w-full text-sm text-slate-800 placeholder-slate-400 bg-transparent border-none focus:outline-none resize-none leading-relaxed"
-            />
-            <div className="flex items-center justify-between text-[11px] text-slate-400 pt-2 border-t border-slate-200/60">
-              <span>Puedes usar #hashtags para etiquetar temas</span>
-              <span>{800 - newContent.length} restantes</span>
-            </div>
-          </div>
-
-          {/* VISTA PREVIA EN GRANDE DEL ARCHIVO/IMAGEN SUBIDO DESDE EL DISPOSITIVO */}
-          {selectedAttachment && (
-            <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-3">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
-                  <Check className="w-4 h-4 text-emerald-600" />
-                  Archivo seleccionado de tu dispositivo
-                </span>
-                <button
-                  type="button"
-                  onClick={() => setSelectedAttachment(null)}
-                  className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
-                  title="Quitar archivo"
-                >
-                  <X className="w-4 h-4" />
-                </button>
-              </div>
-
-              {selectedAttachment.type === 'image' ? (
-                /* Vista previa en grande de la imagen seleccionada */
-                <div className="relative rounded-xl overflow-hidden bg-slate-900 border border-slate-200 max-h-[420px] flex items-center justify-center">
-                  <img
-                    src={selectedAttachment.dataUrl}
-                    alt={selectedAttachment.name}
-                    className="w-full max-h-[420px] object-contain"
-                  />
-                  <div className="absolute bottom-2 left-2 px-3 py-1 rounded-lg bg-black/70 backdrop-blur-md text-white text-xs font-medium">
-                    {selectedAttachment.name} ({formatFileSize(selectedAttachment.size)})
-                  </div>
-                </div>
-              ) : (
-                /* Vista previa en grande de archivo no imagen */
-                <div className="p-4 rounded-xl bg-white border border-slate-200 flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0">
-                    <FileText className="w-5 h-5" />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <p className="text-xs font-bold text-slate-900 truncate">
-                      {selectedAttachment.name}
-                    </p>
-                    <p className="text-[11px] text-slate-500">
-                      {formatFileSize(selectedAttachment.size)} · Listo para compartir
-                    </p>
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Barra de herramientas para subir desde el dispositivo y visibilidad */}
-          <div className="flex flex-wrap items-center justify-between gap-4 pt-2">
-            <div className="flex items-center gap-2">
-              {/* Botón Subir Archivo del Dispositivo */}
-              <button
-                type="button"
-                id="btn-upload-file-device"
-                onClick={() => postFileInputRef.current?.click()}
-                disabled={isUploadingAttachment}
-                className="px-3.5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold flex items-center gap-2 transition-colors cursor-pointer min-h-[38px]"
-              >
-                <FileUp className="w-4 h-4 text-indigo-600" />
-                <span>{selectedAttachment ? 'Cambiar archivo del dispositivo' : 'Subir archivo o foto de tu dispositivo'}</span>
-              </button>
-              <input
-                ref={postFileInputRef}
-                type="file"
-                className="hidden"
-                onChange={handlePostDeviceFileUpload}
-              />
-
-              {/* Selector de visibilidad para esta publicación */}
-              <select
-                value={postVisibility}
-                onChange={(e) => setPostVisibility(e.target.value as any)}
-                className="px-3 py-2 text-xs font-semibold text-slate-700 bg-slate-100 border border-slate-200 rounded-xl focus:outline-none min-h-[38px] cursor-pointer"
-              >
-                <option value="public">🌍 Pública</option>
-                <option value="community_only">👥 Solo Comunidad</option>
-                <option value="private">🔒 Solo Yo (Privada)</option>
-              </select>
-            </div>
-
-            <button
-              type="submit"
-              id="btn-publish-exclusive-post"
-              disabled={isSubmittingPost || (!newContent.trim() && !selectedAttachment)}
-              className="px-6 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white text-xs sm:text-sm font-bold shadow-md shadow-indigo-600/20 transition-all flex items-center gap-2 cursor-pointer min-h-[40px]"
-            >
-              <Send className="w-4 h-4" />
-              <span>{isSubmittingPost ? 'Publicando...' : 'Publicar'}</span>
-            </button>
-          </div>
-
-          {postFeedback && (
-            <p className="text-xs font-bold text-indigo-600 animate-in fade-in">
-              {postFeedback}
-            </p>
-          )}
-        </form>
-      </div>
-
-      {/* 3. TUS PUBLICACIONES EN LA COMUNIDAD */}
+      {/* 2. TUS PUBLICACIONES EN LA COMUNIDAD */}
       <div className="space-y-4 text-left">
         <div className="flex items-center justify-between gap-4">
           <h3 className="text-lg font-extrabold text-slate-900 tracking-tight flex items-center gap-2">
@@ -687,7 +499,7 @@ export const CommunityProfileTab: React.FC<CommunityProfileTabProps> = ({
               Aún no tienes publicaciones
             </h4>
             <p className="text-xs sm:text-sm text-slate-500 max-w-md mx-auto">
-              Utiliza el publicador de arriba para subir fotos de tus proyectos o archivos desde tu dispositivo y compartir tus avances.
+              Utiliza el botón (+) para compartir fotos o archivos desde tu dispositivo y mostrar tus avances en la comunidad.
             </p>
           </div>
         ) : (

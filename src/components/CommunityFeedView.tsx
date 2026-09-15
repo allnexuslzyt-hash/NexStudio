@@ -18,7 +18,8 @@ import {
   Check,
   Globe,
   Lock,
-  Users
+  Users,
+  Plus
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { db, handleFirestoreError, OperationType, removeUndefinedFields } from '../lib/firebase';
@@ -40,6 +41,9 @@ import { CommunityProfileTab } from './community/CommunityProfileTab';
 import { CommunityFullProfileView } from './community/CommunityFullProfileView';
 import { CommunityMediaModal } from './community/CommunityMediaModal';
 import { ReportUserModal } from './community/ReportUserModal';
+import { CreateActionModal } from './community/CreateActionModal';
+import { CreatePostModal } from './community/CreatePostModal';
+import { CreateRepositoryModal } from './community/CreateRepositoryModal';
 import { processDeviceFile, formatFileSize, ProcessedFile } from '../lib/fileUploadHelper';
 
 interface CommunityFeedViewProps {
@@ -61,12 +65,10 @@ export const CommunityFeedView: React.FC<CommunityFeedViewProps> = ({ onBack }) 
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [selectedTag, setSelectedTag] = useState<string | null>(null);
 
-  // Estados del compositor rápido del feed principal
-  const [quickPostContent, setQuickPostContent] = useState('');
-  const [quickPostVisibility, setQuickPostVisibility] = useState<'public' | 'community_only' | 'private'>('public');
-  const [quickAttachment, setQuickAttachment] = useState<ProcessedFile | null>(null);
-  const [isUploadingQuickFile, setIsUploadingQuickFile] = useState(false);
-  const [isSubmittingQuick, setIsSubmittingQuick] = useState(false);
+  // Estados para modales unificados de creación (+)
+  const [isActionModalOpen, setIsActionModalOpen] = useState(false);
+  const [isCreatePostModalOpen, setIsCreatePostModalOpen] = useState(false);
+  const [isCreateRepoModalOpen, setIsCreateRepoModalOpen] = useState(false);
 
   // Lightbox modal para ver imágenes en grande
   const [lightboxData, setLightboxData] = useState<{
@@ -242,43 +244,6 @@ export const CommunityFeedView: React.FC<CommunityFeedViewProps> = ({ onBack }) 
       // Agregar en estado local como fallback para experiencia fluida
       setPosts((prev) => [newPost, ...prev]);
       showToast('Publicación creada localmente.');
-    }
-  };
-
-  // Manejar envío del publicador rápido del feed
-  const handleQuickSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const trimmed = quickPostContent.trim();
-    if (!trimmed && !quickAttachment) return;
-
-    setIsSubmittingQuick(true);
-    try {
-      await handleCreatePost({
-        content: trimmed,
-        attachment: quickAttachment,
-        visibility: quickPostVisibility,
-      });
-      setQuickPostContent('');
-      setQuickAttachment(null);
-    } finally {
-      setIsSubmittingQuick(false);
-    }
-  };
-
-  // Subir archivo desde dispositivo en el compositor rápido
-  const handleQuickFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    setIsUploadingQuickFile(true);
-    try {
-      const processed = await processDeviceFile(file);
-      setQuickAttachment(processed);
-    } catch (err: any) {
-      alert(err.message || 'Error al procesar el archivo del dispositivo.');
-    } finally {
-      setIsUploadingQuickFile(false);
-      if (e.target) e.target.value = '';
     }
   };
 
@@ -554,36 +519,56 @@ export const CommunityFeedView: React.FC<CommunityFeedViewProps> = ({ onBack }) 
           </div>
         </div>
 
-        {/* PESTAÑAS PRINCIPALES: EXPLORAR FEED vs MI PERFIL & PUBLICAR */}
-        <div className="flex items-center gap-2 bg-slate-200/80 p-1 rounded-2xl">
-          <button
-            type="button"
-            id="tab-comunidad-feed"
-            onClick={() => setActiveTab('feed')}
-            className={`flex-1 sm:flex-initial px-5 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all cursor-pointer flex items-center justify-center gap-2 min-h-[38px] ${
-              activeTab === 'feed'
-                ? 'bg-white text-slate-900 shadow-sm'
-                : 'text-slate-600 hover:text-slate-900'
-            }`}
-          >
-            <Globe className="w-4 h-4 text-indigo-600" />
-            <span>Explorar Feed ({posts.length})</span>
-          </button>
+        {/* ACCIONES Y PESTAÑAS */}
+        <div className="flex flex-wrap items-center gap-2.5">
+          <div className="flex items-center gap-1.5 bg-slate-200/80 p-1 rounded-2xl">
+            <button
+              type="button"
+              id="tab-comunidad-feed"
+              onClick={() => setActiveTab('feed')}
+              className={`flex-1 sm:flex-initial px-4 sm:px-5 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all cursor-pointer flex items-center justify-center gap-2 min-h-[38px] ${
+                activeTab === 'feed'
+                  ? 'bg-white text-slate-900 shadow-sm'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              <Globe className="w-4 h-4 text-indigo-600" />
+              <span>Explorar Feed ({posts.length})</span>
+            </button>
 
+            <button
+              type="button"
+              id="tab-comunidad-profile"
+              onClick={() => {
+                if (!user) {
+                  signInWithGoogle();
+                  return;
+                }
+                setViewingProfileUserId(user.uid);
+              }}
+              className="flex-1 sm:flex-initial px-4 sm:px-5 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all cursor-pointer flex items-center justify-center gap-2 min-h-[38px] text-slate-600 hover:text-slate-900"
+            >
+              <User className="w-4 h-4 text-indigo-600" />
+              <span>Mi Perfil & Repos</span>
+            </button>
+          </div>
+
+          {/* Botón (+) único para añadir posts o repositorios */}
           <button
             type="button"
-            id="tab-comunidad-profile"
+            id="btn-community-create-plus"
             onClick={() => {
               if (!user) {
                 signInWithGoogle();
                 return;
               }
-              setViewingProfileUserId(user.uid);
+              setIsActionModalOpen(true);
             }}
-            className="flex-1 sm:flex-initial px-5 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all cursor-pointer flex items-center justify-center gap-2 min-h-[38px] text-slate-600 hover:text-slate-900"
+            className="px-4 py-2 rounded-2xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs sm:text-sm shadow-md shadow-indigo-600/25 transition-all flex items-center gap-1.5 cursor-pointer min-h-[38px]"
+            title="Añadir publicación o repositorio (+)"
           >
-            <User className="w-4 h-4 text-indigo-600" />
-            <span>Mi Perfil & Repositorios</span>
+            <Plus className="w-4 h-4 stroke-[3]" />
+            <span>Añadir</span>
           </button>
         </div>
       </header>
@@ -632,114 +617,15 @@ export const CommunityFeedView: React.FC<CommunityFeedViewProps> = ({ onBack }) 
       ) : (
         /* PESTAÑA EXPLORAR: FEED GLOBAL ADAPTADO A TODA LA PANTALLA */
         <div className="w-full space-y-6">
-          {/* Compositor Rápido para usuarios autenticados (opcional en el feed) */}
-          {user ? (
-            <div className="w-full p-4 sm:p-6 rounded-2xl bg-white border border-slate-200 shadow-xs text-left">
-              <div className="flex items-start gap-3">
-                <img
-                  src={profile?.photoURL || user.photoURL || `https://api.dicebear.com/7.x/identicon/svg?seed=${user.uid}`}
-                  alt={user.displayName || 'Usuario'}
-                  className="w-10 h-10 rounded-xl object-cover border border-slate-200 bg-slate-100 shrink-0"
-                  referrerPolicy="no-referrer"
-                />
-                <div className="flex-1 min-w-0">
-                  <textarea
-                    value={quickPostContent}
-                    onChange={(e) => setQuickPostContent(e.target.value)}
-                    placeholder="¿Qué estás creando? Comparte una reflexión o sube fotos/archivos de tu dispositivo..."
-                    rows={2}
-                    maxLength={800}
-                    className="w-full text-sm text-slate-800 placeholder-slate-400 bg-transparent border-none focus:outline-none resize-none leading-relaxed"
-                  />
-
-                  {/* Previsualización en grande del archivo seleccionado en el compositor rápido */}
-                  {quickAttachment && (
-                    <div className="mt-3 p-3 rounded-xl bg-slate-50 border border-slate-200">
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
-                          <Check className="w-3.5 h-3.5 text-emerald-600" />
-                          {quickAttachment.name} ({formatFileSize(quickAttachment.size)})
-                        </span>
-                        <button
-                          type="button"
-                          onClick={() => setQuickAttachment(null)}
-                          className="p-1 text-slate-400 hover:text-rose-600 rounded transition-colors cursor-pointer"
-                        >
-                          <X className="w-4 h-4" />
-                        </button>
-                      </div>
-
-                      {quickAttachment.type === 'image' && (
-                        <div className="max-h-[300px] overflow-hidden rounded-lg bg-slate-900 flex items-center justify-center">
-                          <img
-                            src={quickAttachment.dataUrl}
-                            alt="Previsualización"
-                            className="max-h-[300px] w-auto object-contain"
-                          />
-                        </div>
-                      )}
-                    </div>
-                  )}
-
-                  <div className="flex flex-wrap items-center justify-between gap-3 pt-3 mt-2 border-t border-slate-100">
-                    <div className="flex items-center gap-2">
-                      <label 
-                        className="px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer min-h-[36px]"
-                        title="Subir fotos o archivos exclusivamente desde tu dispositivo"
-                      >
-                        <FileUp className="w-4 h-4 text-indigo-600" />
-                        <span>Subir desde dispositivo</span>
-                        <input
-                          type="file"
-                          className="hidden"
-                          onChange={handleQuickFileUpload}
-                          disabled={isUploadingQuickFile}
-                        />
-                      </label>
-
-                      <select
-                        value={quickPostVisibility}
-                        onChange={(e) => setQuickPostVisibility(e.target.value as any)}
-                        className="px-2.5 py-1.5 text-xs font-semibold text-slate-700 bg-slate-100 border border-slate-200 rounded-xl focus:outline-none min-h-[36px] cursor-pointer"
-                      >
-                        <option value="public">🌍 Pública</option>
-                        <option value="community_only">👥 Solo Comunidad</option>
-                        <option value="private">🔒 Privada</option>
-                      </select>
-                    </div>
-
-                    <div className="flex items-center gap-3">
-                      <button
-                        type="button"
-                        onClick={() => setActiveTab('profile')}
-                        className="text-xs font-semibold text-indigo-600 hover:underline cursor-pointer hidden sm:inline"
-                      >
-                        Ir a Personalizar Banner y Perfil →
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={handleQuickSubmit}
-                        disabled={isSubmittingQuick || (!quickPostContent.trim() && !quickAttachment)}
-                        className="px-5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white text-xs font-bold transition-all cursor-pointer min-h-[36px] flex items-center gap-1.5 shadow-sm"
-                      >
-                        <Send className="w-3.5 h-3.5" />
-                        <span>{isSubmittingQuick ? 'Publicando...' : 'Publicar'}</span>
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          ) : (
-            /* Banner invitando a unirse */
+          {/* Si no está autenticado, banner sutil invitando a iniciar sesión para participar */}
+          {!user && (
             <div className="w-full p-4 sm:p-5 rounded-2xl bg-gradient-to-r from-indigo-50 via-sky-50 to-white border border-indigo-100 flex flex-col sm:flex-row items-center justify-between gap-4 text-left">
               <div>
                 <h3 className="text-sm font-bold text-slate-900">
-                  ¿Quieres publicar y subir tus propios archivos y proyectos?
+                  ¿Quieres publicar y crear repositorios de proyectos?
                 </h3>
                 <p className="text-xs text-slate-600 mt-0.5">
-                  Inicia sesión con Google para personalizar tu perfil, cambiar tu banner y compartir en la comunidad.
+                  Inicia sesión con Google para usar el botón (+) y compartir fotos, archivos y código con la comunidad.
                 </p>
               </div>
               <button
@@ -835,11 +721,11 @@ export const CommunityFeedView: React.FC<CommunityFeedViewProps> = ({ onBack }) 
                   <button
                     type="button"
                     id="btn-first-publish"
-                    onClick={() => setActiveTab('profile')}
+                    onClick={() => setIsActionModalOpen(true)}
                     className="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs shadow-md transition-all cursor-pointer inline-flex items-center gap-2"
                   >
-                    <Send className="w-3.5 h-3.5" />
-                    <span>Crear Primera Publicación</span>
+                    <Plus className="w-4 h-4 stroke-[3]" />
+                    <span>Añadir Primera Publicación o Repo</span>
                   </button>
                 ) : (
                   <button
@@ -848,7 +734,7 @@ export const CommunityFeedView: React.FC<CommunityFeedViewProps> = ({ onBack }) 
                     className="px-5 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs transition-all cursor-pointer inline-flex items-center gap-2"
                   >
                     <LogIn className="w-3.5 h-3.5" />
-                    <span>Inicia sesión para publicar</span>
+                    <span>Inicia sesión para participar</span>
                   </button>
                 )}
               </div>
@@ -873,6 +759,59 @@ export const CommunityFeedView: React.FC<CommunityFeedViewProps> = ({ onBack }) 
             )}
           </div>
         </div>
+      )}
+
+      {/* Botón Flotante (+) exclusivo para crear publicaciones o repositorios */}
+      <motion.button
+        whileHover={{ scale: 1.06 }}
+        whileTap={{ scale: 0.94 }}
+        type="button"
+        id="fab-community-create"
+        onClick={() => {
+          if (!user) {
+            signInWithGoogle();
+            return;
+          }
+          setIsActionModalOpen(true);
+        }}
+        className="fixed bottom-6 right-6 z-40 w-14 h-14 rounded-2xl bg-indigo-600 hover:bg-indigo-500 text-white shadow-xl shadow-indigo-600/35 flex items-center justify-center cursor-pointer transition-colors border border-indigo-400/40"
+        title="Añadir publicación o repositorio (+)"
+      >
+        <Plus className="w-7 h-7 stroke-[2.5]" />
+      </motion.button>
+
+      {/* Modal Selector de Acción (+): Post o Repositorio */}
+      <CreateActionModal
+        isOpen={isActionModalOpen}
+        onClose={() => setIsActionModalOpen(false)}
+        onSelectPost={() => setIsCreatePostModalOpen(true)}
+        onSelectRepo={() => setIsCreateRepoModalOpen(true)}
+      />
+
+      {/* Modal para Crear Publicación */}
+      <CreatePostModal
+        isOpen={isCreatePostModalOpen}
+        onClose={() => setIsCreatePostModalOpen(false)}
+        onPublish={handleCreatePost}
+        userName={profile?.displayName || user?.displayName || 'Creador'}
+        userPhoto={profile?.photoURL || user?.photoURL || undefined}
+      />
+
+      {/* Modal para Crear Repositorio */}
+      {user && (
+        <CreateRepositoryModal
+          isOpen={isCreateRepoModalOpen}
+          onClose={() => setIsCreateRepoModalOpen(false)}
+          userId={user.uid}
+          userName={profile?.displayName || user.displayName || 'Creador'}
+          userUsername={profile?.username || user.email?.split('@')[0]}
+          userPhotoURL={profile?.photoURL || user.photoURL || undefined}
+          onSuccess={() => {
+            setIsCreateRepoModalOpen(false);
+            showToast('¡Repositorio creado con éxito!');
+            setViewingProfileUserId(user.uid);
+          }}
+        />
       )}
 
       {/* Modal para Reportar Usuario y Crear Ticket Oficial */}
