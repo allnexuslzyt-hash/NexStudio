@@ -1,6 +1,6 @@
 {
   "name": "NexStudio",
-  "description": "Plataforma de estudio digital y lienzo de trabajo con autenticación de Firebase y Google, optimizada para pantalla completa.",
+  "description": "El espacio de trabajo digital definitivo para creadores: lienzo interactivo, gestión de proyectos y sincronización en la nube en una sola plataforma.",
   "requestFramePermissions": [],
   "majorCapabilities": [
     "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
