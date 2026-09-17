@@ -173,9 +173,6 @@ export interface CommunityPost {
   attachmentName?: string;
   attachmentType?: 'image' | 'video' | 'audio' | 'document' | 'file';
   attachmentSize?: number;
-  isDriveFile?: boolean;
-  driveFileId?: string;
-  driveWebViewLink?: string;
   visibility?: 'public' | 'community_only' | 'private';
   projectId?: string;
   projectTitle?: string;
@@ -222,9 +219,6 @@ export interface UserRepoProject {
   attachmentName?: string;
   attachmentType?: string;
   attachmentSize?: number;
-  isDriveFile?: boolean;
-  driveFileId?: string;
-  driveWebViewLink?: string;
   demoUrl?: string;
   version?: string;
   isPublic?: boolean;

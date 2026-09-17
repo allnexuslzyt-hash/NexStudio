@@ -1,7 +1,6 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { 
   User, 
-  GoogleAuthProvider,
   signInWithPopup, 
   signOut as fbSignOut, 
   onAuthStateChanged,
@@ -15,17 +14,7 @@ import {
   onSnapshot,
   serverTimestamp 
 } from 'firebase/firestore';
-import { 
-  auth, 
-  db, 
-  googleProvider, 
-  getDriveAuthProvider,
-  handleFirestoreError, 
-  OperationType, 
-  testConnection,
-  getCachedDriveAccessToken,
-  setCachedDriveAccessToken
-} from '../lib/firebase';
+import { auth, db, googleProvider, handleFirestoreError, OperationType, testConnection } from '../lib/firebase';
 import { UserProfile } from '../types';
 
 export const ADMIN_EMAILS = ['allnexuslzyt@gmail.com'];
@@ -52,8 +41,6 @@ interface AuthContextType {
   deleteAccount: () => Promise<void>;
   isBanned: boolean;
   refreshProfile: () => Promise<void>;
-  connectGoogleDrive: () => Promise<string>;
-  getDriveAccessToken: () => string | null;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -246,44 +233,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  const connectGoogleDrive = async (): Promise<string> => {
-    const cached = getCachedDriveAccessToken();
-    if (cached) return cached;
-
-    setLoading(true);
-    try {
-      const driveProvider = getDriveAuthProvider();
-      const result = await signInWithPopup(auth, driveProvider);
-      const credential = GoogleAuthProvider.credentialFromResult(result);
-      if (!credential?.accessToken) {
-        throw new Error('No se pudo obtener el token de acceso para Google Drive.');
-      }
-      setCachedDriveAccessToken(credential.accessToken);
-      if (result.user && (!user || user.uid !== result.user.uid)) {
-        await syncUserProfile(result.user);
-      }
-      return credential.accessToken;
-    } catch (err: any) {
-      console.error('Error conectando Google Drive:', err);
-      if (err.code === 'auth/unauthorized-domain') {
-        const currentHostname = typeof window !== 'undefined' ? window.location.hostname : '';
-        setUnauthorizedDomain(currentHostname);
-        setAuthError(`Dominio no autorizado en Firebase ("${currentHostname}"). Abre la guía para autorizarlo.`);
-        throw new Error(`Dominio no autorizado en Firebase. Agrega "${currentHostname}" en la consola de Firebase Authentication.`);
-      }
-      if (err.code === 'auth/popup-closed-by-user' || err.code === 'auth/cancelled-popup-request') {
-        throw new Error('Conexión con Google Drive cancelada por el usuario.');
-      }
-      throw new Error(err.message || 'Error al conectar con Google Drive.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const signOut = async () => {
     setLoading(true);
     try {
-      setCachedDriveAccessToken(null);
       localStorage.removeItem('nexstudio_dev_user');
       localStorage.removeItem('nexstudio_dev_profile');
       await fbSignOut(auth);
@@ -291,7 +243,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setProfile(null);
     } catch (err) {
       console.error('Error al cerrar sesión:', err);
-      setCachedDriveAccessToken(null);
       setUser(null);
       setProfile(null);
     } finally {
@@ -476,8 +427,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         updateProfileData,
         deleteAccount,
         refreshProfile,
-        connectGoogleDrive,
-        getDriveAccessToken: getCachedDriveAccessToken,
       }}
     >
       {children}

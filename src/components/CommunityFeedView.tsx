@@ -45,7 +45,6 @@ import { CreateActionModal } from './community/CreateActionModal';
 import { CreatePostModal } from './community/CreatePostModal';
 import { CreateRepositoryModal } from './community/CreateRepositoryModal';
 import { processDeviceFile, formatFileSize, ProcessedFile } from '../lib/fileUploadHelper';
-import { GoogleDriveFile, getDriveFileTypeCategory } from '../lib/googleDriveService';
 
 interface CommunityFeedViewProps {
   onBack: () => void;
@@ -183,11 +182,10 @@ export const CommunityFeedView: React.FC<CommunityFeedViewProps> = ({ onBack }) 
     return () => unsubscribe();
   }, []);
 
-  // Función unificada para publicar una nueva publicación con archivo del dispositivo o Google Drive
+  // Función unificada para publicar una nueva publicación con archivo del dispositivo
   const handleCreatePost = async (params: {
     content: string;
     attachment?: ProcessedFile | null;
-    driveFile?: GoogleDriveFile | null;
     visibility: 'public' | 'community_only' | 'private';
   }) => {
     if (!user) {
@@ -219,31 +217,18 @@ export const CommunityFeedView: React.FC<CommunityFeedViewProps> = ({ onBack }) 
       createdAt: new Date().toISOString(),
     };
 
-    if (params.driveFile) {
-      postPayload.isDriveFile = true;
-      postPayload.driveFileId = params.driveFile.id;
-      postPayload.driveWebViewLink = params.driveFile.webViewLink;
-      postPayload.attachmentUrl = params.driveFile.webViewLink;
-      postPayload.attachmentName = params.driveFile.name;
-      postPayload.attachmentType = getDriveFileTypeCategory(params.driveFile.mimeType, params.driveFile.name);
-      if (typeof params.driveFile.size === 'number') {
-        postPayload.attachmentSize = params.driveFile.size;
-      }
-    } else if (params.attachment) {
-      if (params.attachment.dataUrl) {
-        postPayload.attachmentUrl = params.attachment.dataUrl;
-      }
-      if (params.attachment.name) {
-        postPayload.attachmentName = params.attachment.name;
-      }
-      if (params.attachment.type) {
-        postPayload.attachmentType = params.attachment.type;
-      }
-      if (typeof params.attachment.size === 'number') {
-        postPayload.attachmentSize = params.attachment.size;
-      }
+    if (params.attachment?.dataUrl) {
+      postPayload.attachmentUrl = params.attachment.dataUrl;
     }
-
+    if (params.attachment?.name) {
+      postPayload.attachmentName = params.attachment.name;
+    }
+    if (params.attachment?.type) {
+      postPayload.attachmentType = params.attachment.type;
+    }
+    if (typeof params.attachment?.size === 'number') {
+      postPayload.attachmentSize = params.attachment.size;
+    }
     if (detectedTags.length > 0) {
       postPayload.tags = detectedTags;
     }

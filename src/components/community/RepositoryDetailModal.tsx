@@ -21,8 +21,7 @@ import {
   Sparkles,
   Layers,
   AlertTriangle,
-  CheckCircle2,
-  HardDrive
+  CheckCircle2
 } from 'lucide-react';
 import { UserRepository, UserRepoProject } from '../../types';
 import { 
@@ -33,7 +32,6 @@ import {
   adminModerateRepository 
 } from '../../lib/repositoryService';
 import { formatFileSize } from '../../lib/fileUploadHelper';
-import { formatDriveFileSize } from '../../lib/googleDriveService';
 
 interface RepositoryDetailModalProps {
   isOpen: boolean;
@@ -438,71 +436,40 @@ export const RepositoryDetailModal: React.FC<RepositoryDetailModalProps> = ({
                         </p>
                       )}
 
-                      {/* Archivo adjunto del proyecto (Dispositivo o Google Drive) */}
+                      {/* Archivo adjunto del proyecto */}
                       {proj.attachmentUrl && (
-                        proj.isDriveFile ? (
-                          <div className="p-3 rounded-xl bg-emerald-50/80 border border-emerald-200/80 flex items-center justify-between gap-3">
-                            <div className="flex items-center gap-2.5 min-w-0">
-                              <div className="w-8 h-8 rounded-lg bg-white border border-emerald-200 flex items-center justify-center text-emerald-600 shrink-0 shadow-2xs">
-                                <HardDrive className="w-4 h-4" />
-                              </div>
-                              <div className="min-w-0">
-                                <p className="text-xs font-semibold text-slate-800 truncate">
-                                  {proj.attachmentName || 'archivo-drive'}
-                                </p>
-                                <div className="flex items-center gap-1.5 text-[10px] text-emerald-700">
-                                  <span className="font-bold">Google Drive</span>
-                                  {proj.attachmentSize ? (
-                                    <span>· {formatDriveFileSize(proj.attachmentSize)}</span>
-                                  ) : null}
-                                </div>
-                              </div>
+                        <div className="p-3 rounded-xl bg-slate-50 border border-slate-200/80 flex items-center justify-between gap-3">
+                          <div className="flex items-center gap-2.5 min-w-0">
+                            <div className="w-8 h-8 rounded-lg bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600 shrink-0">
+                              {proj.attachmentType?.startsWith('image/') ? (
+                                <ImageIcon className="w-4 h-4" />
+                              ) : proj.attachmentName?.endsWith('.zip') ? (
+                                <FileArchive className="w-4 h-4" />
+                              ) : (
+                                <FileCode className="w-4 h-4" />
+                              )}
                             </div>
-
-                            <a
-                              href={proj.driveWebViewLink || proj.attachmentUrl}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="p-2 text-emerald-600 hover:bg-emerald-100/60 rounded-lg transition-colors cursor-pointer shrink-0"
-                              title="Abrir en Google Drive"
-                            >
-                              <ExternalLink className="w-4 h-4" />
-                            </a>
-                          </div>
-                        ) : (
-                          <div className="p-3 rounded-xl bg-slate-50 border border-slate-200/80 flex items-center justify-between gap-3">
-                            <div className="flex items-center gap-2.5 min-w-0">
-                              <div className="w-8 h-8 rounded-lg bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600 shrink-0">
-                                {proj.attachmentType?.startsWith('image/') ? (
-                                  <ImageIcon className="w-4 h-4" />
-                                ) : proj.attachmentName?.endsWith('.zip') ? (
-                                  <FileArchive className="w-4 h-4" />
-                                ) : (
-                                  <FileCode className="w-4 h-4" />
-                                )}
-                              </div>
-                              <div className="min-w-0">
-                                <p className="text-xs font-semibold text-slate-800 truncate">
-                                  {proj.attachmentName || 'archivo-proyecto'}
+                            <div className="min-w-0">
+                              <p className="text-xs font-semibold text-slate-800 truncate">
+                                {proj.attachmentName || 'archivo-proyecto'}
+                              </p>
+                              {proj.attachmentSize ? (
+                                <p className="text-[10px] text-slate-400">
+                                  {formatFileSize(proj.attachmentSize)}
                                 </p>
-                                {proj.attachmentSize ? (
-                                  <p className="text-[10px] text-slate-400">
-                                    {formatFileSize(proj.attachmentSize)}
-                                  </p>
-                                ) : null}
-                              </div>
+                              ) : null}
                             </div>
-
-                            <a
-                              href={proj.attachmentUrl}
-                              download={proj.attachmentName || 'proyecto-nexstudio'}
-                              className="p-2 text-indigo-600 hover:bg-indigo-100/60 rounded-lg transition-colors cursor-pointer shrink-0"
-                              title="Descargar archivo"
-                            >
-                              <Download className="w-4 h-4" />
-                            </a>
                           </div>
-                        )
+
+                          <a
+                            href={proj.attachmentUrl}
+                            download={proj.attachmentName || 'proyecto-nexstudio'}
+                            className="p-2 text-indigo-600 hover:bg-indigo-100/60 rounded-lg transition-colors cursor-pointer shrink-0"
+                            title="Descargar archivo"
+                          >
+                            <Download className="w-4 h-4" />
+                          </a>
+                        </div>
                       )}
                     </div>
 
