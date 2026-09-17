@@ -13,11 +13,15 @@ import {
   Image as ImageIcon,
   FileArchive,
   Layers,
-  Sparkles
+  Sparkles,
+  HardDrive,
+  ExternalLink
 } from 'lucide-react';
 import { UserRepository } from '../../types';
 import { processDeviceFile, formatFileSize, ProcessedFile } from '../../lib/fileUploadHelper';
 import { addProjectToRepository } from '../../lib/repositoryService';
+import { GoogleDriveFile, formatDriveFileSize } from '../../lib/googleDriveService';
+import { GoogleDrivePickerModal } from './GoogleDrivePickerModal';
 
 interface UploadProjectModalProps {
   isOpen: boolean;
@@ -46,6 +50,8 @@ export const UploadProjectModal: React.FC<UploadProjectModalProps> = ({
   const [version, setVersion] = useState('v1.0');
   const [demoUrl, setDemoUrl] = useState('');
   const [attachment, setAttachment] = useState<ProcessedFile | null>(null);
+  const [driveFile, setDriveFile] = useState<GoogleDriveFile | null>(null);
+  const [isDriveModalOpen, setIsDriveModalOpen] = useState(false);
   const [isUploadingFile, setIsUploadingFile] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -74,6 +80,7 @@ export const UploadProjectModal: React.FC<UploadProjectModalProps> = ({
     try {
       const processed = await processDeviceFile(file);
       setAttachment(processed);
+      setDriveFile(null);
       if (!title) {
         // Sugerir nombre de archivo sin extensión como título inicial
         const cleanName = file.name.replace(/\.[^/.]+$/, '').replace(/[_-]/g, ' ');
@@ -112,6 +119,7 @@ export const UploadProjectModal: React.FC<UploadProjectModalProps> = ({
         title: title.trim(),
         description: description.trim(),
         attachment,
+        driveFile,
         demoUrl: demoUrl.trim() || undefined,
         version: version.trim() || 'v1.0',
         isPublic: true,
@@ -121,6 +129,7 @@ export const UploadProjectModal: React.FC<UploadProjectModalProps> = ({
       setTitle('');
       setDescription('');
       setAttachment(null);
+      setDriveFile(null);
       setDemoUrl('');
       setVersion('v1.0');
       onSuccess(projectId);
@@ -247,13 +256,58 @@ export const UploadProjectModal: React.FC<UploadProjectModalProps> = ({
               />
             </div>
 
-            {/* Subida de Archivo Real desde el Dispositivo */}
+            {/* Subida de Archivo: Desde Dispositivo o Google Drive */}
             <div>
-              <label className="block text-xs font-bold text-slate-800 mb-1.5">
-                Archivo o Paquete del Proyecto (Desde tu Dispositivo)
-              </label>
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="block text-xs font-bold text-slate-800">
+                  Archivo o Paquete del Proyecto
+                </label>
+                <span className="text-[11px] text-slate-400">
+                  {driveFile ? 'Google Drive (Nube)' : attachment ? 'Desde tu equipo' : 'Opcional'}
+                </span>
+              </div>
 
-              {attachment ? (
+              {driveFile ? (
+                /* Archivo de Google Drive seleccionado */
+                <div className="p-3.5 rounded-2xl bg-emerald-50/90 border border-emerald-200/90 flex items-center justify-between gap-3 shadow-2xs">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="w-10 h-10 rounded-xl bg-white border border-emerald-200 flex items-center justify-center text-emerald-600 shrink-0 shadow-xs">
+                      <HardDrive className="w-5 h-5" />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-xs font-bold text-slate-900 truncate">
+                        {driveFile.name}
+                      </p>
+                      <p className="text-[11px] text-emerald-700 flex items-center gap-1.5 mt-0.5">
+                        <span className="font-semibold text-slate-700">{formatDriveFileSize(driveFile.size)}</span>
+                        <span>· Archivo de Google Drive</span>
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-1 shrink-0">
+                    {driveFile.webViewLink && (
+                      <a
+                        href={driveFile.webViewLink}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="p-2 text-emerald-600 hover:bg-emerald-100 rounded-xl transition-colors"
+                        title="Ver en Google Drive"
+                      >
+                        <ExternalLink className="w-4 h-4" />
+                      </a>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => setDriveFile(null)}
+                      className="p-2 text-rose-500 hover:bg-rose-100/50 rounded-xl transition-colors cursor-pointer"
+                      title="Quitar archivo"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+              ) : attachment ? (
                 <div className="p-3 rounded-2xl bg-indigo-50/50 border border-indigo-200 flex items-center justify-between gap-3">
                   <div className="flex items-center gap-3 min-w-0">
                     <div className="w-10 h-10 rounded-xl bg-white border border-indigo-100 flex items-center justify-center text-indigo-600 shrink-0">
@@ -285,10 +339,48 @@ export const UploadProjectModal: React.FC<UploadProjectModalProps> = ({
                   </button>
                 </div>
               ) : (
-                <div
-                  onClick={() => fileInputRef.current?.click()}
-                  className="w-full p-6 border-2 border-dashed border-slate-200 hover:border-indigo-400 hover:bg-indigo-50/20 rounded-2xl transition-colors cursor-pointer text-center group"
-                >
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {/* Opción 1: Google Drive */}
+                  <button
+                    type="button"
+                    onClick={() => setIsDriveModalOpen(true)}
+                    className="p-4 rounded-2xl border-2 border-dashed border-emerald-200 hover:border-emerald-500 hover:bg-emerald-50/40 bg-white transition-all text-left group cursor-pointer"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-xl bg-emerald-50 border border-emerald-100 flex items-center justify-center text-emerald-600 group-hover:scale-105 transition-transform">
+                        <HardDrive className="w-5 h-5" />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-xs font-bold text-slate-900 group-hover:text-emerald-700">
+                          Google Drive
+                        </p>
+                        <p className="text-[11px] text-slate-500">
+                          Para archivos grandes o de varios GB
+                        </p>
+                      </div>
+                    </div>
+                  </button>
+
+                  {/* Opción 2: Subir de Dispositivo */}
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    className="p-4 rounded-2xl border-2 border-dashed border-slate-200 hover:border-indigo-400 hover:bg-indigo-50/30 bg-white transition-all text-left group cursor-pointer"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-center text-slate-600 group-hover:text-indigo-600 group-hover:scale-105 transition-transform">
+                        <UploadCloud className="w-5 h-5" />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-xs font-bold text-slate-900 group-hover:text-indigo-600">
+                          Subir de mi equipo
+                        </p>
+                        <p className="text-[11px] text-slate-500">
+                          Archivos directos hasta 15 MB
+                        </p>
+                      </div>
+                    </div>
+                  </button>
                   <input
                     ref={fileInputRef}
                     type="file"
@@ -296,13 +388,6 @@ export const UploadProjectModal: React.FC<UploadProjectModalProps> = ({
                     className="hidden"
                     accept="image/*,.zip,.rar,.tar,.gz,.json,.js,.ts,.tsx,.jsx,.html,.css,.py,.pdf,.txt,.md"
                   />
-                  <UploadCloud className="w-8 h-8 text-slate-400 group-hover:text-indigo-600 mx-auto mb-2 transition-colors" />
-                  <p className="text-xs sm:text-sm font-bold text-slate-700 group-hover:text-indigo-600">
-                    {isUploadingFile ? 'Procesando archivo...' : 'Selecciona o arrastra un archivo desde tu dispositivo'}
-                  </p>
-                  <p className="text-[11px] text-slate-400 mt-0.5">
-                    Imágenes, archivos ZIP, código fuente (JS, TS, HTML, Python), PDFs o documentos (hasta 15 MB)
-                  </p>
                 </div>
               )}
             </div>
@@ -353,6 +438,20 @@ export const UploadProjectModal: React.FC<UploadProjectModalProps> = ({
             </div>
           </form>
         </motion.div>
+
+        {/* Modal para conectar y seleccionar archivo de Google Drive */}
+        <GoogleDrivePickerModal
+          isOpen={isDriveModalOpen}
+          onClose={() => setIsDriveModalOpen(false)}
+          onSelectFile={(selected) => {
+            setDriveFile(selected);
+            setAttachment(null);
+            if (!title) {
+              const clean = selected.name.replace(/\.[^/.]+$/, '').replace(/[_-]/g, ' ');
+              setTitle(clean.charAt(0).toUpperCase() + clean.slice(1));
+            }
+          }}
+        />
       </div>
     </AnimatePresence>
   );

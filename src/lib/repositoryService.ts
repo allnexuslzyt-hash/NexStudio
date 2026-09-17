@@ -16,6 +16,7 @@ import {
 import { db, handleFirestoreError, OperationType, removeUndefinedFields } from './firebase';
 import { UserRepository, UserRepoProject } from '../types';
 import { ProcessedFile } from './fileUploadHelper';
+import { GoogleDriveFile, getDriveFileTypeCategory } from './googleDriveService';
 
 // Colecciones de Firestore
 const REPOS_COLLECTION = 'user_repositories';
@@ -238,12 +239,21 @@ export async function addProjectToRepository(data: {
   title: string;
   description: string;
   attachment?: ProcessedFile | null;
+  driveFile?: GoogleDriveFile | null;
   demoUrl?: string;
   version?: string;
   isPublic?: boolean;
 }): Promise<string> {
   const projectId = `proj_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
   const projectRef = doc(db, PROJECTS_COLLECTION, projectId);
+
+  const isDrive = Boolean(data.driveFile);
+  const attachmentUrl = data.driveFile?.webViewLink || data.attachment?.dataUrl || '';
+  const attachmentName = data.driveFile?.name || data.attachment?.name || '';
+  const attachmentType = data.driveFile 
+    ? getDriveFileTypeCategory(data.driveFile.mimeType, data.driveFile.name)
+    : (data.attachment?.type || '');
+  const attachmentSize = data.driveFile?.size ?? data.attachment?.size ?? 0;
 
   const newProject: UserRepoProject = {
     id: projectId,
@@ -253,10 +263,13 @@ export async function addProjectToRepository(data: {
     ownerName: data.ownerName,
     title: data.title.trim(),
     description: data.description.trim(),
-    attachmentUrl: data.attachment?.dataUrl || '',
-    attachmentName: data.attachment?.name || '',
-    attachmentType: data.attachment?.type || '',
-    attachmentSize: data.attachment?.size || 0,
+    attachmentUrl,
+    attachmentName,
+    attachmentType,
+    attachmentSize,
+    isDriveFile: isDrive,
+    driveFileId: data.driveFile?.id,
+    driveWebViewLink: data.driveFile?.webViewLink,
     demoUrl: data.demoUrl ? data.demoUrl.trim() : '',
     version: data.version ? data.version.trim() : 'v1.0',
     isPublic: data.isPublic ?? true,

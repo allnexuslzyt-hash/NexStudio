@@ -17,11 +17,14 @@ import {
   Archive,
   Film,
   Music,
-  File
+  File,
+  HardDrive,
+  ExternalLink
 } from 'lucide-react';
 import { CommunityPost, PostComment } from '../../types';
 import { useAuth } from '../../context/AuthContext';
 import { formatFileSize } from '../../lib/fileUploadHelper';
+import { formatDriveFileSize } from '../../lib/googleDriveService';
 
 interface CommunityPostCardProps {
   post: CommunityPost;
@@ -211,10 +214,45 @@ export const CommunityPostCard: React.FC<CommunityPostCardProps> = ({
         </div>
       )}
 
-      {/* ARCHIVOS SUBIDOS DESDE EL DISPOSITIVO (VISTA PREVIA EN GRANDE) */}
+      {/* ARCHIVOS SUBIDOS DESDE EL DISPOSITIVO O GOOGLE DRIVE */}
       {post.attachmentUrl && (
         <div className="mb-5 w-full">
-          {post.attachmentType === 'image' ? (
+          {post.isDriveFile ? (
+            /* Tarjeta de Archivo de Google Drive */
+            <div className="w-full p-4 sm:p-5 rounded-2xl bg-gradient-to-r from-emerald-50/90 via-teal-50/40 to-white border border-emerald-200/90 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-2xs">
+              <div className="flex items-center gap-3.5 min-w-0">
+                <div className="w-12 h-12 rounded-xl bg-white border border-emerald-200 flex items-center justify-center shrink-0 shadow-xs text-emerald-600">
+                  <HardDrive className="w-6 h-6" />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-sm font-bold text-slate-900 truncate">
+                    {post.attachmentName || 'Archivo de Google Drive'}
+                  </p>
+                  <div className="text-xs text-slate-500 flex items-center flex-wrap gap-2 mt-0.5">
+                    <span className="font-bold text-[10px] px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 flex items-center gap-1">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                      Google Drive
+                    </span>
+                    {post.attachmentSize ? (
+                      <span className="font-semibold text-slate-700">{formatDriveFileSize(post.attachmentSize)}</span>
+                    ) : null}
+                    <span className="text-slate-400">· Archivo compartido en la nube</span>
+                  </div>
+                </div>
+              </div>
+
+              <a
+                id={`btn-open-drive-${post.id}`}
+                href={post.driveWebViewLink || post.attachmentUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="w-full sm:w-auto px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold flex items-center justify-center gap-2 shadow-sm transition-all cursor-pointer min-h-[38px] shrink-0"
+              >
+                <ExternalLink className="w-3.5 h-3.5" />
+                <span>Abrir en Google Drive</span>
+              </a>
+            </div>
+          ) : post.attachmentType === 'image' ? (
             /* Vista Previa en Grande de Imagen del Dispositivo */
             <div 
               className="relative w-full rounded-2xl overflow-hidden border border-slate-200 bg-slate-950 group cursor-pointer shadow-xs"

@@ -10,9 +10,13 @@ import {
   Users, 
   Lock, 
   Sparkles,
-  MessageSquarePlus
+  MessageSquarePlus,
+  HardDrive,
+  ExternalLink
 } from 'lucide-react';
 import { processDeviceFile, formatFileSize, ProcessedFile } from '../../lib/fileUploadHelper';
+import { GoogleDriveFile, formatDriveFileSize } from '../../lib/googleDriveService';
+import { GoogleDrivePickerModal } from './GoogleDrivePickerModal';
 
 interface CreatePostModalProps {
   isOpen: boolean;
@@ -20,6 +24,7 @@ interface CreatePostModalProps {
   onPublish: (params: {
     content: string;
     attachment?: ProcessedFile | null;
+    driveFile?: GoogleDriveFile | null;
     visibility: 'public' | 'community_only' | 'private';
   }) => Promise<void>;
   userName?: string;
@@ -35,6 +40,8 @@ export const CreatePostModal: React.FC<CreatePostModalProps> = ({
 }) => {
   const [content, setContent] = useState('');
   const [attachment, setAttachment] = useState<ProcessedFile | null>(null);
+  const [driveFile, setDriveFile] = useState<GoogleDriveFile | null>(null);
+  const [isDriveModalOpen, setIsDriveModalOpen] = useState(false);
   const [visibility, setVisibility] = useState<'public' | 'community_only' | 'private'>('public');
   const [isUploadingFile, setIsUploadingFile] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -52,6 +59,7 @@ export const CreatePostModal: React.FC<CreatePostModalProps> = ({
     try {
       const processed = await processDeviceFile(file);
       setAttachment(processed);
+      setDriveFile(null); // Si sube del dispositivo, reemplaza el de drive
     } catch (err: any) {
       setError(err.message || 'Error al procesar el archivo del dispositivo.');
     } finally {
@@ -63,7 +71,7 @@ export const CreatePostModal: React.FC<CreatePostModalProps> = ({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const trimmed = content.trim();
-    if (!trimmed && !attachment) {
+    if (!trimmed && !attachment && !driveFile) {
       setError('Escribe un texto o adjunta un archivo para publicar.');
       return;
     }
@@ -74,10 +82,12 @@ export const CreatePostModal: React.FC<CreatePostModalProps> = ({
       await onPublish({
         content: trimmed,
         attachment,
+        driveFile,
         visibility,
       });
       setContent('');
       setAttachment(null);
+      setDriveFile(null);
       onClose();
     } catch (err: any) {
       setError(err?.message || 'Error al crear la publicación.');
@@ -157,7 +167,47 @@ export const CreatePostModal: React.FC<CreatePostModalProps> = ({
               </div>
             </div>
 
-            {/* Vista previa de archivo adjunto */}
+            {/* Vista previa de archivo adjunto de Google Drive */}
+            {driveFile && (
+              <div className="p-3.5 rounded-2xl bg-emerald-50/80 border border-emerald-200/80 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-emerald-900 flex items-center gap-1.5">
+                    <HardDrive className="w-4 h-4 text-emerald-600 shrink-0" />
+                    <span className="truncate max-w-[260px]">{driveFile.name}</span>
+                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-200 text-emerald-800 font-bold shrink-0">
+                      {formatDriveFileSize(driveFile.size)}
+                    </span>
+                  </span>
+                  <div className="flex items-center gap-1">
+                    {driveFile.webViewLink && (
+                      <a
+                        href={driveFile.webViewLink}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="p-1 text-emerald-600 hover:text-emerald-800 rounded transition-colors"
+                        title="Ver en Google Drive"
+                      >
+                        <ExternalLink className="w-3.5 h-3.5" />
+                      </a>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => setDriveFile(null)}
+                      className="p-1 text-slate-400 hover:text-rose-600 rounded transition-colors cursor-pointer"
+                      title="Quitar archivo"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+                <div className="text-[11px] text-emerald-700 flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                  <span>Archivo de Google Drive listo para compartir con la comunidad</span>
+                </div>
+              </div>
+            )}
+
+            {/* Vista previa de archivo adjunto local */}
             {attachment && (
               <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200 space-y-2">
                 <div className="flex items-center justify-between">
@@ -198,8 +248,20 @@ export const CreatePostModal: React.FC<CreatePostModalProps> = ({
             )}
 
             {/* Botones inferiores */}
-            <div className="flex items-center justify-between pt-2">
-              <div>
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-2">
+              <div className="flex items-center gap-2 flex-wrap">
+                {/* Botón de Google Drive */}
+                <button
+                  type="button"
+                  onClick={() => setIsDriveModalOpen(true)}
+                  className="px-3.5 py-2 rounded-xl bg-emerald-50 hover:bg-emerald-100/80 text-emerald-700 border border-emerald-200/80 text-xs font-bold flex items-center gap-2 transition-all cursor-pointer min-h-[38px] shadow-2xs"
+                  title="Conectar cuenta y elegir archivo de Google Drive"
+                >
+                  <HardDrive className="w-4 h-4 text-emerald-600" />
+                  <span>{driveFile ? 'Cambiar Google Drive' : 'Google Drive'}</span>
+                </button>
+
+                {/* Botón de subida local */}
                 <button
                   type="button"
                   onClick={() => fileInputRef.current?.click()}
@@ -207,7 +269,7 @@ export const CreatePostModal: React.FC<CreatePostModalProps> = ({
                   className="px-3.5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold flex items-center gap-2 transition-colors cursor-pointer min-h-[38px]"
                 >
                   <FileUp className="w-4 h-4 text-indigo-600" />
-                  <span>{attachment ? 'Cambiar archivo' : 'Subir archivo o foto'}</span>
+                  <span>{attachment ? 'Cambiar dispositivo' : 'Subir de mi equipo'}</span>
                 </button>
                 <input
                   ref={fileInputRef}
@@ -217,7 +279,7 @@ export const CreatePostModal: React.FC<CreatePostModalProps> = ({
                 />
               </div>
 
-              <div className="flex items-center gap-2">
+              <div className="flex items-center justify-end gap-2">
                 <button
                   type="button"
                   onClick={onClose}
@@ -227,7 +289,7 @@ export const CreatePostModal: React.FC<CreatePostModalProps> = ({
                 </button>
                 <button
                   type="submit"
-                  disabled={isSubmitting || (!content.trim() && !attachment)}
+                  disabled={isSubmitting || (!content.trim() && !attachment && !driveFile)}
                   className="px-5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white text-xs font-bold shadow-md shadow-indigo-600/20 transition-all flex items-center gap-2 cursor-pointer min-h-[38px]"
                 >
                   <Send className="w-3.5 h-3.5" />
@@ -237,6 +299,16 @@ export const CreatePostModal: React.FC<CreatePostModalProps> = ({
             </div>
           </form>
         </motion.div>
+
+        {/* Modal de Google Drive */}
+        <GoogleDrivePickerModal
+          isOpen={isDriveModalOpen}
+          onClose={() => setIsDriveModalOpen(false)}
+          onSelectFile={(selected) => {
+            setDriveFile(selected);
+            setAttachment(null); // Prioriza el de Drive
+          }}
+        />
       </div>
     </AnimatePresence>
   );

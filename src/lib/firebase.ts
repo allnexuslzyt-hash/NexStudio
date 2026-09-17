@@ -26,12 +26,37 @@ import firebaseConfig from '../../firebase-applet-config.json';
 const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
 
 // Initialize Firestore with custom databaseId if configured
-export const db: Firestore = getFirestore(app, firebaseConfig.firestoreDatabaseId);
+export const db: Firestore = getFirestore(app, (firebaseConfig as any).firestoreDatabaseId);
 export const auth = getAuth(app);
 
+export const WORKSPACE_DRIVE_SCOPES = [
+  'https://www.googleapis.com/auth/drive.file',
+  'https://www.googleapis.com/auth/drive.metadata.readonly',
+  'https://www.googleapis.com/auth/drive.readonly',
+];
+
 export const googleProvider = new GoogleAuthProvider();
+WORKSPACE_DRIVE_SCOPES.forEach((scope) => {
+  googleProvider.addScope(scope);
+});
+
 googleProvider.setCustomParameters({
   prompt: 'select_account'
+});
+
+// In-memory token caching for Workspace Google Drive APIs
+let inMemoryDriveAccessToken: string | null = null;
+
+export const getCachedDriveAccessToken = (): string | null => inMemoryDriveAccessToken;
+export const setCachedDriveAccessToken = (token: string | null): void => {
+  inMemoryDriveAccessToken = token;
+};
+
+// Clear token on sign out
+onAuthStateChanged(auth, (user) => {
+  if (!user) {
+    inMemoryDriveAccessToken = null;
+  }
 });
 
 export enum OperationType {
