@@ -269,6 +269,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return credential.accessToken;
     } catch (err: any) {
       console.error('Error conectando Google Drive:', err);
+      if (err.code === 'auth/unauthorized-domain') {
+        const currentHostname = typeof window !== 'undefined' ? window.location.hostname : '';
+        setUnauthorizedDomain(currentHostname);
+        setAuthError(`Dominio no autorizado en Firebase ("${currentHostname}"). Abre la guía para autorizarlo.`);
+        throw new Error(`Dominio no autorizado en Firebase. Agrega "${currentHostname}" en la consola de Firebase Authentication.`);
+      }
       if (err.code === 'auth/popup-closed-by-user' || err.code === 'auth/cancelled-popup-request') {
         throw new Error('Conexión con Google Drive cancelada por el usuario.');
       }
