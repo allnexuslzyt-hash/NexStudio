@@ -19,6 +19,7 @@ import {
   auth, 
   db, 
   googleProvider, 
+  getDriveAuthProvider,
   handleFirestoreError, 
   OperationType, 
   testConnection,
@@ -216,12 +217,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       const result = await signInWithPopup(auth, googleProvider);
       if (result.user) {
-        // Cache Google Drive access token in memory for Google Workspace APIs
-        const credential = GoogleAuthProvider.credentialFromResult(result);
-        if (credential?.accessToken) {
-          setCachedDriveAccessToken(credential.accessToken);
-        }
-
         // Clear dev session when actual Google user connects
         localStorage.removeItem('nexstudio_dev_user');
         localStorage.removeItem('nexstudio_dev_profile');
@@ -257,7 +252,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     setLoading(true);
     try {
-      const result = await signInWithPopup(auth, googleProvider);
+      const driveProvider = getDriveAuthProvider();
+      const result = await signInWithPopup(auth, driveProvider);
       const credential = GoogleAuthProvider.credentialFromResult(result);
       if (!credential?.accessToken) {
         throw new Error('No se pudo obtener el token de acceso para Google Drive.');

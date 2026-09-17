@@ -35,14 +35,23 @@ export const WORKSPACE_DRIVE_SCOPES = [
   'https://www.googleapis.com/auth/drive.readonly',
 ];
 
+// Standard Google Auth Provider for basic login (email, profile) - NO Drive scopes
 export const googleProvider = new GoogleAuthProvider();
-WORKSPACE_DRIVE_SCOPES.forEach((scope) => {
-  googleProvider.addScope(scope);
-});
-
 googleProvider.setCustomParameters({
   prompt: 'select_account'
 });
+
+// Dedicated Google Auth Provider only requested when user explicitly connects Google Drive
+export const getDriveAuthProvider = (): GoogleAuthProvider => {
+  const driveProvider = new GoogleAuthProvider();
+  WORKSPACE_DRIVE_SCOPES.forEach((scope) => {
+    driveProvider.addScope(scope);
+  });
+  driveProvider.setCustomParameters({
+    prompt: 'consent select_account'
+  });
+  return driveProvider;
+};
 
 // In-memory token caching for Workspace Google Drive APIs
 let inMemoryDriveAccessToken: string | null = null;
