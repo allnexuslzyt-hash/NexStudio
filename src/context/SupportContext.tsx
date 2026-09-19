@@ -282,13 +282,15 @@ export const SupportProvider: React.FC<{ children: React.ReactNode }> = ({ child
     }
   };
 
-  // Delete ticket (Admin only)
+  // Delete ticket (Admin or Owner)
   const deleteTicket = async (ticketId: string) => {
     try {
-      await deleteDoc(doc(db, 'support_tickets', ticketId));
+      // Optimistic local state update
+      setTickets((prev) => prev.filter((t) => t.id !== ticketId));
       if (activeTicketId === ticketId) {
         setActiveTicketId(null);
       }
+      await deleteDoc(doc(db, 'support_tickets', ticketId));
     } catch (err) {
       console.error('Error eliminando ticket:', err);
       handleFirestoreError(err, OperationType.DELETE, `support_tickets/${ticketId}`);

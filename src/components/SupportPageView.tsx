@@ -19,7 +19,8 @@ import {
   Layers,
   Check,
   User,
-  ExternalLink
+  ExternalLink,
+  Trash2
 } from 'lucide-react';
 import { useSupport } from '../context/SupportContext';
 import { useAuth } from '../context/AuthContext';
@@ -48,6 +49,7 @@ export const SupportPageView: React.FC<SupportPageViewProps> = ({ onBack }) => {
     addMessageToTicket,
     closeTicket,
     reopenTicket,
+    deleteTicket,
     isLoading 
   } = useSupport();
 
@@ -65,6 +67,8 @@ export const SupportPageView: React.FC<SupportPageViewProps> = ({ onBack }) => {
   const [replyText, setReplyText] = useState('');
   const [formError, setFormError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
+  const [ticketToDelete, setTicketToDelete] = useState<SupportTicket | null>(null);
+  const [isDeletingTicket, setIsDeletingTicket] = useState<boolean>(false);
 
   // Search and filter in tickets list
   const [statusFilter, setStatusFilter] = useState<'all' | 'abierto' | 'cerrado'>('all');
@@ -823,8 +827,8 @@ export const SupportPageView: React.FC<SupportPageViewProps> = ({ onBack }) => {
                         </div>
                       </div>
 
-                      {/* Acción de Cerrar o Reabrir */}
-                      <div className="self-end sm:self-auto">
+                      {/* Acción de Cerrar o Reabrir y Eliminar */}
+                      <div className="flex items-center gap-2 self-end sm:self-auto">
                         {activeTicket.status === 'abierto' || activeTicket.status === 'en_proceso' ? (
                           <button
                             type="button"
@@ -844,6 +848,15 @@ export const SupportPageView: React.FC<SupportPageViewProps> = ({ onBack }) => {
                             <span>Reabrir Caso</span>
                           </button>
                         )}
+
+                        <button
+                          type="button"
+                          onClick={() => setTicketToDelete(activeTicket)}
+                          className="p-2 rounded-xl text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
+                          title="Eliminar este ticket"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
                       </div>
                     </div>
 
@@ -961,6 +974,76 @@ export const SupportPageView: React.FC<SupportPageViewProps> = ({ onBack }) => {
           </div>
         )}
       </div>
+      {/* Modal de confirmación para eliminar ticket */}
+      <AnimatePresence>
+        {ticketToDelete && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs">
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="w-full max-w-md bg-white rounded-2xl p-6 shadow-2xl border border-slate-200 space-y-4"
+            >
+              <div className="w-12 h-12 rounded-2xl bg-rose-50 border border-rose-200 flex items-center justify-center text-rose-600 mx-auto">
+                <Trash2 className="w-6 h-6" />
+              </div>
+
+              <div className="text-center space-y-1">
+                <h3 className="text-base font-extrabold text-slate-900">
+                  ¿Eliminar este ticket definitivamente?
+                </h3>
+                <p className="text-xs text-slate-500">
+                  El ticket #{ticketToDelete.id.slice(-8)} y todo su historial de mensajes se eliminarán permanentemente.
+                </p>
+                <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200 text-left mt-2">
+                  <p className="text-xs font-bold text-slate-800 line-clamp-1">
+                    {ticketToDelete.subject}
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 pt-2">
+                <button
+                  type="button"
+                  disabled={isDeletingTicket}
+                  onClick={() => setTicketToDelete(null)}
+                  className="w-1/2 py-2.5 rounded-xl border border-slate-200 text-slate-700 text-xs font-semibold hover:bg-slate-50 cursor-pointer disabled:opacity-50"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  disabled={isDeletingTicket}
+                  onClick={async () => {
+                    try {
+                      setIsDeletingTicket(true);
+                      await deleteTicket(ticketToDelete.id);
+                      setTicketToDelete(null);
+                    } catch (err) {
+                      console.error('Error al borrar ticket:', err);
+                    } finally {
+                      setIsDeletingTicket(false);
+                    }
+                  }}
+                  className="w-1/2 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold transition-colors shadow-xs cursor-pointer flex items-center justify-center gap-1.5 disabled:opacity-50"
+                >
+                  {isDeletingTicket ? (
+                    <>
+                      <RotateCcw className="w-3.5 h-3.5 animate-spin" />
+                      <span>Eliminando...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Trash2 className="w-3.5 h-3.5" />
+                      <span>Eliminar</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };

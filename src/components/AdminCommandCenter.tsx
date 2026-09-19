@@ -28,6 +28,7 @@ import {
   Edit3, 
   Eye, 
   RefreshCw, 
+  RotateCcw,
   ArrowLeft,
   ChevronRight,
   TrendingUp,
@@ -132,6 +133,8 @@ export const AdminCommandCenter: React.FC<AdminCommandCenterProps> = ({ onBack }
   const [selectedUserForRole, setSelectedUserForRole] = useState<ManagedUser | null>(null);
   const [selectedUserForBan, setSelectedUserForBan] = useState<ManagedUser | null>(null);
   const [selectedUserForDelete, setSelectedUserForDelete] = useState<ManagedUser | null>(null);
+  const [selectedTicketForDelete, setSelectedTicketForDelete] = useState<SupportTicket | null>(null);
+  const [isDeletingTicket, setIsDeletingTicket] = useState<boolean>(false);
   const [isAddUserModalOpen, setIsAddUserModalOpen] = useState(false);
 
   // Ban modal fields
@@ -999,14 +1002,9 @@ export const AdminCommandCenter: React.FC<AdminCommandCenterProps> = ({ onBack }
 
                       <button
                         type="button"
-                        onClick={async () => {
-                          if (confirm('¿Estás seguro de eliminar definitivamente este ticket?')) {
-                            await deleteTicket(t.id);
-                            showToast('Ticket eliminado');
-                          }
-                        }}
+                        onClick={() => setSelectedTicketForDelete(t)}
                         className="p-2 rounded-xl text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
-                        title="Eliminar Ticket"
+                        title="Eliminar Ticket Definitivamente"
                       >
                         <Trash2 className="w-4 h-4" />
                       </button>
@@ -1664,6 +1662,86 @@ export const AdminCommandCenter: React.FC<AdminCommandCenterProps> = ({ onBack }
         )}
       </AnimatePresence>
 
+      {/* MODAL 3.5: Eliminar Ticket de Soporte Definitivamente */}
+      <AnimatePresence>
+        {selectedTicketForDelete && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs">
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="w-full max-w-md bg-white rounded-2xl p-6 shadow-2xl border-2 border-rose-500 space-y-4"
+            >
+              <div className="w-12 h-12 rounded-2xl bg-rose-50 border border-rose-200 flex items-center justify-center text-rose-600 mx-auto">
+                <Trash2 className="w-6 h-6" />
+              </div>
+
+              <div className="text-center space-y-1">
+                <h3 className="text-base font-extrabold text-slate-900">
+                  ¿Eliminar ticket de soporte definitivamente?
+                </h3>
+                <p className="text-xs text-slate-500">
+                  Esta acción es destructiva e irreversible. Se borrará el ticket y todo su historial de mensajes de la base de datos.
+                </p>
+                <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 text-left mt-2">
+                  <p className="text-xs font-bold text-slate-800 line-clamp-1">
+                    {selectedTicketForDelete.subject}
+                  </p>
+                  <p className="text-[11px] text-slate-500 mt-0.5">
+                    ID: #{selectedTicketForDelete.id.slice(-8)} &bull; De: {selectedTicketForDelete.userName} ({selectedTicketForDelete.contactEmail})
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 pt-2">
+                <button
+                  type="button"
+                  disabled={isDeletingTicket}
+                  onClick={() => setSelectedTicketForDelete(null)}
+                  className="w-1/2 py-2.5 rounded-xl border border-slate-200 text-slate-700 text-xs font-semibold hover:bg-slate-50 cursor-pointer disabled:opacity-50"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  disabled={isDeletingTicket}
+                  onClick={async () => {
+                    try {
+                      setIsDeletingTicket(true);
+                      const id = selectedTicketForDelete.id;
+                      if (activeAdminChatTicketId === id) {
+                        setActiveAdminChatTicketId(null);
+                      }
+                      await deleteTicket(id);
+                      showToast('Ticket eliminado exitosamente');
+                      setSelectedTicketForDelete(null);
+                    } catch (err: any) {
+                      console.error('Error al eliminar ticket:', err);
+                      showToast('Error al eliminar: ' + (err?.message || 'Error de base de datos'));
+                    } finally {
+                      setIsDeletingTicket(false);
+                    }
+                  }}
+                  className="w-1/2 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold transition-colors shadow-xs cursor-pointer flex items-center justify-center gap-1.5 disabled:opacity-50"
+                >
+                  {isDeletingTicket ? (
+                    <>
+                      <RotateCcw className="w-3.5 h-3.5 animate-spin" />
+                      <span>Eliminando...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Trash2 className="w-3.5 h-3.5" />
+                      <span>Eliminar Ticket</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
       {/* MODAL 4: Agregar FAQ */}
       <AnimatePresence>
         {isNewFaqModalOpen && (
@@ -2071,12 +2149,9 @@ export const AdminCommandCenter: React.FC<AdminCommandCenterProps> = ({ onBack }
 
                   <button
                     type="button"
-                    onClick={async () => {
-                      if (confirm('¿Eliminar este ticket definitivamente?')) {
-                        const id = activeAdminChatTicket.id;
-                        setActiveAdminChatTicketId(null);
-                        await deleteTicket(id);
-                        showToast('Ticket eliminado');
+                    onClick={() => {
+                      if (activeAdminChatTicket) {
+                        setSelectedTicketForDelete(activeAdminChatTicket);
                       }
                     }}
                     className="p-1.5 rounded-lg text-slate-400 hover:text-rose-400 hover:bg-slate-800 cursor-pointer"
@@ -2137,15 +2212,13 @@ export const AdminCommandCenter: React.FC<AdminCommandCenterProps> = ({ onBack }
                       <button
                         type="button"
                         onClick={async () => {
-                          if (confirm(`¿Levantar sanción y reactivar al usuario ${activeAdminChatTicket.userName}?`)) {
-                            await banOrSuspendUser(activeAdminChatTicket.userId!, 'activo', 'Sanción levantada tras revisión de apelación');
-                            await addMessageToTicket(
-                              activeAdminChatTicket.id,
-                              '✅ Tu reclamación ha sido aceptada por la administración. La sanción ha sido levantada y tu cuenta ha sido reactivada con normalidad.'
-                            );
-                            await closeTicket(activeAdminChatTicket.id);
-                            showToast('Sanción levantada y usuario reactivado');
-                          }
+                          await banOrSuspendUser(activeAdminChatTicket.userId!, 'activo', 'Sanción levantada tras revisión de apelación');
+                          await addMessageToTicket(
+                            activeAdminChatTicket.id,
+                            '✅ Tu reclamación ha sido aceptada por la administración. La sanción ha sido levantada y tu cuenta ha sido reactivada con normalidad.'
+                          );
+                          await closeTicket(activeAdminChatTicket.id);
+                          showToast('Sanción levantada y usuario reactivado');
                         }}
                         className="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold shadow-xs cursor-pointer"
                       >
@@ -2155,14 +2228,12 @@ export const AdminCommandCenter: React.FC<AdminCommandCenterProps> = ({ onBack }
                     <button
                       type="button"
                       onClick={async () => {
-                        if (confirm('¿Rechazar esta reclamación y mantener la sanción?')) {
-                          await addMessageToTicket(
-                            activeAdminChatTicket.id,
-                            '❌ Tu reclamación ha sido examinada minuciosamente y el equipo de administración ha determinado mantener la sanción.'
-                          );
-                          await closeTicket(activeAdminChatTicket.id);
-                          showToast('Reclamación rechazada y caso cerrado');
-                        }
+                        await addMessageToTicket(
+                          activeAdminChatTicket.id,
+                          '❌ Tu reclamación ha sido examinada minuciosamente y el equipo de administración ha determinado mantener la sanción.'
+                        );
+                        await closeTicket(activeAdminChatTicket.id);
+                        showToast('Reclamación rechazada y caso cerrado');
                       }}
                       className="px-3 py-1.5 rounded-xl bg-white border border-rose-300 text-rose-700 hover:bg-rose-100 text-xs font-semibold cursor-pointer"
                     >
