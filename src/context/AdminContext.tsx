@@ -139,6 +139,36 @@ export const INITIAL_PROJECTS: AdminProject[] = [
     status: 'active',
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString()
+  },
+  {
+    id: 'proj-nexclean',
+    title: 'NexClean',
+    description: 'Software oficial de limpieza y optimización para el ordenador en formato ejecutable (.exe). Elimina archivos residuales, optimiza la memoria y mejora el rendimiento general del PC de forma rápida y segura.',
+    category: 'Proyecto Oficial',
+    tag: 'Optimización (.exe)',
+    downloadUrl: 'https://drive.google.com/file/d/11aT9ZnT1MYMlYH2bG7o3b3ujrgpz0LMd/view?usp=sharing',
+    linkUrl: '',
+    waitTimeSeconds: 3,
+    isPublic: true,
+    requireAuth: true,
+    status: 'active',
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString()
+  },
+  {
+    id: 'proj-nexboost',
+    title: 'NexBoost',
+    description: 'Herramienta oficial de optimización extrema en ejecutable (.exe). Libera y optimiza la memoria RAM en tiempo real, prioriza procesos del sistema y acelera el rendimiento general del ordenador.',
+    category: 'Proyecto Oficial',
+    tag: 'Optimización RAM (.exe)',
+    downloadUrl: 'https://drive.google.com/file/d/16ji00s6bKIguJEdXgKZ8DmZmRcF5WB_t/view?usp=sharing',
+    linkUrl: '',
+    waitTimeSeconds: 3,
+    isPublic: true,
+    requireAuth: true,
+    status: 'active',
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString()
   }
 ];
 
@@ -239,7 +269,19 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const [projects, setProjects] = useState<AdminProject[]>(() => {
     try {
       const saved = localStorage.getItem('nexstudio_admin_projects');
-      if (saved) return JSON.parse(saved);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          // Verify if any default initial projects are missing; if so, merge them
+          const missing = INITIAL_PROJECTS.filter(ip => !parsed.some(p => p.id === ip.id || p.title.toLowerCase() === ip.title.toLowerCase()));
+          if (missing.length > 0) {
+            const merged = [...parsed, ...missing];
+            localStorage.setItem('nexstudio_admin_projects', JSON.stringify(merged));
+            return merged;
+          }
+          return parsed;
+        }
+      }
     } catch (e) {
       console.error('Error cargando proyectos locales:', e);
     }
@@ -286,7 +328,14 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         if (docSnap.exists()) {
           const data = docSnap.data();
           if (data && Array.isArray(data.items) && data.items.length > 0) {
-            setProjects(data.items as AdminProject[]);
+            const remoteItems = data.items as AdminProject[];
+            const missing = INITIAL_PROJECTS.filter(ip => !remoteItems.some(p => p.id === ip.id || p.title.toLowerCase() === ip.title.toLowerCase()));
+            if (missing.length > 0) {
+              const merged = [...remoteItems, ...missing];
+              setProjects(merged);
+              return;
+            }
+            setProjects(remoteItems);
           }
         }
       },

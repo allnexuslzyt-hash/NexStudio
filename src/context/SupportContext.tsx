@@ -18,8 +18,11 @@ interface SupportContextType {
   activeTicket: SupportTicket | null;
   activeTicketId: string | null;
   isSupportModalOpen: boolean;
+  supportPageRequested: boolean;
   isLoading: boolean;
   openSupportModal: (ticketId?: string) => void;
+  requestSupportPage: (ticketId?: string) => void;
+  clearSupportPageRequest: () => void;
   closeSupportModal: () => void;
   setActiveTicketId: (ticketId: string | null) => void;
   createTicket: (data: {
@@ -46,6 +49,7 @@ export const SupportProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const [tickets, setTickets] = useState<SupportTicket[]>([]);
   const [activeTicketId, setActiveTicketId] = useState<string | null>(null);
   const [isSupportModalOpen, setIsSupportModalOpen] = useState(false);
+  const [supportPageRequested, setSupportPageRequested] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
   // Synchronize tickets in real time from Firestore
@@ -98,7 +102,19 @@ export const SupportProvider: React.FC<{ children: React.ReactNode }> = ({ child
     if (ticketId) {
       setActiveTicketId(ticketId);
     }
+    setSupportPageRequested(true);
     setIsSupportModalOpen(true);
+  };
+
+  const requestSupportPage = (ticketId?: string) => {
+    if (ticketId) {
+      setActiveTicketId(ticketId);
+    }
+    setSupportPageRequested(true);
+  };
+
+  const clearSupportPageRequest = () => {
+    setSupportPageRequested(false);
   };
 
   const closeSupportModal = () => {
@@ -388,8 +404,11 @@ export const SupportProvider: React.FC<{ children: React.ReactNode }> = ({ child
         activeTicket,
         activeTicketId,
         isSupportModalOpen,
+        supportPageRequested,
         isLoading,
         openSupportModal,
+        requestSupportPage,
+        clearSupportPageRequest,
         closeSupportModal,
         setActiveTicketId,
         createTicket,

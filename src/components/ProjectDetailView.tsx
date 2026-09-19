@@ -10,7 +10,10 @@ import {
   FileCode,
   CheckCircle2,
   AlertCircle,
-  X
+  X,
+  Sparkles,
+  Cpu,
+  HardDrive
 } from 'lucide-react';
 import { DownloadModal } from './DownloadModal';
 import { useAuth } from '../context/AuthContext';
@@ -32,6 +35,14 @@ export const ProjectDetailView: React.FC<ProjectDetailViewProps> = ({ onBack, pr
   const waitTime = project?.waitTimeSeconds ?? 3;
   const requireAuth = project?.requireAuth ?? true;
   const projectDesc = project?.description || 'Estructura completa de asistente inteligente construida en código nativo. Lista para descargar, integrar y personalizar sin dependencias externas.';
+
+  const isNexBoost = project?.id === 'proj-nexboost' || projectTitle.toLowerCase().includes('boost');
+  const isNexClean = project?.id === 'proj-nexclean' || projectTitle.toLowerCase().includes('clean');
+  const isExeProject = isNexClean || 
+                       isNexBoost ||
+                       projectTitle.toLowerCase().includes('.exe') ||
+                       projectDesc.toLowerCase().includes('.exe') ||
+                       Boolean(project?.tag?.toLowerCase().includes('.exe'));
 
   // Manejo del click de descarga: Valida si o si el registro previo si requireAuth está activo
   const handleDownloadClick = () => {
@@ -55,7 +66,34 @@ export const ProjectDetailView: React.FC<ProjectDetailViewProps> = ({ onBack, pr
     }
   };
 
-  const specCards = [
+  const specCards = isExeProject ? [
+    {
+      title: 'Formato',
+      value: 'Ejecutable (.exe)',
+      icon: <Cpu className="w-5 h-5 text-indigo-600" />,
+      desc: 'Software nativo para Windows (10 / 11) listo para ejecutar sin instalaciones complejas.',
+    },
+    {
+      title: 'Rendimiento',
+      value: isNexBoost ? 'Optimización RAM' : 'Limpieza Profunda',
+      icon: <Zap className="w-5 h-5 text-amber-500" />,
+      desc: isNexBoost 
+        ? 'Libera memoria RAM en tiempo real y prioriza procesos críticos para máxima fluidez.'
+        : 'Elimina residuos, optimiza la memoria y recupera la velocidad óptima de tu ordenador.',
+    },
+    {
+      title: 'Seguridad',
+      value: '100% Verificado',
+      icon: <ShieldCheck className="w-5 h-5 text-emerald-600" />,
+      desc: 'Software oficial seguro, libre de adware, publicidad molesta o scripts no deseados.',
+    },
+    {
+      title: 'Alojamiento',
+      value: 'Google Drive',
+      icon: <HardDrive className="w-5 h-5 text-teal-600" />,
+      desc: 'Descarga directa, rápida y de alta disponibilidad protegida en servidores de Google.',
+    },
+  ] : [
     {
       title: 'Tecnología',
       value: 'HTML · CSS · JS',
@@ -154,6 +192,34 @@ export const ProjectDetailView: React.FC<ProjectDetailViewProps> = ({ onBack, pr
         className="relative rounded-3xl bg-white/90 backdrop-blur-xl border border-slate-200/90 p-8 sm:p-12 mb-10 overflow-hidden shadow-xl shadow-slate-200/40 text-left"
       >
         <div className="relative z-10 max-w-3xl">
+          {/* Project Tag / Category Badge */}
+          <div className="flex flex-wrap items-center gap-2 mb-4">
+            <span className={`px-3 py-1 rounded-full text-xs font-bold ${
+              isNexBoost
+                ? 'bg-amber-100 text-amber-800 border border-amber-200'
+                : isExeProject 
+                ? 'bg-emerald-100 text-emerald-800 border border-emerald-200' 
+                : 'bg-indigo-100 text-indigo-800 border border-indigo-200'
+            }`}>
+              {project?.tag || (isNexBoost ? 'Optimización RAM (.exe)' : isExeProject ? 'Software Oficial · Windows (.exe)' : 'Proyecto Oficial')}
+            </span>
+            {isExeProject && (
+              <span className="px-2.5 py-1 rounded-full text-[11px] font-semibold bg-slate-100 text-slate-700 border border-slate-200 flex items-center gap-1.5">
+                {isNexBoost ? (
+                  <>
+                    <Zap className="w-3.5 h-3.5 text-amber-500" />
+                    <span>Optimización RAM & Sistema</span>
+                  </>
+                ) : (
+                  <>
+                    <Cpu className="w-3.5 h-3.5 text-slate-500" />
+                    <span>Optimización PC</span>
+                  </>
+                )}
+              </span>
+            )}
+          </div>
+
           {/* Title Typography standard with site */}
           <motion.h1
             initial={{ opacity: 0, y: 12 }}
@@ -185,7 +251,7 @@ export const ProjectDetailView: React.FC<ProjectDetailViewProps> = ({ onBack, pr
               <div className="absolute -inset-0.5 bg-gradient-to-r from-emerald-500 to-teal-500 rounded-2xl blur-sm opacity-50 group-hover:opacity-100 transition duration-300 pointer-events-none" />
               <motion.button
                 type="button"
-                id="btn-download-project-1"
+                id={project?.id ? `btn-download-${project.id}` : "btn-download-project"}
                 onClick={handleDownloadClick}
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.98 }}
@@ -196,7 +262,7 @@ export const ProjectDetailView: React.FC<ProjectDetailViewProps> = ({ onBack, pr
                 ) : (
                   <Lock className="w-5 h-5 text-emerald-100" />
                 )}
-                <span>Descargar {projectTitle}</span>
+                <span>Descargar {projectTitle} {isExeProject && !projectTitle.includes('.exe') ? '(.exe)' : ''}</span>
               </motion.button>
             </div>
           </motion.div>

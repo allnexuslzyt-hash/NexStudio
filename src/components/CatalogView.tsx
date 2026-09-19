@@ -24,7 +24,8 @@ import {
   Video,
   Download,
   Clock,
-  ShieldCheck
+  ShieldCheck,
+  Zap
 } from 'lucide-react';
 import { DownloadModal } from './DownloadModal';
 import { ProjectDetailView } from './ProjectDetailView';
@@ -89,18 +90,32 @@ export const CatalogView: React.FC<CatalogViewProps> = ({ view, onBack }) => {
     switch (view) {
       case 'proyectos': {
         const visibleProjects = isAdmin ? projects : projects.filter(p => p.isPublic);
-        return visibleProjects.map((p, idx) => ({
-          id: p.id,
-          title: p.title,
-          category: p.category || `Proyecto ${idx + 1}`,
-          description: '',
-          tag: p.tag || `Proyecto ${idx + 1}`,
-          icon: <Code2 className="w-5 h-5 text-indigo-600" />,
-          accentColor: 'from-indigo-500/10 to-blue-500/10 border-indigo-200',
-          linkText: 'Ver',
-          downloadUrl: p.downloadUrl,
-          downloadSeconds: p.waitTimeSeconds ?? 3
-        }));
+        return visibleProjects.map((p, idx) => {
+          const isNexClean = p.id === 'proj-nexclean' || p.title.toLowerCase().includes('clean');
+          const isNexBoost = p.id === 'proj-nexboost' || p.title.toLowerCase().includes('boost');
+          return {
+            id: p.id,
+            title: p.title,
+            category: p.category || (isNexClean || isNexBoost ? 'Proyecto Oficial' : `Proyecto ${idx + 1}`),
+            description: p.description || '',
+            tag: p.tag || (isNexBoost ? 'Optimización RAM (.exe)' : isNexClean ? 'Optimización (.exe)' : `Proyecto ${idx + 1}`),
+            icon: isNexBoost ? (
+              <Zap className="w-5 h-5 text-amber-500" />
+            ) : isNexClean ? (
+              <Sparkles className="w-5 h-5 text-emerald-600" />
+            ) : (
+              <Code2 className="w-5 h-5 text-indigo-600" />
+            ),
+            accentColor: isNexBoost
+              ? 'from-amber-500/10 to-orange-500/10 border-amber-200'
+              : isNexClean 
+              ? 'from-emerald-500/10 to-teal-500/10 border-emerald-200' 
+              : 'from-indigo-500/10 to-blue-500/10 border-indigo-200',
+            linkText: 'Ver',
+            downloadUrl: p.downloadUrl,
+            downloadSeconds: p.waitTimeSeconds ?? 3
+          };
+        });
       }
 
       case 'creaciones':
@@ -322,13 +337,35 @@ export const CatalogView: React.FC<CatalogViewProps> = ({ view, onBack }) => {
               className="group p-6 sm:p-7 rounded-2xl bg-white border border-slate-200 hover:border-indigo-300 shadow-xs hover:shadow-xl hover:shadow-indigo-500/10 transform transition-all duration-300 ease-out hover:scale-[1.01] cursor-pointer flex flex-col sm:flex-row items-start sm:items-center justify-between gap-5 text-left"
             >
               <div className="flex items-center gap-4">
-                <div className="w-12 h-12 rounded-2xl bg-indigo-50 border border-indigo-200/80 flex items-center justify-center text-indigo-600 shadow-xs group-hover:scale-105 transition-transform shrink-0">
+                <div className={`w-12 h-12 rounded-2xl ${
+                  card.id === 'proj-nexboost' || card.title.toLowerCase().includes('boost')
+                    ? 'bg-amber-50 border-amber-200/90 text-amber-600'
+                    : card.id === 'proj-nexclean' || card.title.toLowerCase().includes('clean')
+                    ? 'bg-emerald-50 border-emerald-200/90 text-emerald-600'
+                    : 'bg-indigo-50 border-indigo-200/80 text-indigo-600'
+                } border flex items-center justify-center shadow-xs group-hover:scale-105 transition-transform shrink-0`}>
                   {card.icon}
                 </div>
                 <div>
-                  <h3 className="text-xl font-bold text-slate-900 group-hover:text-indigo-950 transition-colors">
-                    {card.title}
-                  </h3>
+                  <div className="flex items-center gap-2 mb-0.5">
+                    <h3 className="text-xl font-bold text-slate-900 group-hover:text-indigo-950 transition-colors">
+                      {card.title}
+                    </h3>
+                    {(card.id === 'proj-nexboost' || card.title.toLowerCase().includes('boost')) ? (
+                      <span className="px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-wide bg-amber-100 text-amber-800 rounded-full border border-amber-200">
+                        .EXE
+                      </span>
+                    ) : (card.id === 'proj-nexclean' || card.title.toLowerCase().includes('clean') || card.tag?.toLowerCase().includes('.exe')) && (
+                      <span className="px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-wide bg-emerald-100 text-emerald-800 rounded-full border border-emerald-200">
+                        .EXE
+                      </span>
+                    )}
+                  </div>
+                  {card.description && (
+                    <p className="text-xs text-slate-500 line-clamp-1 max-w-md">
+                      {card.description}
+                    </p>
+                  )}
                 </div>
               </div>
 

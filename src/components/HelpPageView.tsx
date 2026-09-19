@@ -16,7 +16,8 @@ import {
   Sparkles,
   Layers,
   ArrowRight,
-  Headphones
+  Headphones,
+  Bot
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 

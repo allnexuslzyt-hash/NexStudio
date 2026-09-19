@@ -18,16 +18,26 @@ import { BannedScreen } from './components/BannedScreen';
 import { AdminCommandCenter } from './components/AdminCommandCenter';
 import { UnauthorizedDomainModal } from './components/UnauthorizedDomainModal';
 import { OnboardingModal } from './components/OnboardingModal';
-import { SupportChatModal } from './components/SupportChatModal';
+import { SupportPageView } from './components/SupportPageView';
 import { CommunityFeedView } from './components/CommunityFeedView';
+import { useSupport } from './context/SupportContext';
 import { motion } from 'motion/react';
 import { Boxes } from 'lucide-react';
 
 const WorkspaceContent: React.FC = () => {
   const { user, isBanned, unauthorizedDomain, setUnauthorizedDomain } = useAuth();
   const { siteSettings, isAdmin } = useAdmin();
+  const { supportPageRequested, clearSupportPageRequest } = useSupport();
   const [activeView, setActiveView] = useState<string>('workspace');
   const [isTermsOpen, setIsTermsOpen] = useState<boolean>(false);
+
+  // Escuchar si se solicitó la página de soporte desde cualquier botón o acción
+  React.useEffect(() => {
+    if (supportPageRequested) {
+      setActiveView('soporte');
+      clearSupportPageRequest();
+    }
+  }, [supportPageRequested, clearSupportPageRequest]);
 
   // Vistas de página blanca requeridas por el usuario hasta que defina contenido (creaciones y herramientas pendientes)
   const isBlankView = ['creaciones', 'herramientas'].includes(activeView);
@@ -75,14 +85,17 @@ const WorkspaceContent: React.FC = () => {
       <SignInPromptBanner />
 
       {/* Main Content Area */}
-      <main className={`w-full flex-1 flex flex-col relative overflow-hidden bg-white ${
-        activeView === 'comunidad' 
-          ? 'p-0 items-stretch justify-start min-h-[calc(100vh-64px)]' 
-          : 'items-center justify-center p-4 sm:p-8'
+      <main className={`w-full flex-1 flex flex-col relative bg-white ${
+        activeView === 'comunidad' || activeView === 'soporte' || activeView === 'ayuda' || activeView === 'proyectos' || activeView === 'admin'
+          ? 'p-0 items-stretch justify-start' 
+          : 'items-center justify-center p-4 sm:p-8 overflow-x-hidden'
       }`}>
         {activeView === 'admin' ? (
           /* Centro de Mando de Administrador (Exclusivo allnexuslzyt@gmail.com / SuperAdmin) */
           <AdminCommandCenter onBack={() => setActiveView('workspace')} />
+        ) : activeView === 'soporte' ? (
+          /* Página completa de Soporte: Tickets normales prioritarios y Asistencia Rápida IA */
+          <SupportPageView onBack={() => setActiveView('workspace')} />
         ) : activeView === 'ayuda' ? (
           /* Centro de Ayuda completo con buscador en tiempo real, categorías, FAQs, guías y contacto */
           <HelpPageView onBack={() => setActiveView('workspace')} />
@@ -158,9 +171,6 @@ const WorkspaceContent: React.FC = () => {
 
       {/* Modal de Bienvenida / Onboarding inicial (Nombre visible, @usuario estricto y avatar) */}
       <OnboardingModal />
-
-      {/* Modal de Chat de Soporte Técnico para usuarios */}
-      <SupportChatModal />
 
       {/* Modal Informativo y de Acceso Inmediato por auth/unauthorized-domain */}
       <UnauthorizedDomainModal

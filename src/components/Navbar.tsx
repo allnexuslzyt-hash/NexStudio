@@ -20,7 +20,9 @@ import {
   ShieldCheck,
   Sliders,
   Headphones,
-  Users
+  Users,
+  Bot,
+  Sparkles
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useSettings } from '../context/SettingsContext';
@@ -262,9 +264,13 @@ export const Navbar: React.FC<NavbarProps> = ({
                           id="user-item-support"
                           onClick={() => {
                             setUserMenuOpen(false);
-                            openSupportModal();
+                            onSelectView?.('soporte');
                           }}
-                          className="w-full px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-100 rounded-lg flex items-center gap-2.5 transition-colors min-h-[44px] cursor-pointer"
+                          className={`w-full px-3 py-2 text-left text-sm rounded-lg flex items-center gap-2.5 transition-colors min-h-[44px] cursor-pointer ${
+                            activeView === 'soporte'
+                              ? 'bg-indigo-50 text-indigo-700 font-semibold'
+                              : 'text-slate-700 hover:bg-slate-100'
+                          }`}
                         >
                           <Headphones className="w-4 h-4 text-indigo-600" />
                           <span>Chat de Soporte</span>
@@ -436,9 +442,9 @@ export const Navbar: React.FC<NavbarProps> = ({
               </div>
             )}
 
-            {/* Opción Ayuda en móvil */}
+            {/* Opción Ayuda y Soporte en móvil */}
             <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400 px-3 pt-3 pb-1">
-              Soporte
+              Soporte y Ayuda
             </p>
             <button
               type="button"
@@ -446,10 +452,30 @@ export const Navbar: React.FC<NavbarProps> = ({
                 onSelectView?.('ayuda');
                 setMobileMenuOpen(false);
               }}
-              className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-slate-700 hover:bg-slate-100 transition-colors min-h-[44px] cursor-pointer"
+              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors min-h-[44px] cursor-pointer ${
+                activeView === 'ayuda'
+                  ? 'bg-slate-100 text-slate-900 font-semibold'
+                  : 'text-slate-700 hover:bg-slate-100'
+              }`}
             >
               <HelpCircle className="w-4 h-4 text-indigo-600" />
               <span>Ayuda</span>
+            </button>
+            <button
+              type="button"
+              id="mobile-nav-support-btn"
+              onClick={() => {
+                onSelectView?.('soporte');
+                setMobileMenuOpen(false);
+              }}
+              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors min-h-[44px] cursor-pointer ${
+                activeView === 'soporte'
+                  ? 'bg-indigo-50 text-indigo-700 font-semibold'
+                  : 'text-slate-700 hover:bg-slate-100'
+              }`}
+            >
+              <Headphones className="w-4 h-4 text-indigo-600" />
+              <span>Chat de Soporte</span>
             </button>
 
             {user && (
@@ -480,10 +506,14 @@ export const Navbar: React.FC<NavbarProps> = ({
                   type="button"
                   id="mobile-support-btn"
                   onClick={() => {
-                    openSupportModal();
+                    onSelectView?.('soporte');
                     setMobileMenuOpen(false);
                   }}
-                  className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-slate-700 hover:bg-slate-100 transition-colors min-h-[44px] cursor-pointer"
+                  className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors min-h-[44px] cursor-pointer ${
+                    activeView === 'soporte'
+                      ? 'bg-indigo-50 text-indigo-700 font-semibold'
+                      : 'text-slate-700 hover:bg-slate-100'
+                  }`}
                 >
                   <Headphones className="w-4 h-4 text-indigo-600" />
                   <span>Chat de Soporte</span>
