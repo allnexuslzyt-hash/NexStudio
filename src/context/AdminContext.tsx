@@ -25,6 +25,7 @@ interface AdminContextType {
   updateLaunchMode: (config: Partial<LaunchModeConfig>) => Promise<void>;
   toggleLaunchMode: (enabled?: boolean) => Promise<void>;
   pauseResumeCountdown: (overrideSeconds?: number) => Promise<void>;
+  resetCountdown: (defaultHours?: number) => Promise<void>;
   setCountdownTarget: (targetIsoDate: string) => Promise<void>;
   setCustomCountdownDuration: (days: number, hours: number, minutes: number, seconds: number) => Promise<void>;
   
@@ -666,6 +667,27 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     );
   };
 
+  // Restablecer por completo toda la cuenta atrás
+  const resetCountdown = async (defaultHours: number = 24) => {
+    const totalSeconds = defaultHours * 3600;
+    const targetTimestampMs = Date.now() + (totalSeconds * 1000);
+    const targetIsoDate = new Date(targetTimestampMs).toISOString();
+
+    await updateLaunchMode({
+      targetDate: targetIsoDate,
+      targetTimestampMs,
+      durationSeconds: totalSeconds,
+      isPaused: false,
+      pausedRemainingSeconds: 0
+    });
+
+    logAdminAction(
+      `Restableció por completo la cuenta atrás de lanzamiento (${defaultHours} horas)`,
+      'Modo Lanzamiento',
+      'ajustes'
+    );
+  };
+
   // User Actions
   const updateUserNames = async (userId: string, newDisplayName: string, newUsername: string) => {
     const targetUser = users.find(u => u.id === userId);
@@ -1036,6 +1058,7 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         updateLaunchMode,
         toggleLaunchMode,
         pauseResumeCountdown,
+        resetCountdown,
         setCountdownTarget,
         setCustomCountdownDuration,
         users,
