@@ -73,9 +73,9 @@ app.post("/api/support/jaime", async (req: Request, res: Response) => {
 
     const ai = getGenAI();
 
-    // If API key is not configured or in development placeholder, provide simulated intelligent response
-    if (!ai) {
-      const lower = message.toLowerCase();
+    // Helper function for intelligent simulated response
+    const generateSmartFallback = (msg: string) => {
+      const lower = msg.toLowerCase();
       let fallbackText = "¡Hola! Soy Jaime, tu asistente virtual de NexStudio. ";
       if (lower.includes("nexclean") || lower.includes("limpieza")) {
         fallbackText += "**NexClean** es nuestro software oficial para Windows (.exe) que elimina archivos basura, optimiza la memoria y deja tu ordenador rápido y limpio. Puedes descargarlo directamente en la pestaña **Proyectos** del Catálogo con 3 segundos de espera segura.";
@@ -83,12 +83,18 @@ app.post("/api/support/jaime", async (req: Request, res: Response) => {
         fallbackText += "**NexBoost** es nuestro software ejecutable (.exe) diseñado para optimizar y liberar memoria RAM en tiempo real, acelerando la respuesta del sistema y de tus juegos. Lo tienes disponible en la sección **Proyectos** del Catálogo.";
       } else if (lower.includes("humano") || lower.includes("admin") || lower.includes("ticket") || lower.includes("ban") || lower.includes("cuenta")) {
         fallbackText += "Para consultas que requieran atención directa de un administrador de NexStudio (como apelaciones de cuenta o revisiones técnicas), puedes cambiar a la pestaña **Tickets de Soporte** en este mismo panel y abrir una solicitud personalizada.";
+      } else if (lower.includes("noticias") || lower.includes("actualizacion") || lower.includes("version")) {
+        fallbackText += "Puedes ver todas las novedades y características de la **Actualización 1.0** en la nueva pestaña **Noticias** ubicada en el menú superior.";
       } else {
         fallbackText += "Estoy aquí para resolver cualquier duda sobre la plataforma NexStudio, nuestros proyectos ejecutables como **NexClean** y **NexBoost**, o ayudarte a contactar con nuestro equipo de soporte humano. ¿En qué más puedo ayudarte hoy?";
       }
+      return fallbackText;
+    };
 
+    // If API key is not configured or in development placeholder, provide simulated intelligent response
+    if (!ai) {
       return res.json({
-        reply: fallbackText,
+        reply: generateSmartFallback(message),
         source: "fallback",
         success: true
       });
@@ -114,16 +120,26 @@ app.post("/api/support/jaime", async (req: Request, res: Response) => {
       parts: [{ text: message.trim() }]
     });
 
-    const response = await ai.models.generateContent({
-      model: "gemini-3.8-flash",
-      contents: formattedContents,
-      config: {
-        systemInstruction: JAIME_SYSTEM_INSTRUCTION,
-        temperature: 0.7,
-      }
-    });
+    let reply = "";
+    try {
+      const response = await ai.models.generateContent({
+        model: "gemini-2.5-flash",
+        contents: formattedContents,
+        config: {
+          systemInstruction: JAIME_SYSTEM_INSTRUCTION,
+          temperature: 0.7,
+        }
+      });
+      reply = response.text || "";
+    } catch (modelError: any) {
+      console.warn("Aviso: Fallback activado para asistente Jaime tras respuesta del modelo:", modelError?.message || modelError);
+      // Fallback a respuesta inteligente inmediata si Gemini experimenta alta demanda temporal (503)
+      reply = generateSmartFallback(message);
+    }
 
-    const reply = response.text || "¡Hola! Soy Jaime. ¿En qué puedo ayudarte hoy en NexStudio?";
+    if (!reply) {
+      reply = generateSmartFallback(message);
+    }
 
     return res.json({
       reply,
@@ -132,10 +148,10 @@ app.post("/api/support/jaime", async (req: Request, res: Response) => {
     });
   } catch (error: any) {
     console.error("Error en el asistente Jaime:", error);
-    return res.status(500).json({
-      reply: "Disculpa, ha ocurrido un detalle temporal al procesar tu solicitud. Por favor inténtalo de nuevo en unos momentos o abre un ticket de soporte humano si necesitas ayuda urgente.",
-      error: error?.message || "Error interno del servidor",
-      success: false
+    return res.json({
+      reply: "¡Hola! Soy Jaime. NexStudio se encuentra activo. Si tu duda es sobre **NexClean** o **NexBoost**, puedes descargarlos gratis desde la pestaña **Proyectos** del Catálogo. También puedes abrir un ticket de soporte para que un administrador te atienda directamente.",
+      source: "fallback",
+      success: true
     });
   }
 });

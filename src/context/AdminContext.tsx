@@ -7,7 +7,8 @@ import {
   UserRole, 
   UserStatus,
   GlobalBannerConfig,
-  AdminProject
+  AdminProject,
+  LaunchModeConfig
 } from '../types';
 import { useAuth, isSuperAdminEmail } from './AuthContext';
 import { FAQ_ITEMS, GUIDE_ARTICLES, FAQItem, GuideArticle } from '../data/helpData';
@@ -19,6 +20,12 @@ interface AdminContextType {
   toggleMaintenanceMode: (enabled?: boolean, message?: string, estimatedReturn?: string, reason?: string) => Promise<void>;
   updateGlobalBanner: (bannerConfig: Partial<GlobalBannerConfig>) => Promise<void>;
   updateSiteSettings: (settings: Partial<SiteSettings>) => Promise<void>;
+  
+  // Launch Mode (Modo En Lanzamiento)
+  updateLaunchMode: (config: Partial<LaunchModeConfig>) => Promise<void>;
+  toggleLaunchMode: (enabled?: boolean) => Promise<void>;
+  pauseResumeCountdown: () => Promise<void>;
+  setCountdownTarget: (targetIsoDate: string) => Promise<void>;
   
   // Users management
   users: ManagedUser[];
@@ -68,6 +75,19 @@ interface AdminContextType {
   };
 }
 
+export const DEFAULT_LAUNCH_MODE_CONFIG: LaunchModeConfig = {
+  enabled: false,
+  targetDate: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+  title: '¡El Gran Lanzamiento de NexStudio está cerca!',
+  subtitle: 'Estamos preparando los últimos detalles de todos nuestros proyectos, herramientas y la comunidad. ¡Muy pronto abriremos las puertas para todos!',
+  badgeText: 'Gran Estreno Oficial 1.0',
+  isPaused: false,
+  pausedRemainingSeconds: 24 * 3600,
+  allowAdminBypass: true,
+  autoUnlockOnFinish: true,
+  lastUpdated: new Date().toISOString(),
+};
+
 const INITIAL_SITE_SETTINGS: SiteSettings = {
   maintenanceMode: false,
   maintenanceMessage: 'NexStudio se encuentra actualmente en labores de mantenimiento programado. Volveremos a estar disponibles muy pronto.',
@@ -84,7 +104,8 @@ const INITIAL_SITE_SETTINGS: SiteSettings = {
     actionText: 'Ver detalles',
     actionLink: '#',
     dismissible: true
-  }
+  },
+  launchMode: DEFAULT_LAUNCH_MODE_CONFIG
 };
 
 const INITIAL_MANAGED_USERS: ManagedUser[] = [];
@@ -496,6 +517,76 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     } catch (err) {}
   };
 
+  // Launch Mode Management (Modo En Lanzamiento con cuenta atrás sincronizada)
+  const updateLaunchMode = async (config: Partial<LaunchModeConfig>) => {
+    const currentLaunch = siteSettings.launchMode || DEFAULT_LAUNCH_MODE_CONFIG;
+    const updatedLaunch: LaunchModeConfig = {
+      ...currentLaunch,
+      ...config,
+      lastUpdated: new Date().toISOString()
+    };
+
+    const updatedSettings: SiteSettings = {
+      ...siteSettings,
+      launchMode: updatedLaunch,
+      lastUpdated: new Date().toISOString(),
+      updatedBy: user?.email || 'allnexuslzyt@gmail.com'
+    };
+
+    setSiteSettingsState(updatedSettings);
+
+    logAdminAction(
+      updatedLaunch.enabled ? 'Activó Modo En Lanzamiento' : 'Modificó Configuración de Lanzamiento',
+      'Modo En Lanzamiento',
+      'ajustes',
+      `Estado: ${updatedLaunch.enabled ? 'Activo' : 'Inactivo'} | Título: "${updatedLaunch.title}"`
+    );
+
+    try {
+      await setDoc(doc(db, 'settings', 'global'), updatedSettings, { merge: true });
+    } catch (err) {}
+  };
+
+  const toggleLaunchMode = async (enabled?: boolean) => {
+    const currentLaunch = siteSettings.launchMode || DEFAULT_LAUNCH_MODE_CONFIG;
+    const newState = enabled !== undefined ? enabled : !currentLaunch.enabled;
+    await updateLaunchMode({ enabled: newState });
+  };
+
+  const pauseResumeCountdown = async () => {
+    const currentLaunch = siteSettings.launchMode || DEFAULT_LAUNCH_MODE_CONFIG;
+    if (currentLaunch.isPaused) {
+      // Reanudar cuenta atrás: calcular nueva fecha objetivo sumando los segundos congelados
+      const secondsLeft = currentLaunch.pausedRemainingSeconds && currentLaunch.pausedRemainingSeconds > 0
+        ? currentLaunch.pausedRemainingSeconds 
+        : 3600;
+      const newTarget = new Date(Date.now() + secondsLeft * 1000).toISOString();
+      await updateLaunchMode({
+        isPaused: false,
+        targetDate: newTarget,
+        pausedRemainingSeconds: undefined
+      });
+      logAdminAction('Reanudó Cuenta Atrás de Lanzamiento', 'Modo Lanzamiento', 'ajustes');
+    } else {
+      // Pausar cuenta atrás: congelar los segundos que restan
+      const targetTime = new Date(currentLaunch.targetDate).getTime();
+      const remainingSeconds = Math.max(0, Math.floor((targetTime - Date.now()) / 1000));
+      await updateLaunchMode({
+        isPaused: true,
+        pausedRemainingSeconds: remainingSeconds
+      });
+      logAdminAction('Pausó Cuenta Atrás de Lanzamiento', 'Modo Lanzamiento', 'ajustes');
+    }
+  };
+
+  const setCountdownTarget = async (targetIsoDate: string) => {
+    await updateLaunchMode({
+      targetDate: targetIsoDate,
+      isPaused: false,
+      pausedRemainingSeconds: undefined
+    });
+  };
+
   // User Actions
   const updateUserNames = async (userId: string, newDisplayName: string, newUsername: string) => {
     const targetUser = users.find(u => u.id === userId);
@@ -863,6 +954,10 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         toggleMaintenanceMode,
         updateGlobalBanner,
         updateSiteSettings,
+        updateLaunchMode,
+        toggleLaunchMode,
+        pauseResumeCountdown,
+        setCountdownTarget,
         users,
         updateUserNames,
         changeUserRole,

@@ -14,12 +14,14 @@ import { HelpPageView } from './components/HelpPageView';
 import { SettingsModal } from './components/SettingsModal';
 import { GlobalBanner } from './components/GlobalBanner';
 import { MaintenanceScreen } from './components/MaintenanceScreen';
+import { LaunchScreen } from './components/LaunchScreen';
 import { BannedScreen } from './components/BannedScreen';
 import { AdminCommandCenter } from './components/AdminCommandCenter';
 import { UnauthorizedDomainModal } from './components/UnauthorizedDomainModal';
 import { OnboardingModal } from './components/OnboardingModal';
 import { SupportPageView } from './components/SupportPageView';
 import { CommunityFeedView } from './components/CommunityFeedView';
+import { NewsPageView } from './components/NewsPageView';
 import { useSupport } from './context/SupportContext';
 import { motion } from 'motion/react';
 import { Boxes } from 'lucide-react';
@@ -30,6 +32,7 @@ const WorkspaceContent: React.FC = () => {
   const { supportPageRequested, clearSupportPageRequest } = useSupport();
   const [activeView, setActiveView] = useState<string>('workspace');
   const [isTermsOpen, setIsTermsOpen] = useState<boolean>(false);
+  const [visitorUnlockedLaunch, setVisitorUnlockedLaunch] = useState<boolean>(false);
 
   // Escuchar si se solicitó la página de soporte desde cualquier botón o acción
   React.useEffect(() => {
@@ -70,6 +73,37 @@ const WorkspaceContent: React.FC = () => {
     );
   }
 
+  // Si el Modo En Lanzamiento está activo:
+  const launchConfig = siteSettings.launchMode;
+  const isLaunchActive = Boolean(launchConfig?.enabled);
+  const allowAdminBypass = Boolean(launchConfig?.allowAdminBypass ?? true);
+
+  if (isLaunchActive && !(isAdmin && allowAdminBypass)) {
+    // Comprobar si la cuenta atrás ya finalizó y se permite entrar
+    const isPaused = Boolean(launchConfig?.isPaused);
+    const targetMs = launchConfig?.targetDate ? new Date(launchConfig.targetDate).getTime() : 0;
+    const isFinished = !isPaused && targetMs <= Date.now();
+
+    // Si ya terminó y el visitante pulsó en entrar: permitir acceso normal
+    if (isFinished && visitorUnlockedLaunch && (launchConfig?.autoUnlockOnFinish ?? true)) {
+      // Dejar pasar a la web
+    } else {
+      return (
+        <>
+          <LaunchScreen 
+            onOpenAdminPanel={() => setActiveView('admin')}
+            onUnlocked={() => setVisitorUnlockedLaunch(true)}
+          />
+          <UnauthorizedDomainModal
+            domain={unauthorizedDomain || ''}
+            isOpen={Boolean(unauthorizedDomain)}
+            onClose={() => setUnauthorizedDomain(null)}
+          />
+        </>
+      );
+    }
+  }
+
   return (
     <div className="w-full min-h-screen flex flex-col bg-white text-slate-900 selection:bg-indigo-600 selection:text-white">
       {/* Aviso / Banner Global en la parte superior del sitio */}
@@ -86,13 +120,16 @@ const WorkspaceContent: React.FC = () => {
 
       {/* Main Content Area */}
       <main className={`w-full flex-1 flex flex-col relative bg-white ${
-        activeView === 'comunidad' || activeView === 'soporte' || activeView === 'ayuda' || activeView === 'proyectos' || activeView === 'admin'
+        activeView === 'comunidad' || activeView === 'soporte' || activeView === 'ayuda' || activeView === 'proyectos' || activeView === 'admin' || activeView === 'noticias'
           ? 'p-0 items-stretch justify-start' 
           : 'items-center justify-center p-4 sm:p-8 overflow-x-hidden'
       }`}>
         {activeView === 'admin' ? (
           /* Centro de Mando de Administrador (Exclusivo allnexuslzyt@gmail.com / SuperAdmin) */
           <AdminCommandCenter onBack={() => setActiveView('workspace')} />
+        ) : activeView === 'noticias' ? (
+          /* Página oficial de Noticias: Actualización 1.0 */
+          <NewsPageView onBack={() => setActiveView('workspace')} />
         ) : activeView === 'soporte' ? (
           /* Página completa de Soporte: Tickets normales prioritarios y Asistencia Rápida IA */
           <SupportPageView onBack={() => setActiveView('workspace')} />
@@ -178,6 +215,24 @@ const WorkspaceContent: React.FC = () => {
         isOpen={Boolean(unauthorizedDomain)}
         onClose={() => setUnauthorizedDomain(null)}
       />
+
+      {/* Indicador flotante cuando el Modo Lanzamiento está activo y el Administrador navega */}
+      {isLaunchActive && isAdmin && activeView !== 'admin' && (
+        <div className="fixed bottom-5 right-5 z-40 px-4 py-2.5 rounded-2xl bg-slate-900/95 text-white border border-amber-500/40 shadow-2xl backdrop-blur-md flex items-center gap-3 text-xs animate-in fade-in slide-in-from-bottom-2">
+          <span className="relative flex h-2.5 w-2.5">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+            <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-amber-500"></span>
+          </span>
+          <span className="font-semibold text-amber-300">Modo Lanzamiento Activo para visitantes</span>
+          <button
+            type="button"
+            onClick={() => setActiveView('admin')}
+            className="px-2.5 py-1 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-[11px] transition-colors cursor-pointer"
+          >
+            Panel
+          </button>
+        </div>
+      )}
     </div>
   );
 };

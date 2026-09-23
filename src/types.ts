@@ -111,6 +111,19 @@ export interface GlobalBannerConfig {
   dismissible: boolean;
 }
 
+export interface LaunchModeConfig {
+  enabled: boolean; // Si el modo lanzamiento está activo bloqueando la web
+  targetDate: string; // ISO string de la fecha/hora objetivo de lanzamiento
+  title: string; // Título principal (ej. "¡Gran Lanzamiento de NexStudio!")
+  subtitle: string; // Subtítulo o mensaje explicativo
+  badgeText: string; // Texto del distintivo (ej. "Gran Estreno Oficial 1.0")
+  isPaused: boolean; // Si la cuenta atrás ha sido pausada temporalmente por el admin
+  pausedRemainingSeconds?: number; // Segundos restantes cuando fue pausada
+  allowAdminBypass: boolean; // Permite a allnexuslzyt@gmail.com o administradores entrar a la web y panel
+  autoUnlockOnFinish: boolean; // Si se desbloquea automáticamente al llegar a 0
+  lastUpdated: string;
+}
+
 export interface SiteSettings {
   maintenanceMode: boolean; // Kill Switch
   maintenanceMessage: string;
@@ -121,6 +134,7 @@ export interface SiteSettings {
   allowNewRegistrations: boolean;
   lastUpdated: string;
   updatedBy: string;
+  launchMode?: LaunchModeConfig; // Modo En Lanzamiento con cuenta atrás sincronizada
 }
 
 export interface AuditLogItem {

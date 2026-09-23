@@ -18,11 +18,13 @@ import {
   MessageSquare,
   Settings,
   ShieldCheck,
+  BadgeCheck,
   Sliders,
   Headphones,
   Users,
   Bot,
-  Sparkles
+  Sparkles,
+  Newspaper
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useSettings } from '../context/SettingsContext';
@@ -59,6 +61,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [mobileRedesExpanded, setMobileRedesExpanded] = useState(false);
   const [mobileOficialesExpanded, setMobileOficialesExpanded] = useState(true);
+  const [mobileOficialesRedesExpanded, setMobileOficialesRedesExpanded] = useState(true);
 
   // Elementos dentro de Oficiales: Proyectos, Creaciones, Herramientas
   const oficialesSubItems = [
@@ -103,12 +106,29 @@ export const Navbar: React.FC<NavbarProps> = ({
       icon: <Users className="w-4 h-4 text-sky-600" />,
       onClick: () => onSelectView?.('comunidad'),
     },
+    {
+      id: 'noticias',
+      label: 'Noticias',
+      description: 'Notas y detalles de la Actualización 1.0',
+      icon: <Newspaper className="w-4 h-4 text-amber-600" />,
+      badge: '1.0',
+      onClick: () => onSelectView?.('noticias'),
+    },
+  ];
+
+  const officialLinks = [
+    {
+      id: 'youtube-nexstudio',
+      name: 'YouTube NexStudio',
+      url: 'https://www.youtube.com/@NexStudio-Nexuslz',
+      icon: <Youtube className="w-4 h-4 text-rose-600" />,
+    },
   ];
 
   const socialLinks = [
     {
       id: 'youtube',
-      name: 'YouTube',
+      name: 'YouTube (Nexuslz)',
       url: 'https://youtube.com/@Nexuslz_original',
       icon: <Youtube className="w-4 h-4 text-rose-600" />,
     },
@@ -161,7 +181,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             <nav className="hidden md:flex items-center gap-1.5">
               <DropdownMenu label="Menú" items={menuItems} />
               
-              {/* Menú desplegable Redes con botón "Ver todas las redes" y sin descripciones */}
+              {/* Menú desplegable Redes con Redes Oficiales y Ver todas las redes */}
               <RedesDropdown />
 
               {/* Botón Ayuda al lado de Redes */}
@@ -401,17 +421,84 @@ export const Navbar: React.FC<NavbarProps> = ({
               <span>Comunidad</span>
             </button>
 
+            {/* Noticias */}
+            <button
+              type="button"
+              id="mobile-menu-noticias-btn"
+              onClick={() => {
+                onSelectView?.('noticias');
+                setMobileMenuOpen(false);
+              }}
+              className="w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-sm font-semibold text-slate-800 hover:bg-slate-100 transition-colors min-h-[44px] cursor-pointer"
+            >
+              <div className="flex items-center gap-3">
+                <span className="p-1 rounded-md bg-amber-50 text-amber-600">
+                  <Newspaper className="w-4 h-4" />
+                </span>
+                <span>Noticias</span>
+              </div>
+              <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-indigo-50 text-indigo-700">
+                1.0
+              </span>
+            </button>
+
             {/* Redes desplegable en móvil */}
             <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400 px-3 pt-3 pb-1">
               Redes
             </p>
+            {/* Redes Oficiales */}
+            <button
+              type="button"
+              onClick={() => setMobileOficialesRedesExpanded(!mobileOficialesRedesExpanded)}
+              className="w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-sm font-semibold text-slate-800 hover:bg-slate-100 transition-colors min-h-[44px] cursor-pointer"
+            >
+              <div className="flex items-center gap-2.5">
+                <span className="p-1 rounded-md bg-indigo-50 text-indigo-600">
+                  <BadgeCheck className="w-4 h-4" />
+                </span>
+                <span>Redes Oficiales</span>
+                <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-indigo-100/70 text-indigo-700 ml-1">
+                  Oficial
+                </span>
+              </div>
+              <ChevronDown
+                className={`w-4 h-4 text-slate-400 transition-transform duration-200 ${
+                  mobileOficialesRedesExpanded ? 'rotate-180 text-indigo-600' : ''
+                }`}
+              />
+            </button>
+
+            {mobileOficialesRedesExpanded && (
+              <div className="pl-4 space-y-0.5 pt-1 pb-1">
+                {officialLinks.map((net) => (
+                  <button
+                    key={net.id}
+                    onClick={() => {
+                      window.open(net.url, '_blank', 'noopener,noreferrer');
+                      setMobileMenuOpen(false);
+                    }}
+                    className="w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs font-semibold text-slate-700 hover:bg-slate-100 transition-colors min-h-[40px] cursor-pointer"
+                  >
+                    <div className="flex items-center gap-2.5">
+                      <span>{net.icon}</span>
+                      <span>{net.name}</span>
+                    </div>
+                    <ExternalLink className="w-3.5 h-3.5 text-slate-400" />
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {/* Ver todas las redes */}
             <button
               type="button"
               onClick={() => setMobileRedesExpanded(!mobileRedesExpanded)}
               className="w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-sm font-medium text-slate-700 hover:bg-slate-100 transition-colors min-h-[44px] cursor-pointer"
             >
-              <div className="flex items-center gap-3">
-                <span className="text-indigo-600"><Globe className="w-4 h-4" /></span>
+              <div className="flex items-center gap-2.5">
+                <span className="p-1 rounded-md bg-slate-100 text-slate-600">
+                  <Globe className="w-4 h-4" />
+                </span>
                 <span>Ver todas las redes</span>
               </div>
               <ChevronDown

@@ -42,7 +42,11 @@ import {
   MessageSquare,
   Headphones,
   Send,
-  FolderGit2
+  FolderGit2,
+  Rocket,
+  PlayCircle,
+  PauseCircle,
+  Timer
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { ManagedUser, UserRole, UserStatus, ContentReport, GlobalBannerConfig, BannerType, SupportTicket } from '../types';
@@ -50,12 +54,13 @@ import { FAQItem, GuideArticle } from '../data/helpData';
 import { useSupport } from '../context/SupportContext';
 import { validateUsername, validateDisplayName } from '../utils/usernameValidation';
 import { AdminProjectsManager } from './AdminProjectsManager';
+import { LaunchScreen } from './LaunchScreen';
 
 interface AdminCommandCenterProps {
   onBack: () => void;
 }
 
-type AdminTab = 'dashboard' | 'users' | 'tickets' | 'projects' | 'moderation' | 'settings';
+type AdminTab = 'dashboard' | 'users' | 'tickets' | 'projects' | 'moderation' | 'settings' | 'launch';
 
 export const AdminCommandCenter: React.FC<AdminCommandCenterProps> = ({ onBack }) => {
   const { 
@@ -63,6 +68,10 @@ export const AdminCommandCenter: React.FC<AdminCommandCenterProps> = ({ onBack }
     toggleMaintenanceMode, 
     updateGlobalBanner, 
     updateSiteSettings,
+    updateLaunchMode,
+    toggleLaunchMode,
+    pauseResumeCountdown,
+    setCountdownTarget,
     users, 
     updateUserNames,
     changeUserRole, 
@@ -163,6 +172,40 @@ export const AdminCommandCenter: React.FC<AdminCommandCenterProps> = ({ onBack }
   const [maintenanceInputReason, setMaintenanceInputReason] = useState(
     siteSettings.maintenanceReason || 'Actualización crítica del sistema'
   );
+
+  // Modo En Lanzamiento Form State
+  const formatDatetimeForInput = (isoString?: string) => {
+    try {
+      const d = isoString ? new Date(isoString) : new Date(Date.now() + 24 * 3600 * 1000);
+      const pad = (n: number) => n.toString().padStart(2, '0');
+      return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+    } catch {
+      return '';
+    }
+  };
+
+  const [launchTitle, setLaunchTitle] = useState(siteSettings.launchMode?.title || '¡El Gran Lanzamiento de NexStudio está cerca!');
+  const [launchSubtitle, setLaunchSubtitle] = useState(siteSettings.launchMode?.subtitle || 'Estamos preparando todos los proyectos, herramientas y la comunidad. ¡Muy pronto abriremos las puertas para todos!');
+  const [launchBadgeText, setLaunchBadgeText] = useState(siteSettings.launchMode?.badgeText || 'Gran Estreno Oficial 1.0');
+  const [launchTargetInput, setLaunchTargetInput] = useState(() => formatDatetimeForInput(siteSettings.launchMode?.targetDate));
+  const [launchAutoUnlock, setLaunchAutoUnlock] = useState(siteSettings.launchMode?.autoUnlockOnFinish ?? true);
+  const [launchAdminBypass, setLaunchAdminBypass] = useState(siteSettings.launchMode?.allowAdminBypass ?? true);
+  const [isSavingLaunch, setIsSavingLaunch] = useState(false);
+  const [previewLaunchModalOpen, setPreviewLaunchModalOpen] = useState(false);
+
+  // Sync launch settings when siteSettings update
+  useEffect(() => {
+    if (siteSettings?.launchMode) {
+      setLaunchTitle(siteSettings.launchMode.title || '¡El Gran Lanzamiento de NexStudio está cerca!');
+      setLaunchSubtitle(siteSettings.launchMode.subtitle || '');
+      setLaunchBadgeText(siteSettings.launchMode.badgeText || 'Gran Estreno Oficial 1.0');
+      if (siteSettings.launchMode.targetDate) {
+        setLaunchTargetInput(formatDatetimeForInput(siteSettings.launchMode.targetDate));
+      }
+      setLaunchAutoUnlock(siteSettings.launchMode.autoUnlockOnFinish ?? true);
+      setLaunchAdminBypass(siteSettings.launchMode.allowAdminBypass ?? true);
+    }
+  }, [siteSettings?.launchMode]);
 
   // Sync maintenance settings when siteSettings update
   useEffect(() => {
@@ -272,7 +315,19 @@ export const AdminCommandCenter: React.FC<AdminCommandCenterProps> = ({ onBack }
         </div>
 
         {/* Global Web State Indicator & Kill Switch Shortcut */}
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-2.5">
+          {/* Launch Mode status badge */}
+          {siteSettings.launchMode?.enabled && (
+            <button
+              type="button"
+              onClick={() => setActiveTab('launch')}
+              className="px-3 py-1.5 rounded-xl border border-amber-300 bg-amber-50 hover:bg-amber-100 text-amber-800 flex items-center gap-2 text-xs font-bold transition-all cursor-pointer shadow-xs"
+            >
+              <Rocket className="w-3.5 h-3.5 text-amber-600 animate-bounce" />
+              <span>EN LANZAMIENTO (BLOQUEADA)</span>
+            </button>
+          )}
+
           <div className={`px-3 py-1.5 rounded-xl border flex items-center gap-2 text-xs font-semibold ${
             siteSettings.maintenanceMode 
               ? 'bg-rose-50 border-rose-200 text-rose-700' 
@@ -408,6 +463,25 @@ export const AdminCommandCenter: React.FC<AdminCommandCenterProps> = ({ onBack }
         >
           <Settings className="w-4 h-4" />
           <span>Ajustes y Kill Switch</span>
+        </button>
+
+        <button
+          type="button"
+          id="btn-admin-tab-launch"
+          onClick={() => setActiveTab('launch')}
+          className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-semibold transition-all cursor-pointer whitespace-nowrap ${
+            activeTab === 'launch' 
+              ? 'bg-gradient-to-r from-amber-500 via-indigo-600 to-indigo-700 text-white shadow-xs font-bold' 
+              : 'text-slate-600 hover:text-slate-900'
+          }`}
+        >
+          <Rocket className={`w-4 h-4 ${activeTab === 'launch' ? 'text-amber-200' : 'text-amber-500'}`} />
+          <span>Modo En Lanzamiento</span>
+          {siteSettings.launchMode?.enabled && (
+            <span className="ml-1 px-1.5 py-0.2 rounded-full text-[10px] bg-amber-400 text-slate-950 font-extrabold animate-pulse">
+              ACTIVO
+            </span>
+          )}
         </button>
       </div>
 
@@ -1459,6 +1533,297 @@ export const AdminCommandCenter: React.FC<AdminCommandCenterProps> = ({ onBack }
         </div>
       )}
 
+      {/* TAB E: MODO EN LANZAMIENTO (LAUNCH MODE) */}
+      {activeTab === 'launch' && (
+        <div className="space-y-6">
+          {/* Main Activation Card */}
+          <div className="p-6 rounded-2xl bg-white border border-slate-200 shadow-xs space-y-5">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 pb-4">
+              <div>
+                <h3 className="text-base font-extrabold text-slate-900 flex items-center gap-2">
+                  <Rocket className="w-5 h-5 text-indigo-600" />
+                  <span>Modo En Lanzamiento (Pantalla de Estreno Bloqueada)</span>
+                </h3>
+                <p className="text-xs text-slate-500 mt-1 max-w-xl">
+                  Activa este modo exclusivamente cuando vayas a lanzar la web. Los usuarios verán una pantalla de lanzamiento con una cuenta atrás sincronizada en tiempo real.
+                </p>
+              </div>
+
+              {/* Master Toggle */}
+              <div className="flex items-center gap-3">
+                <span className={`px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1.5 ${
+                  siteSettings.launchMode?.enabled 
+                    ? 'bg-amber-100 text-amber-800 border border-amber-300' 
+                    : 'bg-slate-100 text-slate-600 border border-slate-200'
+                }`}>
+                  <span className={`h-2 w-2 rounded-full ${siteSettings.launchMode?.enabled ? 'bg-amber-500 animate-ping' : 'bg-slate-400'}`} />
+                  {siteSettings.launchMode?.enabled ? 'MODO LANZAMIENTO ACTIVO' : 'MODO LANZAMIENTO INACTIVO'}
+                </span>
+
+                <button
+                  type="button"
+                  id="btn-toggle-launch-mode"
+                  onClick={async () => {
+                    const newState = !siteSettings.launchMode?.enabled;
+                    await toggleLaunchMode(newState);
+                    showToast(newState ? '🚀 Modo En Lanzamiento ACTIVADO' : 'Modo En Lanzamiento DESACTIVADO');
+                  }}
+                  className={`px-4 py-2 rounded-xl text-xs font-bold transition-all shadow-xs flex items-center gap-2 cursor-pointer ${
+                    siteSettings.launchMode?.enabled
+                      ? 'bg-rose-600 hover:bg-rose-500 text-white'
+                      : 'bg-gradient-to-r from-amber-500 via-indigo-600 to-indigo-700 hover:from-amber-600 hover:to-indigo-800 text-white shadow-indigo-600/20'
+                  }`}
+                >
+                  <Rocket className="w-4 h-4" />
+                  <span>{siteSettings.launchMode?.enabled ? 'DESACTIVAR LANZAMIENTO' : 'ACTIVAR MODO LANZAMIENTO'}</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Quick Live Status Card */}
+            <div className="p-5 rounded-2xl bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white border border-indigo-900/60 shadow-xl flex flex-col md:flex-row items-center justify-between gap-6">
+              <div className="space-y-1 text-center md:text-left">
+                <div className="flex items-center justify-center md:justify-start gap-2">
+                  <Timer className="w-4 h-4 text-amber-400" />
+                  <span className="text-xs font-bold text-amber-400 uppercase tracking-wider">
+                    Estado de la Cuenta Atrás en Tiempo Real
+                  </span>
+                  {siteSettings.launchMode?.isPaused && (
+                    <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                      PAUSADA
+                    </span>
+                  )}
+                </div>
+                <h4 className="text-lg font-bold text-white">
+                  {siteSettings.launchMode?.title || 'Gran Lanzamiento de NexStudio'}
+                </h4>
+                <p className="text-xs text-slate-300">
+                  Fecha Objetivo Sincronizada: <strong>{siteSettings.launchMode?.targetDate ? new Date(siteSettings.launchMode.targetDate).toLocaleString() : 'No fijada'}</strong>
+                </p>
+              </div>
+
+              {/* Countdown Actions: Pause / Resume & Live Preview */}
+              <div className="flex flex-wrap items-center justify-center gap-2.5">
+                <button
+                  type="button"
+                  id="btn-pause-resume-countdown"
+                  onClick={async () => {
+                    await pauseResumeCountdown();
+                    showToast(siteSettings.launchMode?.isPaused ? '▶️ Cuenta atrás REANUDADA' : '⏸️ Cuenta atrás PAUSADA');
+                  }}
+                  className={`px-4 py-2 rounded-xl text-xs font-bold transition-all shadow-xs flex items-center gap-2 cursor-pointer ${
+                    siteSettings.launchMode?.isPaused
+                      ? 'bg-emerald-600 hover:bg-emerald-500 text-white'
+                      : 'bg-amber-500 hover:bg-amber-400 text-slate-950'
+                  }`}
+                >
+                  {siteSettings.launchMode?.isPaused ? (
+                    <>
+                      <PlayCircle className="w-4 h-4" />
+                      <span>REANUDAR CUENTA ATRÁS</span>
+                    </>
+                  ) : (
+                    <>
+                      <PauseCircle className="w-4 h-4" />
+                      <span>DETENER / PAUSAR CUENTA</span>
+                    </>
+                  )}
+                </button>
+
+                <button
+                  type="button"
+                  id="btn-preview-launch-screen"
+                  onClick={() => setPreviewLaunchModalOpen(true)}
+                  className="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-white text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer border border-slate-700"
+                >
+                  <Eye className="w-4 h-4 text-indigo-400" />
+                  <span>Previsualizar Pantalla</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Configuration Form */}
+            <div className="space-y-5 pt-2">
+              <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500">
+                Ajustes de Fecha y Cuenta Atrás
+              </h4>
+
+              {/* Target Date Picker & Presets */}
+              <div className="p-4 rounded-xl bg-slate-50 border border-slate-200/80 space-y-3">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div>
+                    <label className="block text-xs font-bold text-slate-800 mb-0.5">
+                      Fecha y Hora Objetivo de Lanzamiento:
+                    </label>
+                    <p className="text-[11px] text-slate-500">
+                      Todos los usuarios contarán hacia este momento exacto de forma sincronizada en todos los lugares.
+                    </p>
+                  </div>
+                  <input
+                    type="datetime-local"
+                    value={launchTargetInput}
+                    onChange={(e) => setLaunchTargetInput(e.target.value)}
+                    className="px-3.5 py-2 rounded-xl bg-white border border-slate-300 text-xs text-slate-900 font-mono font-medium focus:outline-none focus:border-indigo-500 shadow-2xs"
+                  />
+                </div>
+
+                {/* Quick Presets */}
+                <div>
+                  <span className="text-[11px] font-semibold text-slate-600 block mb-2">
+                    Fijar cuenta atrás rápida desde este momento:
+                  </span>
+                  <div className="flex flex-wrap items-center gap-2">
+                    {[
+                      { label: '+10 Minutos', ms: 10 * 60 * 1000 },
+                      { label: '+30 Minutos', ms: 30 * 60 * 1000 },
+                      { label: '+1 Hora', ms: 60 * 60 * 1000 },
+                      { label: '+6 Horas', ms: 6 * 60 * 60 * 1000 },
+                      { label: '+12 Horas', ms: 12 * 60 * 60 * 1000 },
+                      { label: '+24 Horas (1 Día)', ms: 24 * 60 * 60 * 1000 },
+                      { label: '+3 Días', ms: 3 * 24 * 60 * 60 * 1000 },
+                      { label: '+1 Semana', ms: 7 * 24 * 60 * 60 * 1000 },
+                    ].map((preset) => (
+                      <button
+                        key={preset.label}
+                        type="button"
+                        onClick={() => {
+                          const newDate = new Date(Date.now() + preset.ms);
+                          const formatted = formatDatetimeForInput(newDate.toISOString());
+                          setLaunchTargetInput(formatted);
+                          showToast(`Fecha fijada para ${preset.label}`);
+                        }}
+                        className="px-2.5 py-1 rounded-lg bg-white hover:bg-slate-100 border border-slate-200 text-[11px] font-semibold text-slate-700 hover:text-indigo-600 transition-colors cursor-pointer shadow-2xs"
+                      >
+                        {preset.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {/* Text Customization */}
+              <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500 pt-2">
+                Personalización de Textos de la Pantalla
+              </h4>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-bold text-slate-800 mb-1">
+                    Título Principal de Lanzamiento:
+                  </label>
+                  <input
+                    type="text"
+                    value={launchTitle}
+                    onChange={(e) => setLaunchTitle(e.target.value)}
+                    placeholder="ej. ¡El Gran Lanzamiento de NexStudio está cerca!"
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-900 focus:outline-none focus:border-indigo-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-800 mb-1">
+                    Texto del Distintivo / Badge:
+                  </label>
+                  <input
+                    type="text"
+                    value={launchBadgeText}
+                    onChange={(e) => setLaunchBadgeText(e.target.value)}
+                    placeholder="ej. Gran Estreno Oficial 1.0"
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-900 focus:outline-none focus:border-indigo-500"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-800 mb-1">
+                  Descripción o Mensaje Informativo:
+                </label>
+                <textarea
+                  rows={3}
+                  value={launchSubtitle}
+                  onChange={(e) => setLaunchSubtitle(e.target.value)}
+                  placeholder="Escribe el mensaje motivador o explicativo que verán los visitantes mientras esperan..."
+                  className="w-full p-3 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-900 focus:outline-none focus:border-indigo-500 leading-relaxed"
+                />
+              </div>
+
+              {/* Advanced Options */}
+              <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500 pt-2">
+                Comportamiento de Acceso
+              </h4>
+
+              <div className="space-y-3 p-4 rounded-xl bg-slate-50 border border-slate-200/80">
+                <label className="flex items-start gap-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={launchAutoUnlock}
+                    onChange={(e) => setLaunchAutoUnlock(e.target.checked)}
+                    className="w-4 h-4 mt-0.5 rounded text-indigo-600 focus:ring-indigo-500 border-slate-300"
+                  />
+                  <div>
+                    <span className="text-xs font-bold text-slate-800 block">
+                      Desbloquear automáticamente al finalizar la cuenta atrás (Llegar a 0)
+                    </span>
+                    <span className="text-[11px] text-slate-500">
+                      Cuando el cronómetro llegue a 0, la web se abrirá automáticamente para todos los visitantes sin necesidad de que intervengas manualmente.
+                    </span>
+                  </div>
+                </label>
+
+                <label className="flex items-start gap-3 cursor-pointer border-t border-slate-200/60 pt-3">
+                  <input
+                    type="checkbox"
+                    checked={launchAdminBypass}
+                    onChange={(e) => setLaunchAdminBypass(e.target.checked)}
+                    className="w-4 h-4 mt-0.5 rounded text-indigo-600 focus:ring-indigo-500 border-slate-300"
+                  />
+                  <div>
+                    <span className="text-xs font-bold text-slate-800 block">
+                      Permitir a los administradores navegar por la web normalmente durante el lanzamiento
+                    </span>
+                    <span className="text-[11px] text-slate-500">
+                      Te permite comprobar proyectos, funciones y la web antes de la apertura oficial mientras los visitantes ven la pantalla de lanzamiento.
+                    </span>
+                  </div>
+                </label>
+              </div>
+
+              {/* Save & Apply Button */}
+              <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-100">
+                <button
+                  type="button"
+                  id="btn-save-launch-config"
+                  disabled={isSavingLaunch}
+                  onClick={async () => {
+                    setIsSavingLaunch(true);
+                    try {
+                      const isoDate = launchTargetInput ? new Date(launchTargetInput).toISOString() : new Date(Date.now() + 24 * 3600 * 1000).toISOString();
+                      await updateLaunchMode({
+                        title: launchTitle.trim() || '¡El Gran Lanzamiento de NexStudio está cerca!',
+                        subtitle: launchSubtitle.trim() || 'Estamos preparando todos los proyectos, herramientas y la comunidad. ¡Muy pronto abriremos las puertas para todos!',
+                        badgeText: launchBadgeText.trim() || 'Gran Estreno Oficial 1.0',
+                        targetDate: isoDate,
+                        autoUnlockOnFinish: launchAutoUnlock,
+                        allowAdminBypass: launchAdminBypass
+                      });
+                      showToast('Configuración de lanzamiento guardada y sincronizada en tiempo real');
+                    } catch (e) {
+                      showToast('Error al guardar la configuración');
+                    } finally {
+                      setIsSavingLaunch(false);
+                    }
+                  }}
+                  className="px-6 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold transition-all shadow-md shadow-indigo-600/20 cursor-pointer disabled:opacity-50 flex items-center gap-2"
+                >
+                  <Sparkles className="w-4 h-4" />
+                  <span>{isSavingLaunch ? 'Sincronizando...' : 'Guardar y Sincronizar Cambios'}</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* TAB PROYECTOS: GESTIÓN DE PROYECTOS, ENLACES, VISIBILIDAD Y RESTRICCIONES */}
       {activeTab === 'projects' && (
         <AdminProjectsManager onShowToast={showToast} />
@@ -2305,6 +2670,37 @@ export const AdminCommandCenter: React.FC<AdminCommandCenterProps> = ({ onBack }
                 </button>
               </form>
             </motion.div>
+          </div>
+        )}
+
+        {/* MODAL: PREVISUALIZACIÓN DE PANTALLA DE LANZAMIENTO */}
+        {previewLaunchModalOpen && (
+          <div className="fixed inset-0 z-50 flex flex-col bg-slate-950">
+            {/* Top Toolbar */}
+            <div className="p-3 bg-slate-900/90 backdrop-blur-md border-b border-slate-800 text-white flex items-center justify-between z-50">
+              <div className="flex items-center gap-2">
+                <Rocket className="w-4 h-4 text-amber-400" />
+                <span className="text-xs font-bold text-white">
+                  Vista Previa: Pantalla de Lanzamiento que verán los usuarios
+                </span>
+                <span className="text-[10px] px-2 py-0.5 rounded bg-indigo-500/20 text-indigo-300 font-semibold">
+                  Modo Simulación
+                </span>
+              </div>
+              <button
+                type="button"
+                id="btn-close-launch-preview"
+                onClick={() => setPreviewLaunchModalOpen(false)}
+                className="px-3.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-white text-xs font-bold transition-colors cursor-pointer border border-slate-700"
+              >
+                Volver al Panel
+              </button>
+            </div>
+
+            {/* Launch Screen Preview */}
+            <div className="relative flex-1 overflow-hidden">
+              <LaunchScreen onUnlocked={() => setPreviewLaunchModalOpen(false)} />
+            </div>
           </div>
         )}
       </AnimatePresence>

@@ -209,8 +209,19 @@ export const CatalogView: React.FC<CatalogViewProps> = ({ view, onBack }) => {
       case 'redes':
         return [
           {
+            id: 'net-youtube-nexstudio',
+            title: 'YouTube NexStudio',
+            category: 'Canal Oficial NexStudio',
+            description: 'Canal oficial de NexStudio en YouTube',
+            tag: 'NexStudio Oficial',
+            icon: <Youtube className="w-5 h-5 text-rose-600" />,
+            accentColor: 'from-rose-500/10 to-red-500/10 border-rose-200',
+            linkText: 'Abrir canal en YouTube',
+            linkUrl: 'https://www.youtube.com/@NexStudio-Nexuslz',
+          },
+          {
             id: 'net-youtube',
-            title: 'YouTube',
+            title: 'YouTube (Nexuslz)',
             category: 'Canal Oficial',
             description: 'youtube.com/@Nexuslz_original',
             tag: '@Nexuslz_original',
@@ -255,9 +266,9 @@ export const CatalogView: React.FC<CatalogViewProps> = ({ view, onBack }) => {
           {
             id: 'net-discord',
             title: 'Discord',
-            category: 'Servidor Oficial',
+            category: 'Comunidad',
             description: 'discord.gg/qMFcBrHber',
-            tag: 'Servidor Oficial',
+            tag: 'Comunidad Discord',
             icon: <MessageSquare className="w-5 h-5 text-indigo-600" />,
             accentColor: 'from-indigo-500/10 to-violet-500/10 border-indigo-200',
             linkText: 'Unirse al servidor de Discord',
