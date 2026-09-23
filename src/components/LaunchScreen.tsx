@@ -42,10 +42,15 @@ export const LaunchScreen: React.FC<LaunchScreenProps> = ({ onOpenAdminPanel, on
 
   // Remaining time in seconds calculated against target timestamp
   const getTargetMs = () => {
-    if (launchConfig.targetTimestampMs && typeof launchConfig.targetTimestampMs === 'number') {
-      return launchConfig.targetTimestampMs;
+    if (launchConfig.targetTimestampMs) {
+      const parsed = Number(launchConfig.targetTimestampMs);
+      if (!isNaN(parsed) && parsed > 0) return parsed;
     }
-    return new Date(launchConfig.targetDate).getTime();
+    if (launchConfig.targetDate) {
+      const parsed = new Date(launchConfig.targetDate).getTime();
+      if (!isNaN(parsed) && parsed > 0) return parsed;
+    }
+    return Date.now() + 86400000;
   };
 
   const [remainingSeconds, setRemainingSeconds] = useState<number>(() => {

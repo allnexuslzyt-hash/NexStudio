@@ -214,7 +214,7 @@ export const AdminCommandCenter: React.FC<AdminCommandCenterProps> = ({ onBack }
   const [adminLiveRemaining, setAdminLiveRemaining] = useState<number>(() => {
     const launchConfig = siteSettings.launchMode;
     if (launchConfig?.isPaused) return launchConfig.pausedRemainingSeconds ?? 0;
-    const targetMs = launchConfig?.targetTimestampMs || (launchConfig?.targetDate ? new Date(launchConfig.targetDate).getTime() : Date.now() + 86400000);
+    const targetMs = Number(launchConfig?.targetTimestampMs) || (launchConfig?.targetDate ? new Date(launchConfig.targetDate).getTime() : Date.now() + 86400000);
     return Math.max(0, Math.floor((targetMs - Date.now()) / 1000));
   });
 
@@ -227,14 +227,19 @@ export const AdminCommandCenter: React.FC<AdminCommandCenterProps> = ({ onBack }
         setAdminLiveRemaining(launchConfig.pausedRemainingSeconds ?? 0);
         return;
       }
-      const targetMs = launchConfig.targetTimestampMs || (launchConfig.targetDate ? new Date(launchConfig.targetDate).getTime() : Date.now() + 86400000);
+      const targetMs = Number(launchConfig.targetTimestampMs) || (launchConfig.targetDate ? new Date(launchConfig.targetDate).getTime() : Date.now() + 86400000);
       setAdminLiveRemaining(Math.max(0, Math.floor((targetMs - Date.now()) / 1000)));
     };
 
     updateLive();
     const interval = setInterval(updateLive, 250);
     return () => clearInterval(interval);
-  }, [siteSettings.launchMode]);
+  }, [
+    siteSettings.launchMode?.isPaused,
+    siteSettings.launchMode?.targetTimestampMs,
+    siteSettings.launchMode?.targetDate,
+    siteSettings.launchMode?.pausedRemainingSeconds
+  ]);
 
   // Handler for custom duration fields (Days, Hours, Minutes, Seconds)
   const handleDurationChange = (d: number, h: number, m: number, s: number) => {
@@ -1729,8 +1734,10 @@ export const AdminCommandCenter: React.FC<AdminCommandCenterProps> = ({ onBack }
                   type="button"
                   id="btn-pause-resume-countdown"
                   onClick={async () => {
-                    await pauseResumeCountdown();
-                    showToast(siteSettings.launchMode?.isPaused ? '▶️ Cuenta atrás REANUDADA' : '⏸️ Cuenta atrás PAUSADA');
+                    const isCurrentlyPaused = Boolean(siteSettings.launchMode?.isPaused);
+                    const currentInputSeconds = (launchDays * 86400) + (launchHours * 3600) + (launchMinutes * 60) + launchSeconds;
+                    await pauseResumeCountdown(isCurrentlyPaused && currentInputSeconds > 0 ? currentInputSeconds : undefined);
+                    showToast(isCurrentlyPaused ? '▶️ Cuenta atrás REANUDADA' : '⏸️ Cuenta atrás PAUSADA');
                   }}
                   className={`px-4 py-2 rounded-xl text-xs font-bold transition-all shadow-xs flex items-center gap-2 cursor-pointer ${
                     siteSettings.launchMode?.isPaused
@@ -2057,7 +2064,7 @@ export const AdminCommandCenter: React.FC<AdminCommandCenterProps> = ({ onBack }
                         targetDate: isoDate,
                         targetTimestampMs,
                         durationSeconds: totalSeconds,
-                        pausedRemainingSeconds: siteSettings.launchMode?.isPaused ? totalSeconds : undefined,
+                        pausedRemainingSeconds: siteSettings.launchMode?.isPaused ? totalSeconds : 0,
                         autoUnlockOnFinish: launchAutoUnlock,
                         allowAdminBypass: launchAdminBypass
                       });

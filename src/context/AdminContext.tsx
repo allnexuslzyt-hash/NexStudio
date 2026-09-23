@@ -13,7 +13,7 @@ import {
 import { useAuth, isSuperAdminEmail } from './AuthContext';
 import { FAQ_ITEMS, GUIDE_ARTICLES, FAQItem, GuideArticle } from '../data/helpData';
 import { doc, getDoc, setDoc, deleteDoc, onSnapshot, collection } from 'firebase/firestore';
-import { db, handleFirestoreError, OperationType } from '../lib/firebase';
+import { db, handleFirestoreError, OperationType, removeUndefinedFields } from '../lib/firebase';
 
 interface AdminContextType {
   siteSettings: SiteSettings;
@@ -24,7 +24,7 @@ interface AdminContextType {
   // Launch Mode (Modo En Lanzamiento)
   updateLaunchMode: (config: Partial<LaunchModeConfig>) => Promise<void>;
   toggleLaunchMode: (enabled?: boolean) => Promise<void>;
-  pauseResumeCountdown: () => Promise<void>;
+  pauseResumeCountdown: (overrideSeconds?: number) => Promise<void>;
   setCountdownTarget: (targetIsoDate: string) => Promise<void>;
   setCustomCountdownDuration: (days: number, hours: number, minutes: number, seconds: number) => Promise<void>;
   
@@ -525,19 +525,24 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     const currentLaunch = siteSettings.launchMode || DEFAULT_LAUNCH_MODE_CONFIG;
     
     // Ensure targetTimestampMs is always accurately calculated and synchronized across all locations
-    let targetTimestampMs = config.targetTimestampMs;
-    if (!targetTimestampMs && config.targetDate) {
+    let targetTimestampMs = Number(config.targetTimestampMs);
+    if ((!targetTimestampMs || isNaN(targetTimestampMs) || targetTimestampMs <= 0) && config.targetDate) {
       targetTimestampMs = new Date(config.targetDate).getTime();
-    } else if (!targetTimestampMs && currentLaunch.targetTimestampMs) {
-      targetTimestampMs = currentLaunch.targetTimestampMs;
-    } else if (!targetTimestampMs && currentLaunch.targetDate) {
+    } else if ((!targetTimestampMs || isNaN(targetTimestampMs) || targetTimestampMs <= 0) && currentLaunch.targetTimestampMs) {
+      targetTimestampMs = Number(currentLaunch.targetTimestampMs);
+    } else if ((!targetTimestampMs || isNaN(targetTimestampMs) || targetTimestampMs <= 0) && currentLaunch.targetDate) {
       targetTimestampMs = new Date(currentLaunch.targetDate).getTime();
+    }
+    if (!targetTimestampMs || isNaN(targetTimestampMs) || targetTimestampMs <= 0) {
+      targetTimestampMs = Date.now() + 86400000;
     }
 
     const updatedLaunch: LaunchModeConfig = {
       ...currentLaunch,
       ...config,
       targetTimestampMs,
+      // When resuming, explicitly set pausedRemainingSeconds to 0 (never leave as undefined)
+      pausedRemainingSeconds: config.isPaused === false ? 0 : (config.pausedRemainingSeconds ?? currentLaunch.pausedRemainingSeconds ?? 0),
       lastUpdated: new Date().toISOString()
     };
 
@@ -547,6 +552,10 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       lastUpdated: new Date().toISOString(),
       updatedBy: user?.email || 'allnexuslzyt@gmail.com'
     };
+
+    try {
+      localStorage.setItem('nexstudio_site_settings', JSON.stringify(updatedSettings));
+    } catch (e) {}
 
     setSiteSettingsState(updatedSettings);
 
@@ -558,7 +567,8 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     );
 
     try {
-      await setDoc(doc(db, 'settings', 'global'), updatedSettings, { merge: true });
+      const cleanSettings = removeUndefinedFields(updatedSettings);
+      await setDoc(doc(db, 'settings', 'global'), cleanSettings, { merge: true });
     } catch (err) {
       console.error('Error al sincronizar Launch Mode en Firestore:', err);
     }
@@ -570,27 +580,44 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     await updateLaunchMode({ enabled: newState });
   };
 
-  const pauseResumeCountdown = async () => {
+  const pauseResumeCountdown = async (overrideSeconds?: number) => {
     const currentLaunch = siteSettings.launchMode || DEFAULT_LAUNCH_MODE_CONFIG;
     if (currentLaunch.isPaused) {
-      // Reanudar cuenta atrás: calcular nueva fecha objetivo sumando los segundos congelados
-      const secondsLeft = currentLaunch.pausedRemainingSeconds && currentLaunch.pausedRemainingSeconds > 0
-        ? currentLaunch.pausedRemainingSeconds 
-        : 3600;
-      const targetTimestampMs = Date.now() + secondsLeft * 1000;
+      // Reanudar cuenta atrás: calcular nueva fecha objetivo sumando los segundos congelados o el tiempo deseado
+      let secondsLeft = (typeof overrideSeconds === 'number' && overrideSeconds > 0) ? overrideSeconds : 0;
+      if (!secondsLeft) {
+        if (typeof currentLaunch.pausedRemainingSeconds === 'number' && currentLaunch.pausedRemainingSeconds > 0) {
+          secondsLeft = currentLaunch.pausedRemainingSeconds;
+        } else if (typeof currentLaunch.durationSeconds === 'number' && currentLaunch.durationSeconds > 0) {
+          secondsLeft = currentLaunch.durationSeconds;
+        } else {
+          secondsLeft = 86400; // 1 día por defecto si no había segundos previos
+        }
+      }
+      const targetTimestampMs = Date.now() + (secondsLeft * 1000);
       const newTarget = new Date(targetTimestampMs).toISOString();
+
       await updateLaunchMode({
         isPaused: false,
         targetDate: newTarget,
         targetTimestampMs,
         durationSeconds: secondsLeft,
-        pausedRemainingSeconds: undefined
+        pausedRemainingSeconds: 0
       });
       logAdminAction('Reanudó Cuenta Atrás de Lanzamiento', 'Modo Lanzamiento', 'ajustes');
     } else {
       // Pausar cuenta atrás: congelar los segundos que restan
-      const targetTime = currentLaunch.targetTimestampMs || new Date(currentLaunch.targetDate).getTime();
-      const remainingSeconds = Math.max(0, Math.floor((targetTime - Date.now()) / 1000));
+      const targetTime = Number(currentLaunch.targetTimestampMs) || (currentLaunch.targetDate ? new Date(currentLaunch.targetDate).getTime() : Date.now());
+      let remainingSeconds = Math.max(0, Math.floor((targetTime - Date.now()) / 1000));
+      if (remainingSeconds <= 0) {
+        if (typeof overrideSeconds === 'number' && overrideSeconds > 0) {
+          remainingSeconds = overrideSeconds;
+        } else if (typeof currentLaunch.durationSeconds === 'number' && currentLaunch.durationSeconds > 0) {
+          remainingSeconds = currentLaunch.durationSeconds;
+        } else {
+          remainingSeconds = 86400;
+        }
+      }
       await updateLaunchMode({
         isPaused: true,
         pausedRemainingSeconds: remainingSeconds
@@ -607,7 +634,7 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       targetTimestampMs,
       durationSeconds: remainingSeconds,
       isPaused: false,
-      pausedRemainingSeconds: undefined
+      pausedRemainingSeconds: 0
     });
   };
 
@@ -629,7 +656,7 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       targetTimestampMs,
       durationSeconds: totalSeconds,
       isPaused: currentLaunch.isPaused,
-      pausedRemainingSeconds: currentLaunch.isPaused ? totalSeconds : undefined
+      pausedRemainingSeconds: currentLaunch.isPaused ? totalSeconds : 0
     });
 
     logAdminAction(

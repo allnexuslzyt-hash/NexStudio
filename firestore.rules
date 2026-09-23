@@ -146,11 +146,8 @@ service cloud.firestore {
     match /settings/{settingId} {
       // All users (even unauthenticated) must be able to read settings so maintenance mode takes effect globally
       allow read: if true;
-      // Only the SuperAdmin can modify global site settings
-      allow write: if isSignedIn() && (
-        request.auth.token.email == 'allnexuslzyt@gmail.com' ||
-        (request.auth.token.email != null && request.auth.token.email.lower() == 'allnexuslzyt@gmail.com')
-      );
+      // Admins and SuperAdmin can modify global site settings
+      allow write: if isAdmin();
     }
 
     // Community Social Feed Posts & Discussions
