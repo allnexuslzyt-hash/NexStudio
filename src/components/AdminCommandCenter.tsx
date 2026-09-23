@@ -49,7 +49,7 @@ import {
   Timer
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { ManagedUser, UserRole, UserStatus, ContentReport, GlobalBannerConfig, BannerType, SupportTicket } from '../types';
+import { ManagedUser, UserRole, UserStatus, ContentReport, GlobalBannerConfig, BannerType, SupportTicket, LaunchModeConfig } from '../types';
 import { FAQItem, GuideArticle } from '../data/helpData';
 import { useSupport } from '../context/SupportContext';
 import { validateUsername, validateDisplayName } from '../utils/usernameValidation';
@@ -72,6 +72,7 @@ export const AdminCommandCenter: React.FC<AdminCommandCenterProps> = ({ onBack }
     toggleLaunchMode,
     pauseResumeCountdown,
     setCountdownTarget,
+    setCustomCountdownDuration,
     users, 
     updateUserNames,
     changeUserRole, 
@@ -184,6 +185,86 @@ export const AdminCommandCenter: React.FC<AdminCommandCenterProps> = ({ onBack }
     }
   };
 
+  // Helper for computing Days, Hours, Minutes, Seconds from launch config
+  const getDHMSFromLaunch = (launchConfig?: LaunchModeConfig) => {
+    let sec = 24 * 3600;
+    if (launchConfig?.isPaused && typeof launchConfig.pausedRemainingSeconds === 'number') {
+      sec = launchConfig.pausedRemainingSeconds;
+    } else if (launchConfig?.targetTimestampMs) {
+      sec = Math.max(0, Math.floor((launchConfig.targetTimestampMs - Date.now()) / 1000));
+    } else if (launchConfig?.targetDate) {
+      const ms = new Date(launchConfig.targetDate).getTime();
+      sec = Math.max(0, Math.floor((ms - Date.now()) / 1000));
+    }
+    return {
+      d: Math.floor(sec / 86400),
+      h: Math.floor((sec % 86400) / 3600),
+      m: Math.floor((sec % 3600) / 60),
+      s: sec % 60
+    };
+  };
+
+  const initialDHMS = getDHMSFromLaunch(siteSettings.launchMode);
+  const [launchDays, setLaunchDays] = useState<number>(initialDHMS.d);
+  const [launchHours, setLaunchHours] = useState<number>(initialDHMS.h);
+  const [launchMinutes, setLaunchMinutes] = useState<number>(initialDHMS.m);
+  const [launchSeconds, setLaunchSeconds] = useState<number>(initialDHMS.s);
+
+  // Live real-time remaining seconds ticker inside Admin Command Center
+  const [adminLiveRemaining, setAdminLiveRemaining] = useState<number>(() => {
+    const launchConfig = siteSettings.launchMode;
+    if (launchConfig?.isPaused) return launchConfig.pausedRemainingSeconds ?? 0;
+    const targetMs = launchConfig?.targetTimestampMs || (launchConfig?.targetDate ? new Date(launchConfig.targetDate).getTime() : Date.now() + 86400000);
+    return Math.max(0, Math.floor((targetMs - Date.now()) / 1000));
+  });
+
+  useEffect(() => {
+    const launchConfig = siteSettings.launchMode;
+    if (!launchConfig) return;
+
+    const updateLive = () => {
+      if (launchConfig.isPaused) {
+        setAdminLiveRemaining(launchConfig.pausedRemainingSeconds ?? 0);
+        return;
+      }
+      const targetMs = launchConfig.targetTimestampMs || (launchConfig.targetDate ? new Date(launchConfig.targetDate).getTime() : Date.now() + 86400000);
+      setAdminLiveRemaining(Math.max(0, Math.floor((targetMs - Date.now()) / 1000)));
+    };
+
+    updateLive();
+    const interval = setInterval(updateLive, 250);
+    return () => clearInterval(interval);
+  }, [siteSettings.launchMode]);
+
+  // Handler for custom duration fields (Days, Hours, Minutes, Seconds)
+  const handleDurationChange = (d: number, h: number, m: number, s: number) => {
+    const safeD = Math.max(0, isNaN(d) ? 0 : d);
+    const safeH = Math.max(0, Math.min(23, isNaN(h) ? 0 : h));
+    const safeM = Math.max(0, Math.min(59, isNaN(m) ? 0 : m));
+    const safeS = Math.max(0, Math.min(59, isNaN(s) ? 0 : s));
+
+    setLaunchDays(safeD);
+    setLaunchHours(safeH);
+    setLaunchMinutes(safeM);
+    setLaunchSeconds(safeS);
+
+    const totalSec = (safeD * 86400) + (safeH * 3600) + (safeM * 60) + safeS;
+    const computedTarget = new Date(Date.now() + totalSec * 1000);
+    setLaunchTargetInput(formatDatetimeForInput(computedTarget.toISOString()));
+  };
+
+  // Handler for exact datetime picker
+  const handleDatetimeChange = (val: string) => {
+    setLaunchTargetInput(val);
+    if (!val) return;
+    const targetMs = new Date(val).getTime();
+    const totalSec = Math.max(0, Math.floor((targetMs - Date.now()) / 1000));
+    setLaunchDays(Math.floor(totalSec / 86400));
+    setLaunchHours(Math.floor((totalSec % 86400) / 3600));
+    setLaunchMinutes(Math.floor((totalSec % 3600) / 60));
+    setLaunchSeconds(totalSec % 60);
+  };
+
   const [launchTitle, setLaunchTitle] = useState(siteSettings.launchMode?.title || '¡El Gran Lanzamiento de NexStudio está cerca!');
   const [launchSubtitle, setLaunchSubtitle] = useState(siteSettings.launchMode?.subtitle || 'Estamos preparando todos los proyectos, herramientas y la comunidad. ¡Muy pronto abriremos las puertas para todos!');
   const [launchBadgeText, setLaunchBadgeText] = useState(siteSettings.launchMode?.badgeText || 'Gran Estreno Oficial 1.0');
@@ -201,6 +282,11 @@ export const AdminCommandCenter: React.FC<AdminCommandCenterProps> = ({ onBack }
       setLaunchBadgeText(siteSettings.launchMode.badgeText || 'Gran Estreno Oficial 1.0');
       if (siteSettings.launchMode.targetDate) {
         setLaunchTargetInput(formatDatetimeForInput(siteSettings.launchMode.targetDate));
+        const dhms = getDHMSFromLaunch(siteSettings.launchMode);
+        setLaunchDays(dhms.d);
+        setLaunchHours(dhms.h);
+        setLaunchMinutes(dhms.m);
+        setLaunchSeconds(dhms.s);
       }
       setLaunchAutoUnlock(siteSettings.launchMode.autoUnlockOnFinish ?? true);
       setLaunchAdminBypass(siteSettings.launchMode.allowAdminBypass ?? true);
@@ -1580,17 +1666,21 @@ export const AdminCommandCenter: React.FC<AdminCommandCenterProps> = ({ onBack }
               </div>
             </div>
 
-            {/* Quick Live Status Card */}
-            <div className="p-5 rounded-2xl bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white border border-indigo-900/60 shadow-xl flex flex-col md:flex-row items-center justify-between gap-6">
-              <div className="space-y-1 text-center md:text-left">
-                <div className="flex items-center justify-center md:justify-start gap-2">
+            {/* Quick Live Status Card with Live Ticking Countdown */}
+            <div className="p-5 rounded-2xl bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white border border-indigo-900/60 shadow-xl flex flex-col lg:flex-row items-center justify-between gap-6">
+              <div className="space-y-2 text-center lg:text-left">
+                <div className="flex items-center justify-center lg:justify-start gap-2">
                   <Timer className="w-4 h-4 text-amber-400" />
                   <span className="text-xs font-bold text-amber-400 uppercase tracking-wider">
-                    Estado de la Cuenta Atrás en Tiempo Real
+                    Cuenta Atrás Sincronizada en Tiempo Real
                   </span>
-                  {siteSettings.launchMode?.isPaused && (
+                  {siteSettings.launchMode?.isPaused ? (
                     <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30">
                       PAUSADA
+                    </span>
+                  ) : (
+                    <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                      CONTANDO EN VIVO
                     </span>
                   )}
                 </div>
@@ -1598,8 +1688,39 @@ export const AdminCommandCenter: React.FC<AdminCommandCenterProps> = ({ onBack }
                   {siteSettings.launchMode?.title || 'Gran Lanzamiento de NexStudio'}
                 </h4>
                 <p className="text-xs text-slate-300">
-                  Fecha Objetivo Sincronizada: <strong>{siteSettings.launchMode?.targetDate ? new Date(siteSettings.launchMode.targetDate).toLocaleString() : 'No fijada'}</strong>
+                  Fecha Objetivo Global: <strong>{siteSettings.launchMode?.targetDate ? new Date(siteSettings.launchMode.targetDate).toLocaleString() : 'No fijada'}</strong>
                 </p>
+
+                {/* Live Real-time Clock (Days, Hours, Minutes, Seconds) */}
+                <div className="flex items-center justify-center lg:justify-start gap-2 pt-1 font-mono text-center">
+                  <div className="px-3 py-1.5 rounded-xl bg-slate-950/80 border border-slate-800 shadow-inner flex flex-col items-center min-w-[55px]">
+                    <span className="text-xl font-extrabold text-white">
+                      {String(Math.floor(adminLiveRemaining / 86400)).padStart(2, '0')}
+                    </span>
+                    <span className="text-[9px] uppercase font-bold text-slate-400">Días</span>
+                  </div>
+                  <span className="text-slate-500 font-bold">:</span>
+                  <div className="px-3 py-1.5 rounded-xl bg-slate-950/80 border border-slate-800 shadow-inner flex flex-col items-center min-w-[55px]">
+                    <span className="text-xl font-extrabold text-white">
+                      {String(Math.floor((adminLiveRemaining % 86400) / 3600)).padStart(2, '0')}
+                    </span>
+                    <span className="text-[9px] uppercase font-bold text-slate-400">Horas</span>
+                  </div>
+                  <span className="text-slate-500 font-bold">:</span>
+                  <div className="px-3 py-1.5 rounded-xl bg-slate-950/80 border border-slate-800 shadow-inner flex flex-col items-center min-w-[55px]">
+                    <span className="text-xl font-extrabold text-indigo-300">
+                      {String(Math.floor((adminLiveRemaining % 3600) / 60)).padStart(2, '0')}
+                    </span>
+                    <span className="text-[9px] uppercase font-bold text-indigo-400">Min</span>
+                  </div>
+                  <span className="text-slate-500 font-bold">:</span>
+                  <div className="px-3 py-1.5 rounded-xl bg-slate-950/80 border border-slate-800 shadow-inner flex flex-col items-center min-w-[55px]">
+                    <span className="text-xl font-extrabold text-amber-400">
+                      {String(adminLiveRemaining % 60).padStart(2, '0')}
+                    </span>
+                    <span className="text-[9px] uppercase font-bold text-amber-400">Seg</span>
+                  </div>
+                </div>
               </div>
 
               {/* Countdown Actions: Pause / Resume & Live Preview */}
@@ -1644,59 +1765,187 @@ export const AdminCommandCenter: React.FC<AdminCommandCenterProps> = ({ onBack }
 
             {/* Configuration Form */}
             <div className="space-y-5 pt-2">
-              <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500">
-                Ajustes de Fecha y Cuenta Atrás
-              </h4>
+              <div>
+                <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500">
+                  Personalización Completa del Tiempo de Cuenta Atrás
+                </h4>
+                <p className="text-[11px] text-slate-500 mt-0.5">
+                  Puedes escribir o cambiar libremente cualquier cantidad de días, horas, minutos y segundos. La cuenta atrás estará sincronizada a la perfección en todos los ordenadores y teléfonos del mundo.
+                </p>
+              </div>
 
-              {/* Target Date Picker & Presets */}
-              <div className="p-4 rounded-xl bg-slate-50 border border-slate-200/80 space-y-3">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              {/* 100% Fully Customizable Time Inputs (Días, Horas, Minutos, Segundos) */}
+              <div className="p-4 sm:p-5 rounded-2xl bg-slate-50 border border-slate-200/90 shadow-2xs space-y-4">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
+                  {/* DÍAS */}
+                  <div className="p-3.5 rounded-xl bg-white border border-slate-200/80 shadow-xs flex flex-col">
+                    <label className="text-xs font-bold text-slate-700 uppercase tracking-wider mb-1 flex items-center justify-between">
+                      <span>Días</span>
+                      <span className="text-[10px] font-normal text-slate-400 lowercase">enteros</span>
+                    </label>
+                    <div className="flex items-center gap-1.5 mt-1">
+                      <button
+                        type="button"
+                        onClick={() => handleDurationChange(Math.max(0, launchDays - 1), launchHours, launchMinutes, launchSeconds)}
+                        className="w-8 h-8 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold flex items-center justify-center transition-colors cursor-pointer text-sm"
+                        title="Restar 1 día"
+                      >
+                        -
+                      </button>
+                      <input
+                        type="number"
+                        min="0"
+                        value={launchDays}
+                        onChange={(e) => handleDurationChange(parseInt(e.target.value) || 0, launchHours, launchMinutes, launchSeconds)}
+                        className="w-full text-center py-1.5 px-1 rounded-lg bg-slate-50 border border-slate-300 text-sm sm:text-base font-mono font-bold text-slate-900 focus:outline-none focus:border-indigo-500"
+                        placeholder="0"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => handleDurationChange(launchDays + 1, launchHours, launchMinutes, launchSeconds)}
+                        className="w-8 h-8 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold flex items-center justify-center transition-colors cursor-pointer text-sm"
+                        title="Sumar 1 día"
+                      >
+                        +
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* HORAS */}
+                  <div className="p-3.5 rounded-xl bg-white border border-slate-200/80 shadow-xs flex flex-col">
+                    <label className="text-xs font-bold text-slate-700 uppercase tracking-wider mb-1 flex items-center justify-between">
+                      <span>Horas</span>
+                      <span className="text-[10px] font-normal text-slate-400">0 - 23</span>
+                    </label>
+                    <div className="flex items-center gap-1.5 mt-1">
+                      <button
+                        type="button"
+                        onClick={() => handleDurationChange(launchDays, Math.max(0, launchHours - 1), launchMinutes, launchSeconds)}
+                        className="w-8 h-8 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold flex items-center justify-center transition-colors cursor-pointer text-sm"
+                        title="Restar 1 hora"
+                      >
+                        -
+                      </button>
+                      <input
+                        type="number"
+                        min="0"
+                        max="23"
+                        value={launchHours}
+                        onChange={(e) => handleDurationChange(launchDays, parseInt(e.target.value) || 0, launchMinutes, launchSeconds)}
+                        className="w-full text-center py-1.5 px-1 rounded-lg bg-slate-50 border border-slate-300 text-sm sm:text-base font-mono font-bold text-slate-900 focus:outline-none focus:border-indigo-500"
+                        placeholder="0"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => handleDurationChange(launchDays, Math.min(23, launchHours + 1), launchMinutes, launchSeconds)}
+                        className="w-8 h-8 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold flex items-center justify-center transition-colors cursor-pointer text-sm"
+                        title="Sumar 1 hora"
+                      >
+                        +
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* MINUTOS */}
+                  <div className="p-3.5 rounded-xl bg-white border border-slate-200/80 shadow-xs flex flex-col">
+                    <label className="text-xs font-bold text-indigo-700 uppercase tracking-wider mb-1 flex items-center justify-between">
+                      <span>Minutos</span>
+                      <span className="text-[10px] font-normal text-indigo-400">0 - 59</span>
+                    </label>
+                    <div className="flex items-center gap-1.5 mt-1">
+                      <button
+                        type="button"
+                        onClick={() => handleDurationChange(launchDays, launchHours, Math.max(0, launchMinutes - 1), launchSeconds)}
+                        className="w-8 h-8 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold flex items-center justify-center transition-colors cursor-pointer text-sm"
+                        title="Restar 1 minuto"
+                      >
+                        -
+                      </button>
+                      <input
+                        type="number"
+                        min="0"
+                        max="59"
+                        value={launchMinutes}
+                        onChange={(e) => handleDurationChange(launchDays, launchHours, parseInt(e.target.value) || 0, launchSeconds)}
+                        className="w-full text-center py-1.5 px-1 rounded-lg bg-indigo-50/50 border border-indigo-200 text-sm sm:text-base font-mono font-bold text-indigo-950 focus:outline-none focus:border-indigo-500"
+                        placeholder="0"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => handleDurationChange(launchDays, launchHours, Math.min(59, launchMinutes + 1), launchSeconds)}
+                        className="w-8 h-8 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold flex items-center justify-center transition-colors cursor-pointer text-sm"
+                        title="Sumar 1 minuto"
+                      >
+                        +
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* SEGUNDOS */}
+                  <div className="p-3.5 rounded-xl bg-white border border-slate-200/80 shadow-xs flex flex-col">
+                    <label className="text-xs font-bold text-amber-700 uppercase tracking-wider mb-1 flex items-center justify-between">
+                      <span>Segundos</span>
+                      <span className="text-[10px] font-normal text-amber-500">0 - 59</span>
+                    </label>
+                    <div className="flex items-center gap-1.5 mt-1">
+                      <button
+                        type="button"
+                        onClick={() => handleDurationChange(launchDays, launchHours, launchMinutes, Math.max(0, launchSeconds - 1))}
+                        className="w-8 h-8 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold flex items-center justify-center transition-colors cursor-pointer text-sm"
+                        title="Restar 1 segundo"
+                      >
+                        -
+                      </button>
+                      <input
+                        type="number"
+                        min="0"
+                        max="59"
+                        value={launchSeconds}
+                        onChange={(e) => handleDurationChange(launchDays, launchHours, launchMinutes, parseInt(e.target.value) || 0)}
+                        className="w-full text-center py-1.5 px-1 rounded-lg bg-amber-50/50 border border-amber-200 text-sm sm:text-base font-mono font-bold text-amber-950 focus:outline-none focus:border-amber-500"
+                        placeholder="0"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => handleDurationChange(launchDays, launchHours, launchMinutes, Math.min(59, launchSeconds + 1))}
+                        className="w-8 h-8 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold flex items-center justify-center transition-colors cursor-pointer text-sm"
+                        title="Sumar 1 segundo"
+                      >
+                        +
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Sincronización bidireccional con Selector de Fecha y Hora Exacta */}
+                <div className="pt-2 border-t border-slate-200/80 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                   <div>
                     <label className="block text-xs font-bold text-slate-800 mb-0.5">
-                      Fecha y Hora Objetivo de Lanzamiento:
+                      O selecciona directamente la Fecha y Hora exacta en el calendario:
                     </label>
                     <p className="text-[11px] text-slate-500">
-                      Todos los usuarios contarán hacia este momento exacto de forma sincronizada en todos los lugares.
+                      Cualquier fecha que selecciones actualizará automáticamente los días, horas, minutos y segundos de arriba.
                     </p>
                   </div>
                   <input
                     type="datetime-local"
                     value={launchTargetInput}
-                    onChange={(e) => setLaunchTargetInput(e.target.value)}
+                    onChange={(e) => handleDatetimeChange(e.target.value)}
                     className="px-3.5 py-2 rounded-xl bg-white border border-slate-300 text-xs text-slate-900 font-mono font-medium focus:outline-none focus:border-indigo-500 shadow-2xs"
                   />
                 </div>
 
-                {/* Quick Presets */}
-                <div>
-                  <span className="text-[11px] font-semibold text-slate-600 block mb-2">
-                    Fijar cuenta atrás rápida desde este momento:
-                  </span>
-                  <div className="flex flex-wrap items-center gap-2">
-                    {[
-                      { label: '+10 Minutos', ms: 10 * 60 * 1000 },
-                      { label: '+30 Minutos', ms: 30 * 60 * 1000 },
-                      { label: '+1 Hora', ms: 60 * 60 * 1000 },
-                      { label: '+6 Horas', ms: 6 * 60 * 60 * 1000 },
-                      { label: '+12 Horas', ms: 12 * 60 * 60 * 1000 },
-                      { label: '+24 Horas (1 Día)', ms: 24 * 60 * 60 * 1000 },
-                      { label: '+3 Días', ms: 3 * 24 * 60 * 60 * 1000 },
-                      { label: '+1 Semana', ms: 7 * 24 * 60 * 60 * 1000 },
-                    ].map((preset) => (
-                      <button
-                        key={preset.label}
-                        type="button"
-                        onClick={() => {
-                          const newDate = new Date(Date.now() + preset.ms);
-                          const formatted = formatDatetimeForInput(newDate.toISOString());
-                          setLaunchTargetInput(formatted);
-                          showToast(`Fecha fijada para ${preset.label}`);
-                        }}
-                        className="px-2.5 py-1 rounded-lg bg-white hover:bg-slate-100 border border-slate-200 text-[11px] font-semibold text-slate-700 hover:text-indigo-600 transition-colors cursor-pointer shadow-2xs"
-                      >
-                        {preset.label}
-                      </button>
-                    ))}
+                {/* Resumen Informativo de Sincronización en Directo */}
+                <div className="p-3 rounded-xl bg-indigo-50/80 border border-indigo-100 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 text-xs">
+                  <div className="flex items-center gap-2 text-indigo-900">
+                    <Clock className="w-4 h-4 text-indigo-600 shrink-0" />
+                    <span>
+                      Duración personalizada: <strong>{launchDays} días, {launchHours} horas, {launchMinutes} minutos y {launchSeconds} segundos</strong>
+                    </span>
+                  </div>
+                  <div className="text-[11px] font-medium text-indigo-700 flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse inline-block" />
+                    <span>Sincronizado a través de Firestore</span>
                   </div>
                 </div>
               </div>
@@ -1797,16 +2046,22 @@ export const AdminCommandCenter: React.FC<AdminCommandCenterProps> = ({ onBack }
                   onClick={async () => {
                     setIsSavingLaunch(true);
                     try {
-                      const isoDate = launchTargetInput ? new Date(launchTargetInput).toISOString() : new Date(Date.now() + 24 * 3600 * 1000).toISOString();
+                      const totalSeconds = (launchDays * 86400) + (launchHours * 3600) + (launchMinutes * 60) + launchSeconds;
+                      const targetTimestampMs = Date.now() + (totalSeconds * 1000);
+                      const isoDate = new Date(targetTimestampMs).toISOString();
+
                       await updateLaunchMode({
                         title: launchTitle.trim() || '¡El Gran Lanzamiento de NexStudio está cerca!',
                         subtitle: launchSubtitle.trim() || 'Estamos preparando todos los proyectos, herramientas y la comunidad. ¡Muy pronto abriremos las puertas para todos!',
                         badgeText: launchBadgeText.trim() || 'Gran Estreno Oficial 1.0',
                         targetDate: isoDate,
+                        targetTimestampMs,
+                        durationSeconds: totalSeconds,
+                        pausedRemainingSeconds: siteSettings.launchMode?.isPaused ? totalSeconds : undefined,
                         autoUnlockOnFinish: launchAutoUnlock,
                         allowAdminBypass: launchAdminBypass
                       });
-                      showToast('Configuración de lanzamiento guardada y sincronizada en tiempo real');
+                      showToast('⏱️ Cuenta atrás y configuración guardadas y sincronizadas globalmente');
                     } catch (e) {
                       showToast('Error al guardar la configuración');
                     } finally {

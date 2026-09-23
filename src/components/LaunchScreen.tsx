@@ -40,12 +40,19 @@ export const LaunchScreen: React.FC<LaunchScreenProps> = ({ onOpenAdminPanel, on
     lastUpdated: new Date().toISOString()
   };
 
-  // Remaining time in seconds
+  // Remaining time in seconds calculated against target timestamp
+  const getTargetMs = () => {
+    if (launchConfig.targetTimestampMs && typeof launchConfig.targetTimestampMs === 'number') {
+      return launchConfig.targetTimestampMs;
+    }
+    return new Date(launchConfig.targetDate).getTime();
+  };
+
   const [remainingSeconds, setRemainingSeconds] = useState<number>(() => {
     if (launchConfig.isPaused) {
       return launchConfig.pausedRemainingSeconds ?? 0;
     }
-    const targetMs = new Date(launchConfig.targetDate).getTime();
+    const targetMs = getTargetMs();
     return Math.max(0, Math.floor((targetMs - Date.now()) / 1000));
   });
 
@@ -56,15 +63,30 @@ export const LaunchScreen: React.FC<LaunchScreenProps> = ({ onOpenAdminPanel, on
     }
 
     const updateTimer = () => {
-      const targetMs = new Date(launchConfig.targetDate).getTime();
+      const targetMs = getTargetMs();
       const diff = Math.max(0, Math.floor((targetMs - Date.now()) / 1000));
       setRemainingSeconds(diff);
     };
 
     updateTimer();
-    const interval = setInterval(updateTimer, 1000);
-    return () => clearInterval(interval);
-  }, [launchConfig.targetDate, launchConfig.isPaused, launchConfig.pausedRemainingSeconds]);
+    // 250ms interval guarantees perfectly synchronized seconds across all devices without stutter
+    const interval = setInterval(updateTimer, 250);
+
+    // Re-synchronize immediately when browser tab or screen becomes visible again
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        updateTimer();
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('focus', updateTimer);
+
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('focus', updateTimer);
+    };
+  }, [launchConfig.targetDate, launchConfig.targetTimestampMs, launchConfig.isPaused, launchConfig.pausedRemainingSeconds]);
 
   const days = Math.floor(remainingSeconds / (24 * 3600));
   const hours = Math.floor((remainingSeconds % (24 * 3600)) / 3600);

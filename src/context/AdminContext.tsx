@@ -26,6 +26,7 @@ interface AdminContextType {
   toggleLaunchMode: (enabled?: boolean) => Promise<void>;
   pauseResumeCountdown: () => Promise<void>;
   setCountdownTarget: (targetIsoDate: string) => Promise<void>;
+  setCustomCountdownDuration: (days: number, hours: number, minutes: number, seconds: number) => Promise<void>;
   
   // Users management
   users: ManagedUser[];
@@ -78,6 +79,8 @@ interface AdminContextType {
 export const DEFAULT_LAUNCH_MODE_CONFIG: LaunchModeConfig = {
   enabled: false,
   targetDate: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+  targetTimestampMs: Date.now() + 24 * 60 * 60 * 1000,
+  durationSeconds: 24 * 3600,
   title: '¡El Gran Lanzamiento de NexStudio está cerca!',
   subtitle: 'Estamos preparando los últimos detalles de todos nuestros proyectos, herramientas y la comunidad. ¡Muy pronto abriremos las puertas para todos!',
   badgeText: 'Gran Estreno Oficial 1.0',
@@ -520,9 +523,21 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   // Launch Mode Management (Modo En Lanzamiento con cuenta atrás sincronizada)
   const updateLaunchMode = async (config: Partial<LaunchModeConfig>) => {
     const currentLaunch = siteSettings.launchMode || DEFAULT_LAUNCH_MODE_CONFIG;
+    
+    // Ensure targetTimestampMs is always accurately calculated and synchronized across all locations
+    let targetTimestampMs = config.targetTimestampMs;
+    if (!targetTimestampMs && config.targetDate) {
+      targetTimestampMs = new Date(config.targetDate).getTime();
+    } else if (!targetTimestampMs && currentLaunch.targetTimestampMs) {
+      targetTimestampMs = currentLaunch.targetTimestampMs;
+    } else if (!targetTimestampMs && currentLaunch.targetDate) {
+      targetTimestampMs = new Date(currentLaunch.targetDate).getTime();
+    }
+
     const updatedLaunch: LaunchModeConfig = {
       ...currentLaunch,
       ...config,
+      targetTimestampMs,
       lastUpdated: new Date().toISOString()
     };
 
@@ -544,7 +559,9 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
     try {
       await setDoc(doc(db, 'settings', 'global'), updatedSettings, { merge: true });
-    } catch (err) {}
+    } catch (err) {
+      console.error('Error al sincronizar Launch Mode en Firestore:', err);
+    }
   };
 
   const toggleLaunchMode = async (enabled?: boolean) => {
@@ -560,16 +577,19 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       const secondsLeft = currentLaunch.pausedRemainingSeconds && currentLaunch.pausedRemainingSeconds > 0
         ? currentLaunch.pausedRemainingSeconds 
         : 3600;
-      const newTarget = new Date(Date.now() + secondsLeft * 1000).toISOString();
+      const targetTimestampMs = Date.now() + secondsLeft * 1000;
+      const newTarget = new Date(targetTimestampMs).toISOString();
       await updateLaunchMode({
         isPaused: false,
         targetDate: newTarget,
+        targetTimestampMs,
+        durationSeconds: secondsLeft,
         pausedRemainingSeconds: undefined
       });
       logAdminAction('Reanudó Cuenta Atrás de Lanzamiento', 'Modo Lanzamiento', 'ajustes');
     } else {
       // Pausar cuenta atrás: congelar los segundos que restan
-      const targetTime = new Date(currentLaunch.targetDate).getTime();
+      const targetTime = currentLaunch.targetTimestampMs || new Date(currentLaunch.targetDate).getTime();
       const remainingSeconds = Math.max(0, Math.floor((targetTime - Date.now()) / 1000));
       await updateLaunchMode({
         isPaused: true,
@@ -580,11 +600,43 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   };
 
   const setCountdownTarget = async (targetIsoDate: string) => {
+    const targetTimestampMs = new Date(targetIsoDate).getTime();
+    const remainingSeconds = Math.max(0, Math.floor((targetTimestampMs - Date.now()) / 1000));
     await updateLaunchMode({
       targetDate: targetIsoDate,
+      targetTimestampMs,
+      durationSeconds: remainingSeconds,
       isPaused: false,
       pausedRemainingSeconds: undefined
     });
+  };
+
+  // Personalización completa de tiempo (Días, Horas, Minutos, Segundos)
+  const setCustomCountdownDuration = async (days: number, hours: number, minutes: number, seconds: number) => {
+    const validDays = Math.max(0, isNaN(days) ? 0 : Number(days));
+    const validHours = Math.max(0, isNaN(hours) ? 0 : Number(hours));
+    const validMinutes = Math.max(0, isNaN(minutes) ? 0 : Number(minutes));
+    const validSeconds = Math.max(0, isNaN(seconds) ? 0 : Number(seconds));
+
+    const totalSeconds = (validDays * 86400) + (validHours * 3600) + (validMinutes * 60) + validSeconds;
+    const targetTimestampMs = Date.now() + (totalSeconds * 1000);
+    const targetIsoDate = new Date(targetTimestampMs).toISOString();
+
+    const currentLaunch = siteSettings.launchMode || DEFAULT_LAUNCH_MODE_CONFIG;
+
+    await updateLaunchMode({
+      targetDate: targetIsoDate,
+      targetTimestampMs,
+      durationSeconds: totalSeconds,
+      isPaused: currentLaunch.isPaused,
+      pausedRemainingSeconds: currentLaunch.isPaused ? totalSeconds : undefined
+    });
+
+    logAdminAction(
+      `Fijó cuenta atrás a ${validDays}d ${validHours}h ${validMinutes}m ${validSeconds}s`,
+      'Modo Lanzamiento',
+      'ajustes'
+    );
   };
 
   // User Actions
@@ -958,6 +1010,7 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         toggleLaunchMode,
         pauseResumeCountdown,
         setCountdownTarget,
+        setCustomCountdownDuration,
         users,
         updateUserNames,
         changeUserRole,

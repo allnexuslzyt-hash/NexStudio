@@ -114,6 +114,8 @@ export interface GlobalBannerConfig {
 export interface LaunchModeConfig {
   enabled: boolean; // Si el modo lanzamiento está activo bloqueando la web
   targetDate: string; // ISO string de la fecha/hora objetivo de lanzamiento
+  targetTimestampMs?: number; // Timestamp Unix epoch en milisegundos para sincronización ultraprecisa en todos lados
+  durationSeconds?: number; // Duración total en segundos
   title: string; // Título principal (ej. "¡Gran Lanzamiento de NexStudio!")
   subtitle: string; // Subtítulo o mensaje explicativo
   badgeText: string; // Texto del distintivo (ej. "Gran Estreno Oficial 1.0")
