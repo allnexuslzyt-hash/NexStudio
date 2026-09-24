@@ -13,6 +13,8 @@ const __dirname = path.dirname(__filename);
 const app = express();
 const PORT = 3000;
 
+app.set("trust proxy", true);
+
 app.use(express.json({ limit: "5mb" }));
 
 // -------------------------------------------------------------
@@ -106,6 +108,14 @@ setInterval(syncTorExitNodes, 60 * 60 * 1000);
 
 // Helper to extract sanitized client IP address
 function getClientIp(req: Request): string {
+  const cfConnectingIp = req.headers["cf-connecting-ip"];
+  if (typeof cfConnectingIp === "string" && cfConnectingIp.trim()) {
+    return cfConnectingIp.trim().replace(/^::ffff:/, "");
+  }
+  const trueClientIp = req.headers["true-client-ip"];
+  if (typeof trueClientIp === "string" && trueClientIp.trim()) {
+    return trueClientIp.trim().replace(/^::ffff:/, "");
+  }
   const xForwardedFor = req.headers["x-forwarded-for"];
   let rawIp = "";
   if (typeof xForwardedFor === "string") {

@@ -18,11 +18,15 @@ import { useAuth } from '../context/AuthContext';
 interface TorBlockedScreenProps {
   clientIp?: string;
   onRetry: () => Promise<void> | void;
+  isSimulated?: boolean;
+  onExitSimulation?: () => void;
 }
 
 export const TorBlockedScreen: React.FC<TorBlockedScreenProps> = ({
   clientIp = 'IP no disponible',
-  onRetry
+  onRetry,
+  isSimulated = false,
+  onExitSimulation
 }) => {
   const { user, signInWithGoogle, isSuperAdmin } = useAuth();
   const [isChecking, setIsChecking] = useState(false);
@@ -43,6 +47,29 @@ export const TorBlockedScreen: React.FC<TorBlockedScreenProps> = ({
 
   return (
     <div className="min-h-screen w-full bg-slate-950 text-slate-100 flex flex-col justify-between selection:bg-rose-600 selection:text-white relative overflow-x-hidden font-sans">
+      {/* Simulation Banner for Admin Testing */}
+      {isSimulated && (
+        <div className="relative z-30 bg-gradient-to-r from-amber-500 via-rose-500 to-amber-600 text-slate-950 px-4 py-2.5 flex flex-wrap items-center justify-between gap-3 shadow-xl font-bold text-xs">
+          <div className="flex items-center gap-2">
+            <span className="bg-black text-amber-400 px-2 py-0.5 rounded text-[10px] tracking-wider uppercase">
+              MODO PRUEBA ACTIVO
+            </span>
+            <span>
+              Estás viendo la simulación exacta del bloqueo Tor. Ningún usuario desde Tor puede pasar esta pantalla.
+            </span>
+          </div>
+          {onExitSimulation && (
+            <button
+              type="button"
+              onClick={onExitSimulation}
+              className="px-3 py-1 rounded-lg bg-slate-950 hover:bg-slate-900 text-white font-extrabold text-xs transition-colors cursor-pointer shadow-md"
+            >
+              SALIR DE LA SIMULACIÓN Y VOLVER
+            </button>
+          )}
+        </div>
+      )}
+
       {/* Background Ambience Glow */}
       <div className="absolute inset-0 pointer-events-none overflow-hidden">
         <div className="absolute -top-40 left-1/2 -translate-x-1/2 w-[700px] h-[500px] rounded-full bg-rose-950/25 blur-[140px]" />

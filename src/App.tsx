@@ -35,6 +35,21 @@ const WorkspaceContent: React.FC = () => {
   const [isTermsOpen, setIsTermsOpen] = useState<boolean>(false);
   const [visitorUnlockedLaunch, setVisitorUnlockedLaunch] = useState<boolean>(false);
   const [torCheckResult, setTorCheckResult] = useState<{ isTor: boolean; clientIp: string } | null>(null);
+  const [isTorSimulated, setIsTorSimulated] = useState<boolean>(() => {
+    return typeof window !== 'undefined' && sessionStorage.getItem('simulate_tor_block') === 'true';
+  });
+
+  React.useEffect(() => {
+    const handleStorage = () => {
+      setIsTorSimulated(sessionStorage.getItem('simulate_tor_block') === 'true');
+    };
+    window.addEventListener('storage', handleStorage);
+    window.addEventListener('nexstudio_toggle_tor_sim', handleStorage);
+    return () => {
+      window.removeEventListener('storage', handleStorage);
+      window.removeEventListener('nexstudio_toggle_tor_sim', handleStorage);
+    };
+  }, []);
 
   // Verificación perimetral de seguridad IP (nodos de salida Tor / Proxies de evasión)
   const checkTorSecurity = React.useCallback(async () => {
@@ -68,16 +83,25 @@ const WorkspaceContent: React.FC = () => {
   // Vistas de página blanca requeridas por el usuario hasta que defina contenido (creaciones y herramientas pendientes)
   const isBlankView = ['creaciones', 'herramientas'].includes(activeView);
 
-  // Si el usuario está navegando a través de la Red Tor y el bloqueo perimetral está activo:
+  // Si el usuario está navegando a través de la Red Tor o activó el modo de prueba:
   const securityConfig = siteSettings.securityConfig;
   const isTorBlockingEnabled = securityConfig ? securityConfig.blockTorExitNodes !== false : true;
   const allowAdminTorBypass = securityConfig?.allowAdminBypass ?? true;
-  const isBlockedByTor = Boolean(torCheckResult?.isTor) && isTorBlockingEnabled && !(isAdmin && allowAdminTorBypass);
+  const isBlockedByTor = (Boolean(torCheckResult?.isTor) || isTorSimulated) && isTorBlockingEnabled && !(isAdmin && allowAdminTorBypass && !isTorSimulated);
 
   if (isBlockedByTor) {
     return (
       <>
-        <TorBlockedScreen clientIp={torCheckResult?.clientIp} onRetry={checkTorSecurity} />
+        <TorBlockedScreen 
+          clientIp={isTorSimulated ? '185.220.101.5 (Nodo Tor de Prueba)' : (torCheckResult?.clientIp || 'IP de salida Tor detectada')} 
+          onRetry={checkTorSecurity}
+          isSimulated={isTorSimulated}
+          onExitSimulation={() => {
+            sessionStorage.removeItem('simulate_tor_block');
+            setIsTorSimulated(false);
+            window.dispatchEvent(new Event('nexstudio_toggle_tor_sim'));
+          }}
+        />
         <UnauthorizedDomainModal
           domain={unauthorizedDomain || ''}
           isOpen={Boolean(unauthorizedDomain)}
