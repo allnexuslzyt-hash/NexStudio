@@ -16,6 +16,7 @@ import { GlobalBanner } from './components/GlobalBanner';
 import { MaintenanceScreen } from './components/MaintenanceScreen';
 import { LaunchScreen } from './components/LaunchScreen';
 import { BannedScreen } from './components/BannedScreen';
+import { TorBlockedScreen } from './components/TorBlockedScreen';
 import { AdminCommandCenter } from './components/AdminCommandCenter';
 import { UnauthorizedDomainModal } from './components/UnauthorizedDomainModal';
 import { OnboardingModal } from './components/OnboardingModal';
@@ -33,6 +34,28 @@ const WorkspaceContent: React.FC = () => {
   const [activeView, setActiveView] = useState<string>('workspace');
   const [isTermsOpen, setIsTermsOpen] = useState<boolean>(false);
   const [visitorUnlockedLaunch, setVisitorUnlockedLaunch] = useState<boolean>(false);
+  const [torCheckResult, setTorCheckResult] = useState<{ isTor: boolean; clientIp: string } | null>(null);
+
+  // Verificación perimetral de seguridad IP (nodos de salida Tor / Proxies de evasión)
+  const checkTorSecurity = React.useCallback(async () => {
+    try {
+      const res = await fetch('/api/security/ip-check');
+      if (res.ok) {
+        const data = await res.json();
+        setTorCheckResult({
+          isTor: Boolean(data.isTor),
+          clientIp: data.clientIp || ''
+        });
+      }
+    } catch {
+      // Si falla la red o el servicio, no bloquear a usuarios legítimos (Fail-open)
+      setTorCheckResult({ isTor: false, clientIp: '' });
+    }
+  }, []);
+
+  React.useEffect(() => {
+    checkTorSecurity();
+  }, [checkTorSecurity]);
 
   // Escuchar si se solicitó la página de soporte desde cualquier botón o acción
   React.useEffect(() => {
@@ -44,6 +67,25 @@ const WorkspaceContent: React.FC = () => {
 
   // Vistas de página blanca requeridas por el usuario hasta que defina contenido (creaciones y herramientas pendientes)
   const isBlankView = ['creaciones', 'herramientas'].includes(activeView);
+
+  // Si el usuario está navegando a través de la Red Tor y el bloqueo perimetral está activo:
+  const securityConfig = siteSettings.securityConfig;
+  const isTorBlockingEnabled = securityConfig ? securityConfig.blockTorExitNodes !== false : true;
+  const allowAdminTorBypass = securityConfig?.allowAdminBypass ?? true;
+  const isBlockedByTor = Boolean(torCheckResult?.isTor) && isTorBlockingEnabled && !(isAdmin && allowAdminTorBypass);
+
+  if (isBlockedByTor) {
+    return (
+      <>
+        <TorBlockedScreen clientIp={torCheckResult?.clientIp} onRetry={checkTorSecurity} />
+        <UnauthorizedDomainModal
+          domain={unauthorizedDomain || ''}
+          isOpen={Boolean(unauthorizedDomain)}
+          onClose={() => setUnauthorizedDomain(null)}
+        />
+      </>
+    );
+  }
 
   // Si el usuario está baneado o suspendido activamente, bloquear totalmente el acceso a la web y mostrar BannedScreen
   if (isBanned) {

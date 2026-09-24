@@ -126,6 +126,15 @@ export interface LaunchModeConfig {
   lastUpdated: string;
 }
 
+export interface SecurityConfig {
+  blockTorExitNodes: boolean; // Si el bloqueo automático de nodos de salida Tor está activo
+  allowAdminBypass: boolean; // Si los administradores pueden ingresar incluso navegando en Tor
+  customBlockedIps?: string[]; // Lista personalizada de IPs bloqueadas
+  customAllowedIps?: string[]; // Lista blanca de IPs permitidas
+  lastUpdated?: string;
+  updatedBy?: string;
+}
+
 export interface SiteSettings {
   maintenanceMode: boolean; // Kill Switch
   maintenanceMessage: string;
@@ -137,6 +146,7 @@ export interface SiteSettings {
   lastUpdated: string;
   updatedBy: string;
   launchMode?: LaunchModeConfig; // Modo En Lanzamiento con cuenta atrás sincronizada
+  securityConfig?: SecurityConfig; // Escudo perimetral y bloqueo de nodos Tor / anonimizadores
 }
 
 export interface AuditLogItem {

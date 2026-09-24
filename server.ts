@@ -15,6 +15,170 @@ const PORT = 3000;
 
 app.use(express.json({ limit: "5mb" }));
 
+// -------------------------------------------------------------
+// NexStudio Perimeter Shield: Tor Exit Node Detection & Protection
+// -------------------------------------------------------------
+let torExitNodes = new Set<string>();
+let lastTorSync: string | null = null;
+let isSyncingTor = false;
+
+// Sample seed of active Tor exit nodes for immediate protection before sync
+const TOR_SEED_NODES = [
+  "185.220.101.5", "185.220.101.6", "185.220.101.7", "185.220.101.8",
+  "185.220.101.9", "185.220.101.10", "185.220.101.11", "185.220.101.12",
+  "185.220.101.13", "185.220.101.14", "185.220.101.15", "185.220.101.16",
+  "185.220.101.17", "185.220.101.18", "185.220.101.19", "185.220.101.20",
+  "185.220.101.21", "185.220.101.22", "185.220.101.23", "185.220.101.24",
+  "185.220.101.25", "185.220.101.26", "185.220.101.27", "185.220.101.28",
+  "185.220.102.4", "185.220.102.5", "185.220.102.6", "185.220.102.7",
+  "185.220.102.8", "185.220.103.4", "185.220.103.5", "185.220.103.6",
+  "192.42.116.16", "192.42.116.17", "192.42.116.18", "192.42.116.19",
+  "192.42.116.20", "192.42.116.21", "192.42.116.22", "192.42.116.23",
+  "199.249.230.70", "199.249.230.71", "199.249.230.72", "199.249.230.73",
+  "199.249.230.74", "199.249.230.75", "199.249.230.76", "199.249.230.77",
+  "51.15.43.205", "51.15.54.212", "51.15.67.114", "51.15.89.24"
+];
+
+// Initialize with seed list
+for (const ip of TOR_SEED_NODES) {
+  torExitNodes.add(ip);
+}
+lastTorSync = new Date().toISOString();
+
+// Sync Tor exit nodes in the background from official Tor list
+async function syncTorExitNodes(): Promise<{ success: boolean; count: number }> {
+  if (isSyncingTor) return { success: true, count: torExitNodes.size };
+  isSyncingTor = true;
+  try {
+    const urls = [
+      "https://check.torproject.org/torbulkexitlist",
+      "https://raw.githubusercontent.com/SecOps-Institute/Tor-IP-Addresses/master/tor-exit-nodes.lst"
+    ];
+
+    let fetchedList: string[] = [];
+    for (const url of urls) {
+      try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 6000);
+        const res = await fetch(url, { signal: controller.signal });
+        clearTimeout(timeoutId);
+        if (res.ok) {
+          const text = await res.text();
+          const lines = text
+            .split("\n")
+            .map(l => l.trim())
+            .filter(l => l && !l.startsWith("#") && /^[0-9a-fA-F:.]+$/.test(l));
+          if (lines.length > 50) {
+            fetchedList = lines;
+            break;
+          }
+        }
+      } catch (err: any) {
+        // Continue to fallback if fetch fails or times out
+      }
+    }
+
+    if (fetchedList.length > 0) {
+      const newSet = new Set<string>();
+      // Keep seed nodes for resilience
+      for (const ip of TOR_SEED_NODES) {
+        newSet.add(ip);
+      }
+      for (const ip of fetchedList) {
+        newSet.add(ip);
+      }
+      torExitNodes = newSet;
+      lastTorSync = new Date().toISOString();
+      console.log(`[TorShield] Sincronizados exitosamente ${torExitNodes.size} nodos de salida Tor.`);
+    }
+    return { success: true, count: torExitNodes.size };
+  } catch (err: any) {
+    console.warn("[TorShield] Advertencia al sincronizar lista Tor:", err?.message || err);
+    return { success: false, count: torExitNodes.size };
+  } finally {
+    isSyncingTor = false;
+  }
+}
+
+// Initial async sync and scheduled 60-minute background refresh
+syncTorExitNodes();
+setInterval(syncTorExitNodes, 60 * 60 * 1000);
+
+// Helper to extract sanitized client IP address
+function getClientIp(req: Request): string {
+  const xForwardedFor = req.headers["x-forwarded-for"];
+  let rawIp = "";
+  if (typeof xForwardedFor === "string") {
+    rawIp = xForwardedFor.split(",")[0].trim();
+  } else if (Array.isArray(xForwardedFor) && xForwardedFor.length > 0) {
+    rawIp = xForwardedFor[0].trim();
+  } else if (typeof req.headers["x-real-ip"] === "string") {
+    rawIp = (req.headers["x-real-ip"] as string).trim();
+  } else {
+    rawIp = req.ip || req.socket.remoteAddress || "127.0.0.1";
+  }
+
+  // Strip IPv6 prefix if mapped IPv4 (::ffff:1.2.3.4 -> 1.2.3.4)
+  if (rawIp.startsWith("::ffff:")) {
+    rawIp = rawIp.replace("::ffff:", "");
+  }
+  return rawIp;
+}
+
+// Check if IP is local/private loopback
+function isLocalOrPrivateIp(ip: string): boolean {
+  if (ip === "127.0.0.1" || ip === "::1" || ip === "localhost") return true;
+  if (ip.startsWith("10.") || ip.startsWith("192.168.")) return true;
+  if (/^172\.(1[6-9]|2[0-9]|3[0-1])\./.test(ip)) return true;
+  return false;
+}
+
+// Security Check Endpoint for Client Web Application
+app.get("/api/security/ip-check", (req: Request, res: Response) => {
+  const clientIp = getClientIp(req);
+  const isLocal = isLocalOrPrivateIp(clientIp);
+  const isTor = !isLocal && torExitNodes.has(clientIp);
+
+  res.json({
+    success: true,
+    clientIp,
+    isTor,
+    isLocal,
+    nodesCount: torExitNodes.size,
+    lastSync: lastTorSync
+  });
+});
+
+// Admin endpoint to test any given IP against Tor Exit Nodes database
+app.post("/api/security/test-ip", (req: Request, res: Response) => {
+  const { ip } = req.body;
+  if (!ip || typeof ip !== "string") {
+    return res.status(400).json({ error: "Debe proporcionar una dirección IP válida." });
+  }
+  const cleanIp = ip.trim().replace(/^::ffff:/, "");
+  const isLocal = isLocalOrPrivateIp(cleanIp);
+  const isTor = !isLocal && torExitNodes.has(cleanIp);
+
+  res.json({
+    success: true,
+    ip: cleanIp,
+    isTor,
+    isLocal,
+    nodesCount: torExitNodes.size,
+    lastSync: lastTorSync
+  });
+});
+
+// Admin endpoint to trigger a fresh sync of Tor Exit Nodes
+app.post("/api/security/sync-tor", async (_req: Request, res: Response) => {
+  const result = await syncTorExitNodes();
+  res.json({
+    success: result.success,
+    nodesCount: result.count,
+    lastSync: lastTorSync
+  });
+});
+
 // Lazy-initialized Gemini AI client
 let aiClient: GoogleGenAI | null = null;
 function getGenAI(): GoogleGenAI | null {

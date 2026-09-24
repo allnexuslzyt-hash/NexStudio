@@ -180,6 +180,10 @@
         "banner": {
           "type": "object",
           "description": "Global top banner configuration"
+        },
+        "securityConfig": {
+          "type": "object",
+          "description": "Perimeter security settings including Tor exit node blocking and admin bypass"
         }
       },
       "required": ["maintenanceMode"]

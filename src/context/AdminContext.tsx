@@ -8,7 +8,8 @@ import {
   UserStatus,
   GlobalBannerConfig,
   AdminProject,
-  LaunchModeConfig
+  LaunchModeConfig,
+  SecurityConfig
 } from '../types';
 import { useAuth, isSuperAdminEmail } from './AuthContext';
 import { FAQ_ITEMS, GUIDE_ARTICLES, FAQItem, GuideArticle } from '../data/helpData';
@@ -28,6 +29,9 @@ interface AdminContextType {
   resetCountdown: (defaultHours?: number) => Promise<void>;
   setCountdownTarget: (targetIsoDate: string) => Promise<void>;
   setCustomCountdownDuration: (days: number, hours: number, minutes: number, seconds: number) => Promise<void>;
+  
+  // Perimeter Security & Tor Protection
+  updateSecurityConfig: (config: Partial<SecurityConfig>) => Promise<void>;
   
   // Users management
   users: ManagedUser[];
@@ -92,6 +96,15 @@ export const DEFAULT_LAUNCH_MODE_CONFIG: LaunchModeConfig = {
   lastUpdated: new Date().toISOString(),
 };
 
+export const DEFAULT_SECURITY_CONFIG: SecurityConfig = {
+  blockTorExitNodes: true,
+  allowAdminBypass: true,
+  customBlockedIps: [],
+  customAllowedIps: [],
+  lastUpdated: new Date().toISOString(),
+  updatedBy: 'allnexuslzyt@gmail.com'
+};
+
 const INITIAL_SITE_SETTINGS: SiteSettings = {
   maintenanceMode: false,
   maintenanceMessage: 'NexStudio se encuentra actualmente en labores de mantenimiento programado. Volveremos a estar disponibles muy pronto.',
@@ -109,7 +122,8 @@ const INITIAL_SITE_SETTINGS: SiteSettings = {
     actionLink: '#',
     dismissible: true
   },
-  launchMode: DEFAULT_LAUNCH_MODE_CONFIG
+  launchMode: DEFAULT_LAUNCH_MODE_CONFIG,
+  securityConfig: DEFAULT_SECURITY_CONFIG
 };
 
 const INITIAL_MANAGED_USERS: ManagedUser[] = [];
@@ -698,6 +712,44 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     );
   };
 
+  // Perimeter Security & Tor Protection Management
+  const updateSecurityConfig = async (config: Partial<SecurityConfig>) => {
+    const currentSecurity = siteSettings.securityConfig || DEFAULT_SECURITY_CONFIG;
+    const updatedSecurity: SecurityConfig = {
+      ...currentSecurity,
+      ...config,
+      lastUpdated: new Date().toISOString(),
+      updatedBy: user?.email || 'allnexuslzyt@gmail.com'
+    };
+
+    const updatedSettings: SiteSettings = {
+      ...siteSettings,
+      securityConfig: updatedSecurity,
+      lastUpdated: new Date().toISOString(),
+      updatedBy: user?.email || 'allnexuslzyt@gmail.com'
+    };
+
+    try {
+      localStorage.setItem('nexstudio_site_settings', JSON.stringify(updatedSettings));
+    } catch (e) {}
+
+    setSiteSettingsState(updatedSettings);
+
+    logAdminAction(
+      updatedSecurity.blockTorExitNodes ? 'Activó Bloqueo de Red Tor' : 'Desactivó Bloqueo de Red Tor',
+      'Escudo Perimetral de Seguridad',
+      'seguridad',
+      `Bloqueo de nodos Tor: ${updatedSecurity.blockTorExitNodes ? 'HABILITADO' : 'DESHABILITADO'} | Bypass Admin: ${updatedSecurity.allowAdminBypass ? 'Sí' : 'No'}`
+    );
+
+    try {
+      const cleanData = removeUndefinedFields(updatedSettings);
+      await setDoc(doc(db, 'settings', 'global'), cleanData, { merge: true });
+    } catch (err) {
+      console.warn('Error guardando configuración de seguridad en Firestore:', err);
+    }
+  };
+
   // User Actions
   const updateUserNames = async (userId: string, newDisplayName: string, newUsername: string) => {
     const targetUser = users.find(u => u.id === userId);
@@ -1071,6 +1123,7 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         resetCountdown,
         setCountdownTarget,
         setCustomCountdownDuration,
+        updateSecurityConfig,
         users,
         updateUserNames,
         changeUserRole,
