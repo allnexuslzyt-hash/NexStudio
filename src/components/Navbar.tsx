@@ -17,6 +17,8 @@ import {
   Twitter,
   MessageSquare,
   Settings,
+  Shield,
+  ShieldAlert,
   ShieldCheck,
   BadgeCheck,
   Sliders,
@@ -260,6 +262,27 @@ export const Navbar: React.FC<NavbarProps> = ({
                       </div>
 
                       <div className="py-1">
+                        {isAdmin && (
+                          <>
+                            <button
+                              type="button"
+                              id="user-item-admin-command-center"
+                              onClick={() => {
+                                setUserMenuOpen(false);
+                                onSelectView?.('admin');
+                              }}
+                              className="w-full px-3 py-2 text-left text-sm text-indigo-700 bg-indigo-50/80 hover:bg-indigo-100/80 rounded-lg flex items-center justify-between transition-colors min-h-[44px] cursor-pointer font-bold mb-1"
+                            >
+                              <div className="flex items-center gap-2.5">
+                                <Shield className="w-4 h-4 text-indigo-600" />
+                                <span>Centro de Mando</span>
+                              </div>
+                              <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-indigo-600 text-white">
+                                PANEL
+                              </span>
+                            </button>
+                          </>
+                        )}
                         <button
                           type="button"
                           id="user-item-settings"
@@ -274,7 +297,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                             <span>Configuración</span>
                           </div>
                           {isAdmin && (
-                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200">
+                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-200 text-slate-700">
                               Admin
                             </span>
                           )}
@@ -570,6 +593,25 @@ export const Navbar: React.FC<NavbarProps> = ({
                 <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400 px-3 pt-3 pb-1">
                   Configuración y Cuenta
                 </p>
+                {isAdmin && (
+                  <button
+                    type="button"
+                    id="mobile-admin-command-center-btn"
+                    onClick={() => {
+                      onSelectView?.('admin');
+                      setMobileMenuOpen(false);
+                    }}
+                    className="w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-sm bg-indigo-50 text-indigo-900 font-bold hover:bg-indigo-100 transition-colors min-h-[44px] cursor-pointer mb-1 border border-indigo-200"
+                  >
+                    <div className="flex items-center gap-3">
+                      <Shield className="w-4 h-4 text-indigo-600" />
+                      <span>Centro de Mando</span>
+                    </div>
+                    <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-indigo-600 text-white">
+                      PANEL
+                    </span>
+                  </button>
+                )}
                 <button
                   type="button"
                   id="mobile-settings-btn"

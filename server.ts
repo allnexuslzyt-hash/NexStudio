@@ -143,19 +143,40 @@ function isLocalOrPrivateIp(ip: string): boolean {
   return false;
 }
 
-// Security Check Endpoint for Client Web Application
-app.get("/api/security/ip-check", (req: Request, res: Response) => {
+// Security Check Endpoint for Client Web Application with Multi-Vector Analysis
+app.all("/api/security/ip-check", (req: Request, res: Response) => {
   const clientIp = getClientIp(req);
   const isLocal = isLocalOrPrivateIp(clientIp);
-  const isTor = !isLocal && torExitNodes.has(clientIp);
+  const isTorIp = !isLocal && torExitNodes.has(clientIp);
+
+  // Check headers for anonymity indicators
+  const ua = req.headers["user-agent"] || "";
+  const acceptLang = req.headers["accept-language"] || "";
+  const secChUa = req.headers["sec-ch-ua"] || "";
+  const xTorHeader = Boolean(req.headers["x-tor-exit"] || req.headers["x-tor-relay"]);
+
+  // Cloudflare/Proxy tor header flags if routed through CDN
+  const isCfTor = req.headers["cf-ipcountry"] === "T1" || req.headers["cf-ipcountry"] === "XX";
+
+  // Check if client payload reported browser fingerprint score
+  const clientReport = req.method === "POST" ? req.body : {};
+  const clientFingerprintTor = Boolean(clientReport?.browserFingerprint?.isTorDetected);
+
+  const isTor = isTorIp || isCfTor || xTorHeader || clientFingerprintTor;
 
   res.json({
     success: true,
     clientIp,
     isTor,
+    isTorIp,
+    isCfTor,
     isLocal,
     nodesCount: torExitNodes.size,
-    lastSync: lastTorSync
+    lastSync: lastTorSync,
+    analyzedHeaders: {
+      hasTorUserAgent: /Firefox\/1[0-9]{2}\.0/i.test(ua) && !secChUa,
+      isLanguageMasked: acceptLang.toLowerCase() === "en-us,en;q=0.5"
+    }
   });
 });
 

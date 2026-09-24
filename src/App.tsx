@@ -26,6 +26,7 @@ import { NewsPageView } from './components/NewsPageView';
 import { useSupport } from './context/SupportContext';
 import { motion } from 'motion/react';
 import { Boxes } from 'lucide-react';
+import { detectTorBrowserFingerprint } from './utils/torBrowserDetect';
 
 const WorkspaceContent: React.FC = () => {
   const { user, isBanned, unauthorizedDomain, setUnauthorizedDomain } = useAuth();
@@ -51,20 +52,39 @@ const WorkspaceContent: React.FC = () => {
     };
   }, []);
 
-  // Verificación perimetral de seguridad IP (nodos de salida Tor / Proxies de evasión)
+  // Verificación perimetral de seguridad multi-capa (IP + Huella digital de Tor Browser)
   const checkTorSecurity = React.useCallback(async () => {
+    // 1. Análisis en el navegador inmediato de huella digital de Tor (letterboxing, timezone UTC, cores)
+    const browserFingerprint = detectTorBrowserFingerprint();
+    if (browserFingerprint.isTorDetected) {
+      // Bloqueo instantáneo desde el cliente sin esperar a la red
+      setTorCheckResult(prev => ({
+        isTor: true,
+        clientIp: prev?.clientIp || 'Navegador Tor Detectado'
+      }));
+    }
+
+    // 2. Consulta al servidor para comprobar IP en la lista de 1,400+ nodos de salida Tor
     try {
-      const res = await fetch('/api/security/ip-check');
+      const res = await fetch('/api/security/ip-check', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ browserFingerprint })
+      });
       if (res.ok) {
         const data = await res.json();
         setTorCheckResult({
-          isTor: Boolean(data.isTor),
+          isTor: Boolean(data.isTor || browserFingerprint.isTorDetected),
           clientIp: data.clientIp || ''
         });
       }
     } catch {
-      // Si falla la red o el servicio, no bloquear a usuarios legítimos (Fail-open)
-      setTorCheckResult({ isTor: false, clientIp: '' });
+      // Si falla la red, confiar en el análisis de huella digital en cliente
+      if (browserFingerprint.isTorDetected) {
+        setTorCheckResult({ isTor: true, clientIp: 'Navegador Tor Detectado' });
+      } else {
+        setTorCheckResult({ isTor: false, clientIp: '' });
+      }
     }
   }, []);
 
