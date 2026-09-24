@@ -529,6 +529,8 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     let targetTimestampMs = Number(config.targetTimestampMs);
     if ((!targetTimestampMs || isNaN(targetTimestampMs) || targetTimestampMs <= 0) && config.targetDate) {
       targetTimestampMs = new Date(config.targetDate).getTime();
+    } else if ((!targetTimestampMs || isNaN(targetTimestampMs) || targetTimestampMs <= 0) && config.isPaused && typeof config.pausedRemainingSeconds === 'number' && config.pausedRemainingSeconds > 0) {
+      targetTimestampMs = Date.now() + (config.pausedRemainingSeconds * 1000);
     } else if ((!targetTimestampMs || isNaN(targetTimestampMs) || targetTimestampMs <= 0) && currentLaunch.targetTimestampMs) {
       targetTimestampMs = Number(currentLaunch.targetTimestampMs);
     } else if ((!targetTimestampMs || isNaN(targetTimestampMs) || targetTimestampMs <= 0) && currentLaunch.targetDate) {
@@ -584,17 +586,16 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const pauseResumeCountdown = async (overrideSeconds?: number) => {
     const currentLaunch = siteSettings.launchMode || DEFAULT_LAUNCH_MODE_CONFIG;
     if (currentLaunch.isPaused) {
-      // Reanudar cuenta atrás: calcular nueva fecha objetivo sumando los segundos congelados o el tiempo deseado
-      let secondsLeft = (typeof overrideSeconds === 'number' && overrideSeconds > 0) ? overrideSeconds : 0;
-      if (!secondsLeft) {
-        if (typeof currentLaunch.pausedRemainingSeconds === 'number' && currentLaunch.pausedRemainingSeconds > 0) {
-          secondsLeft = currentLaunch.pausedRemainingSeconds;
-        } else if (typeof currentLaunch.durationSeconds === 'number' && currentLaunch.durationSeconds > 0) {
-          secondsLeft = currentLaunch.durationSeconds;
-        } else {
-          secondsLeft = 86400; // 1 día por defecto si no había segundos previos
-        }
-      }
+      // Reanudar cuenta atrás: el tiempo congelado se suma a Date.now() exacto de ahora
+      // para que el tiempo transcurrido durante la pausa NO reduzca la cuenta atrás
+      let secondsLeft = (typeof overrideSeconds === 'number' && overrideSeconds > 0)
+        ? overrideSeconds
+        : (typeof currentLaunch.pausedRemainingSeconds === 'number' && currentLaunch.pausedRemainingSeconds > 0)
+          ? currentLaunch.pausedRemainingSeconds
+          : (typeof currentLaunch.durationSeconds === 'number' && currentLaunch.durationSeconds > 0)
+            ? currentLaunch.durationSeconds
+            : 86400;
+
       const targetTimestampMs = Date.now() + (secondsLeft * 1000);
       const newTarget = new Date(targetTimestampMs).toISOString();
 
@@ -607,7 +608,7 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       });
       logAdminAction('Reanudó Cuenta Atrás de Lanzamiento', 'Modo Lanzamiento', 'ajustes');
     } else {
-      // Pausar cuenta atrás: congelar los segundos que restan
+      // Pausar cuenta atrás: congelar los segundos que restan en este instante
       const targetTime = Number(currentLaunch.targetTimestampMs) || (currentLaunch.targetDate ? new Date(currentLaunch.targetDate).getTime() : Date.now());
       let remainingSeconds = Math.max(0, Math.floor((targetTime - Date.now()) / 1000));
       if (remainingSeconds <= 0) {
@@ -619,9 +620,18 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           remainingSeconds = 86400;
         }
       }
+      
+      // Proyectar también la nueva fecha relativa para que mientras esté pausado
+      // la fecha objetivo proyectada no quede en el pasado
+      const projectedTargetMs = Date.now() + (remainingSeconds * 1000);
+      const projectedTargetIso = new Date(projectedTargetMs).toISOString();
+
       await updateLaunchMode({
         isPaused: true,
-        pausedRemainingSeconds: remainingSeconds
+        pausedRemainingSeconds: remainingSeconds,
+        durationSeconds: remainingSeconds,
+        targetTimestampMs: projectedTargetMs,
+        targetDate: projectedTargetIso
       });
       logAdminAction('Pausó Cuenta Atrás de Lanzamiento', 'Modo Lanzamiento', 'ajustes');
     }

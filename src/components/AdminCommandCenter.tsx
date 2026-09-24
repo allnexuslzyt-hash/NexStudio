@@ -189,8 +189,12 @@ export const AdminCommandCenter: React.FC<AdminCommandCenterProps> = ({ onBack }
   // Helper for computing Days, Hours, Minutes, Seconds from launch config
   const getDHMSFromLaunch = (launchConfig?: LaunchModeConfig) => {
     let sec = 24 * 3600;
-    if (launchConfig?.isPaused && typeof launchConfig.pausedRemainingSeconds === 'number') {
-      sec = launchConfig.pausedRemainingSeconds;
+    if (launchConfig?.isPaused) {
+      if (typeof launchConfig.pausedRemainingSeconds === 'number' && launchConfig.pausedRemainingSeconds > 0) {
+        sec = launchConfig.pausedRemainingSeconds;
+      } else if (typeof launchConfig.durationSeconds === 'number' && launchConfig.durationSeconds > 0) {
+        sec = launchConfig.durationSeconds;
+      }
     } else if (launchConfig?.targetTimestampMs) {
       sec = Math.max(0, Math.floor((launchConfig.targetTimestampMs - Date.now()) / 1000));
     } else if (launchConfig?.targetDate) {
@@ -214,7 +218,13 @@ export const AdminCommandCenter: React.FC<AdminCommandCenterProps> = ({ onBack }
   // Live real-time remaining seconds ticker inside Admin Command Center
   const [adminLiveRemaining, setAdminLiveRemaining] = useState<number>(() => {
     const launchConfig = siteSettings.launchMode;
-    if (launchConfig?.isPaused) return launchConfig.pausedRemainingSeconds ?? 0;
+    if (launchConfig?.isPaused) {
+      return (typeof launchConfig.pausedRemainingSeconds === 'number' && launchConfig.pausedRemainingSeconds > 0)
+        ? launchConfig.pausedRemainingSeconds
+        : (typeof launchConfig.durationSeconds === 'number' && launchConfig.durationSeconds > 0)
+          ? launchConfig.durationSeconds
+          : 0;
+    }
     const targetMs = Number(launchConfig?.targetTimestampMs) || (launchConfig?.targetDate ? new Date(launchConfig.targetDate).getTime() : Date.now() + 86400000);
     return Math.max(0, Math.floor((targetMs - Date.now()) / 1000));
   });
@@ -225,7 +235,12 @@ export const AdminCommandCenter: React.FC<AdminCommandCenterProps> = ({ onBack }
 
     const updateLive = () => {
       if (launchConfig.isPaused) {
-        setAdminLiveRemaining(launchConfig.pausedRemainingSeconds ?? 0);
+        const pausedSec = (typeof launchConfig.pausedRemainingSeconds === 'number' && launchConfig.pausedRemainingSeconds > 0)
+          ? launchConfig.pausedRemainingSeconds
+          : (typeof launchConfig.durationSeconds === 'number' && launchConfig.durationSeconds > 0)
+            ? launchConfig.durationSeconds
+            : 0;
+        setAdminLiveRemaining(pausedSec);
         return;
       }
       const targetMs = Number(launchConfig.targetTimestampMs) || (launchConfig.targetDate ? new Date(launchConfig.targetDate).getTime() : Date.now() + 86400000);
@@ -239,7 +254,8 @@ export const AdminCommandCenter: React.FC<AdminCommandCenterProps> = ({ onBack }
     siteSettings.launchMode?.isPaused,
     siteSettings.launchMode?.targetTimestampMs,
     siteSettings.launchMode?.targetDate,
-    siteSettings.launchMode?.pausedRemainingSeconds
+    siteSettings.launchMode?.pausedRemainingSeconds,
+    siteSettings.launchMode?.durationSeconds
   ]);
 
   // Handler for custom duration fields (Days, Hours, Minutes, Seconds)
@@ -1758,8 +1774,7 @@ export const AdminCommandCenter: React.FC<AdminCommandCenterProps> = ({ onBack }
                   id="btn-pause-resume-countdown"
                   onClick={async () => {
                     const isCurrentlyPaused = Boolean(siteSettings.launchMode?.isPaused);
-                    const currentInputSeconds = (launchDays * 86400) + (launchHours * 3600) + (launchMinutes * 60) + launchSeconds;
-                    await pauseResumeCountdown(isCurrentlyPaused && currentInputSeconds > 0 ? currentInputSeconds : undefined);
+                    await pauseResumeCountdown();
                     showToast(isCurrentlyPaused ? '▶️ Cuenta atrás REANUDADA' : '⏸️ Cuenta atrás PAUSADA');
                   }}
                   className={`px-4 py-2 rounded-xl text-xs font-bold transition-all shadow-xs flex items-center gap-2 cursor-pointer ${

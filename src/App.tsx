@@ -81,8 +81,8 @@ const WorkspaceContent: React.FC = () => {
   if (isLaunchActive && !(isAdmin && allowAdminBypass)) {
     // Comprobar si la cuenta atrás ya finalizó y se permite entrar
     const isPaused = Boolean(launchConfig?.isPaused);
-    const targetMs = launchConfig?.targetDate ? new Date(launchConfig.targetDate).getTime() : 0;
-    const isFinished = !isPaused && targetMs <= Date.now();
+    const targetMs = Number(launchConfig?.targetTimestampMs) || (launchConfig?.targetDate ? new Date(launchConfig.targetDate).getTime() : 0);
+    const isFinished = !isPaused && targetMs > 0 && targetMs <= Date.now();
 
     // Si ya terminó y el visitante pulsó en entrar: permitir acceso normal
     if (isFinished && visitorUnlockedLaunch && (launchConfig?.autoUnlockOnFinish ?? true)) {

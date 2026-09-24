@@ -55,7 +55,13 @@ export const LaunchScreen: React.FC<LaunchScreenProps> = ({ onOpenAdminPanel, on
 
   const [remainingSeconds, setRemainingSeconds] = useState<number>(() => {
     if (launchConfig.isPaused) {
-      return launchConfig.pausedRemainingSeconds ?? 0;
+      if (typeof launchConfig.pausedRemainingSeconds === 'number' && launchConfig.pausedRemainingSeconds > 0) {
+        return launchConfig.pausedRemainingSeconds;
+      }
+      if (typeof launchConfig.durationSeconds === 'number' && launchConfig.durationSeconds > 0) {
+        return launchConfig.durationSeconds;
+      }
+      return 0;
     }
     const targetMs = getTargetMs();
     return Math.max(0, Math.floor((targetMs - Date.now()) / 1000));
@@ -63,7 +69,12 @@ export const LaunchScreen: React.FC<LaunchScreenProps> = ({ onOpenAdminPanel, on
 
   useEffect(() => {
     if (launchConfig.isPaused) {
-      setRemainingSeconds(launchConfig.pausedRemainingSeconds ?? 0);
+      const pausedSec = (typeof launchConfig.pausedRemainingSeconds === 'number' && launchConfig.pausedRemainingSeconds > 0)
+        ? launchConfig.pausedRemainingSeconds
+        : (typeof launchConfig.durationSeconds === 'number' && launchConfig.durationSeconds > 0)
+          ? launchConfig.durationSeconds
+          : 0;
+      setRemainingSeconds(pausedSec);
       return;
     }
 
@@ -91,7 +102,13 @@ export const LaunchScreen: React.FC<LaunchScreenProps> = ({ onOpenAdminPanel, on
       document.removeEventListener('visibilitychange', handleVisibilityChange);
       window.removeEventListener('focus', updateTimer);
     };
-  }, [launchConfig.targetDate, launchConfig.targetTimestampMs, launchConfig.isPaused, launchConfig.pausedRemainingSeconds]);
+  }, [
+    launchConfig.targetDate, 
+    launchConfig.targetTimestampMs, 
+    launchConfig.isPaused, 
+    launchConfig.pausedRemainingSeconds,
+    launchConfig.durationSeconds
+  ]);
 
   const days = Math.floor(remainingSeconds / (24 * 3600));
   const hours = Math.floor((remainingSeconds % (24 * 3600)) / 3600);
