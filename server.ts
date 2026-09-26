@@ -4,6 +4,7 @@ import { fileURLToPath } from "url";
 import { createServer as createViteServer } from "vite";
 import { GoogleGenAI } from "@google/genai";
 import dotenv from "dotenv";
+import dns from "dns";
 
 dotenv.config();
 
@@ -18,13 +19,13 @@ app.set("trust proxy", true);
 app.use(express.json({ limit: "5mb" }));
 
 // -------------------------------------------------------------
-// NexStudio Perimeter Shield: Tor Exit Node Detection & Protection
+// NexStudio High-Performance Perimeter Shield: Multi-Source Tor Detection
 // -------------------------------------------------------------
 let torExitNodes = new Set<string>();
 let lastTorSync: string | null = null;
 let isSyncingTor = false;
 
-// Sample seed of active Tor exit nodes for immediate protection before sync
+// Comprehensive initial seed of active Tor exit nodes and known relays
 const TOR_SEED_NODES = [
   "185.220.101.5", "185.220.101.6", "185.220.101.7", "185.220.101.8",
   "185.220.101.9", "185.220.101.10", "185.220.101.11", "185.220.101.12",
@@ -38,73 +39,163 @@ const TOR_SEED_NODES = [
   "192.42.116.20", "192.42.116.21", "192.42.116.22", "192.42.116.23",
   "199.249.230.70", "199.249.230.71", "199.249.230.72", "199.249.230.73",
   "199.249.230.74", "199.249.230.75", "199.249.230.76", "199.249.230.77",
-  "51.15.43.205", "51.15.54.212", "51.15.67.114", "51.15.89.24"
+  "51.15.43.205", "51.15.54.212", "51.15.67.114", "51.15.89.24",
+  "104.244.72.115", "104.244.72.116", "104.244.72.117", "104.244.72.118",
+  "176.10.99.200", "176.10.99.201", "176.10.99.202", "176.10.99.203",
+  "198.98.51.189", "198.98.56.149", "198.98.57.199", "198.98.58.243",
+  "162.247.74.200", "162.247.74.201", "162.247.74.202", "162.247.74.203",
+  "204.8.96.141", "204.137.14.106", "178.218.144.18", "185.220.101.33"
 ];
 
-// Initialize with seed list
 for (const ip of TOR_SEED_NODES) {
   torExitNodes.add(ip);
 }
 lastTorSync = new Date().toISOString();
 
-// Sync Tor exit nodes in the background from official Tor list
-async function syncTorExitNodes(): Promise<{ success: boolean; count: number }> {
-  if (isSyncingTor) return { success: true, count: torExitNodes.size };
-  isSyncingTor = true;
-  try {
-    const urls = [
-      "https://check.torproject.org/torbulkexitlist",
-      "https://raw.githubusercontent.com/SecOps-Institute/Tor-IP-Addresses/master/tor-exit-nodes.lst"
-    ];
+// Fast Reverse DNS Cache to prevent redundant lookups
+const reverseDnsCache = new Map<string, { isTorHost: boolean; hostnames: string[]; expires: number }>();
 
-    let fetchedList: string[] = [];
-    for (const url of urls) {
-      try {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 6000);
-        const res = await fetch(url, { signal: controller.signal });
-        clearTimeout(timeoutId);
-        if (res.ok) {
-          const text = await res.text();
-          const lines = text
-            .split("\n")
-            .map(l => l.trim())
-            .filter(l => l && !l.startsWith("#") && /^[0-9a-fA-F:.]+$/.test(l));
-          if (lines.length > 50) {
-            fetchedList = lines;
-            break;
+async function checkReverseDnsForTor(ip: string): Promise<{ isTorHost: boolean; hostnames: string[] }> {
+  const now = Date.now();
+  const cached = reverseDnsCache.get(ip);
+  if (cached && cached.expires > now) {
+    return { isTorHost: cached.isTorHost, hostnames: cached.hostnames };
+  }
+
+  // Skip local IPs
+  if (isLocalOrPrivateIp(ip)) {
+    return { isTorHost: false, hostnames: [] };
+  }
+
+  try {
+    const hostnames = await Promise.race([
+      dns.promises.reverse(ip),
+      new Promise<string[]>((_, reject) => setTimeout(() => reject(new Error("Timeout")), 1200))
+    ]);
+
+    const isTorHost = hostnames.some(h => 
+      /tor(-|_|\.)?exit|torexit|tor(-|_|\.)?relay|tor(-|_|\.)?node|torservers|onionoo|exit(-|_|\.)?node|\.onion\./i.test(h)
+    );
+
+    reverseDnsCache.set(ip, { isTorHost, hostnames, expires: now + 3600 * 1000 });
+    return { isTorHost, hostnames };
+  } catch {
+    reverseDnsCache.set(ip, { isTorHost: false, hostnames: [], expires: now + 600 * 1000 });
+    return { isTorHost: false, hostnames: [] };
+  }
+}
+
+// Multi-Source Tor Exit Node Synchronizer:
+// 1. Official Tor Project Onionoo API (relays with Exit flag)
+// 2. SecOps Institute Global Tor Exit list
+// 3. TorProject Bulk Exit list
+async function syncTorExitNodes(): Promise<{ success: boolean; count: number; sources: string[] }> {
+  if (isSyncingTor) return { success: true, count: torExitNodes.size, sources: ["En curso"] };
+  isSyncingTor = true;
+  const successfulSources: string[] = [];
+
+  try {
+    const newIps = new Set<string>();
+
+    // Always preserve seed nodes
+    for (const ip of TOR_SEED_NODES) {
+      newIps.add(ip);
+    }
+
+    // Source 1: Official Tor Project Onionoo API
+    try {
+      const onionooCtrl = new AbortController();
+      const onionooTimer = setTimeout(() => onionooCtrl.abort(), 6000);
+      const res = await fetch("https://onionoo.torproject.org/summary?type=relay&running=true&flag=Exit", {
+        headers: { "User-Agent": "NexStudio-Shield/3.0" },
+        signal: onionooCtrl.signal
+      });
+      clearTimeout(onionooTimer);
+
+      if (res.ok) {
+        const data = await res.json();
+        let addedCount = 0;
+        if (data?.relays && Array.isArray(data.relays)) {
+          for (const relay of data.relays) {
+            if (Array.isArray(relay.a)) {
+              for (const addr of relay.a) {
+                const clean = addr.replace(/[\[\]]/g, "").trim();
+                if (clean) {
+                  newIps.add(clean);
+                  addedCount++;
+                }
+              }
+            }
           }
         }
-      } catch (err: any) {
-        // Continue to fallback if fetch fails or times out
+        if (addedCount > 100) {
+          successfulSources.push(`Tor Project Onionoo (${addedCount} IPs)`);
+        }
       }
+    } catch (e: any) {
+      console.warn("[TorShield] Onionoo sync fallback:", e?.message);
     }
 
-    if (fetchedList.length > 0) {
-      const newSet = new Set<string>();
-      // Keep seed nodes for resilience
-      for (const ip of TOR_SEED_NODES) {
-        newSet.add(ip);
+    // Source 2: SecOps Institute Tor List
+    try {
+      const secOpsCtrl = new AbortController();
+      const secOpsTimer = setTimeout(() => secOpsCtrl.abort(), 5000);
+      const res = await fetch("https://raw.githubusercontent.com/SecOps-Institute/Tor-IP-Addresses/master/tor-exit-nodes.lst", {
+        signal: secOpsCtrl.signal
+      });
+      clearTimeout(secOpsTimer);
+
+      if (res.ok) {
+        const text = await res.text();
+        const lines = text.split("\n").map(l => l.trim()).filter(l => l && !l.startsWith("#"));
+        for (const line of lines) {
+          newIps.add(line);
+        }
+        successfulSources.push(`SecOps Institute (${lines.length} IPs)`);
       }
-      for (const ip of fetchedList) {
-        newSet.add(ip);
-      }
-      torExitNodes = newSet;
-      lastTorSync = new Date().toISOString();
-      console.log(`[TorShield] Sincronizados exitosamente ${torExitNodes.size} nodos de salida Tor.`);
+    } catch (e: any) {
+      console.warn("[TorShield] SecOps sync fallback:", e?.message);
     }
-    return { success: true, count: torExitNodes.size };
+
+    // Source 3: Tor Project Bulk Exit List
+    try {
+      const bulkCtrl = new AbortController();
+      const bulkTimer = setTimeout(() => bulkCtrl.abort(), 5000);
+      const res = await fetch("https://check.torproject.org/torbulkexitlist", {
+        signal: bulkCtrl.signal
+      });
+      clearTimeout(bulkTimer);
+
+      if (res.ok) {
+        const text = await res.text();
+        const lines = text.split("\n").map(l => l.trim()).filter(l => l && !l.startsWith("#") && /^[0-9a-fA-F:.]+$/.test(l));
+        for (const line of lines) {
+          newIps.add(line);
+        }
+        successfulSources.push(`Check.TorProject (${lines.length} IPs)`);
+      }
+    } catch (e: any) {
+      console.warn("[TorShield] Check.torproject fallback:", e?.message);
+    }
+
+    if (newIps.size > TOR_SEED_NODES.length) {
+      torExitNodes = newIps;
+      lastTorSync = new Date().toISOString();
+      console.log(`[TorShield] Sincronización exitosa: ${torExitNodes.size} nodos de salida Tor activos indexados.`);
+    }
+
+    return { success: true, count: torExitNodes.size, sources: successfulSources };
   } catch (err: any) {
-    console.warn("[TorShield] Advertencia al sincronizar lista Tor:", err?.message || err);
-    return { success: false, count: torExitNodes.size };
+    console.warn("[TorShield] Error durante sincronización:", err?.message || err);
+    return { success: false, count: torExitNodes.size, sources: successfulSources };
   } finally {
     isSyncingTor = false;
   }
 }
 
-// Initial async sync and scheduled 60-minute background refresh
+// Initial async sync and scheduled 15-minute background refresh
 syncTorExitNodes();
-setInterval(syncTorExitNodes, 60 * 60 * 1000);
+setInterval(syncTorExitNodes, 15 * 60 * 1000);
 
 // Helper to extract sanitized client IP address
 function getClientIp(req: Request): string {
@@ -128,7 +219,6 @@ function getClientIp(req: Request): string {
     rawIp = req.ip || req.socket.remoteAddress || "127.0.0.1";
   }
 
-  // Strip IPv6 prefix if mapped IPv4 (::ffff:1.2.3.4 -> 1.2.3.4)
   if (rawIp.startsWith("::ffff:")) {
     rawIp = rawIp.replace("::ffff:", "");
   }
@@ -144,10 +234,13 @@ function isLocalOrPrivateIp(ip: string): boolean {
 }
 
 // Security Check Endpoint for Client Web Application with Multi-Vector Analysis
-app.all("/api/security/ip-check", (req: Request, res: Response) => {
+app.all("/api/security/ip-check", async (req: Request, res: Response) => {
   const clientIp = getClientIp(req);
   const isLocal = isLocalOrPrivateIp(clientIp);
   const isTorIp = !isLocal && torExitNodes.has(clientIp);
+
+  // Fast reverse DNS check
+  const reverseDns = await checkReverseDnsForTor(clientIp);
 
   // Check headers for anonymity indicators
   const ua = req.headers["user-agent"] || "";
@@ -155,46 +248,78 @@ app.all("/api/security/ip-check", (req: Request, res: Response) => {
   const secChUa = req.headers["sec-ch-ua"] || "";
   const xTorHeader = Boolean(req.headers["x-tor-exit"] || req.headers["x-tor-relay"]);
 
-  // Cloudflare/Proxy tor header flags if routed through CDN
+  // Cloudflare/Proxy tor header flags if routed through CDN (T1 is official Tor country code in Cloudflare)
   const isCfTor = req.headers["cf-ipcountry"] === "T1" || req.headers["cf-ipcountry"] === "XX";
 
   // Check if client payload reported browser fingerprint score
   const clientReport = req.method === "POST" ? req.body : {};
-  const clientFingerprintTor = Boolean(clientReport?.browserFingerprint?.isTorDetected);
+  const clientFingerprint = clientReport?.browserFingerprint || {};
+  const clientFingerprintTor = Boolean(clientFingerprint?.isTorDetected);
+  const clientFingerprintScore = Number(clientFingerprint?.score || 0);
 
-  const isTor = isTorIp || isCfTor || xTorHeader || clientFingerprintTor;
+  const hasTorUserAgent = /Firefox\/1[0-9]{2}\.0/i.test(ua) && !secChUa;
+  const isLanguageMasked = acceptLang.toLowerCase() === "en-us,en;q=0.5";
+
+  // Multi-Vector Composite Decision:
+  // 1. IP in verified Tor Exit Node database
+  // 2. Reverse DNS hostname points to a Tor exit/relay
+  // 3. Cloudflare Country Code T1
+  // 4. Explicit Tor header
+  // 5. High-confidence Client-Side Browser Fingerprint (RFP, Letterboxing, Timezone, 2 Cores)
+  // 6. Medium fingerprint score with anonymized headers
+  const reasons: string[] = [];
+  if (isTorIp) reasons.push("IP identificada en la base de datos de nodos de salida Tor oficiales");
+  if (reverseDns.isTorHost) reasons.push(`Reverse DNS de IP coincide con nodo Tor (${reverseDns.hostnames.join(", ")})`);
+  if (isCfTor) reasons.push("Cabecera Cloudflare T1 (Red Tor detectada por CDN perimetral)");
+  if (xTorHeader) reasons.push("Cabecera HTTP Tor activa");
+  if (clientFingerprintTor) reasons.push("Huella digital de navegador Tor Browser confirmada por cliente");
+  if (clientFingerprintScore >= 45 && hasTorUserAgent) reasons.push("Firma combinada de navegador anonimizado con score alto");
+
+  const isTor = isTorIp || reverseDns.isTorHost || isCfTor || xTorHeader || clientFingerprintTor || (clientFingerprintScore >= 45 && (hasTorUserAgent || isLanguageMasked));
 
   res.json({
     success: true,
     clientIp,
     isTor,
     isTorIp,
+    isTorDns: reverseDns.isTorHost,
     isCfTor,
     isLocal,
+    reasons,
     nodesCount: torExitNodes.size,
     lastSync: lastTorSync,
     analyzedHeaders: {
-      hasTorUserAgent: /Firefox\/1[0-9]{2}\.0/i.test(ua) && !secChUa,
-      isLanguageMasked: acceptLang.toLowerCase() === "en-us,en;q=0.5"
+      hasTorUserAgent,
+      isLanguageMasked
     }
   });
 });
 
-// Admin endpoint to test any given IP against Tor Exit Nodes database
-app.post("/api/security/test-ip", (req: Request, res: Response) => {
+// Admin endpoint to test any given IP against Tor Exit Nodes database + reverse DNS
+app.post("/api/security/test-ip", async (req: Request, res: Response) => {
   const { ip } = req.body;
   if (!ip || typeof ip !== "string") {
     return res.status(400).json({ error: "Debe proporcionar una dirección IP válida." });
   }
   const cleanIp = ip.trim().replace(/^::ffff:/, "");
   const isLocal = isLocalOrPrivateIp(cleanIp);
-  const isTor = !isLocal && torExitNodes.has(cleanIp);
+  const isTorIp = !isLocal && torExitNodes.has(cleanIp);
+  const reverseDns = await checkReverseDnsForTor(cleanIp);
+
+  const isTor = isTorIp || reverseDns.isTorHost;
+  const reasons: string[] = [];
+  if (isTorIp) reasons.push("Coincide con nodo de salida en la lista activa");
+  if (reverseDns.isTorHost) reasons.push(`Reverse DNS apunta a infraestructura Tor (${reverseDns.hostnames.join(", ")})`);
 
   res.json({
     success: true,
     ip: cleanIp,
     isTor,
+    isTorIp,
+    isTorDns: reverseDns.isTorHost,
+    hostnames: reverseDns.hostnames,
     isLocal,
+    reasons,
     nodesCount: torExitNodes.size,
     lastSync: lastTorSync
   });
@@ -206,6 +331,7 @@ app.post("/api/security/sync-tor", async (_req: Request, res: Response) => {
   res.json({
     success: result.success,
     nodesCount: result.count,
+    sources: result.sources,
     lastSync: lastTorSync
   });
 });

@@ -8,6 +8,7 @@ import {
   UserStatus,
   GlobalBannerConfig,
   AdminProject,
+  AdminCreation,
   LaunchModeConfig,
   SecurityConfig
 } from '../types';
@@ -65,6 +66,13 @@ interface AdminContextType {
   deleteProject: (projectId: string) => Promise<void>;
   toggleProjectVisibility: (projectId: string) => Promise<void>;
   toggleProjectRestriction: (projectId: string) => Promise<void>;
+  
+  // Creations Manager
+  creations: AdminCreation[];
+  updateCreation: (creation: AdminCreation) => Promise<void>;
+  addCreation: (creation: Omit<AdminCreation, 'id' | 'createdAt' | 'updatedAt'>) => Promise<void>;
+  deleteCreation: (creationId: string) => Promise<void>;
+  toggleCreationVisibility: (creationId: string) => Promise<void>;
   
   // Audit Logs
   auditLogs: AuditLogItem[];
@@ -211,6 +219,22 @@ export const INITIAL_PROJECTS: AdminProject[] = [
   }
 ];
 
+export const INITIAL_CREATIONS: AdminCreation[] = [
+  {
+    id: 'crea-juegos-html',
+    title: 'Juegos En HTML',
+    description: 'Colección y compilación oficial de videojuegos desarrollados en HTML nativo con código fuente, instrucciones interactivas y acceso directo a la documentación completa.',
+    category: 'Creación Oficial',
+    tag: 'Juegos · HTML5',
+    documentUrl: 'https://docs.google.com/document/d/1_FmH3BlSBQI7FGgAQL59-ZPe8eCxs35wel6JUyVaG8Q/edit?tab=t.0',
+    linkUrl: 'https://docs.google.com/document/d/1_FmH3BlSBQI7FGgAQL59-ZPe8eCxs35wel6JUyVaG8Q/edit?tab=t.0',
+    isPublic: true,
+    status: 'active',
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString()
+  }
+];
+
 const AdminContext = createContext<AdminContextType | undefined>(undefined);
 
 export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -327,6 +351,36 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     return INITIAL_PROJECTS;
   });
 
+  // Creations management state
+  const [creations, setCreations] = useState<AdminCreation[]>(() => {
+    try {
+      const saved = localStorage.getItem('nexstudio_admin_creations');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          const missing = INITIAL_CREATIONS.filter(ic => !parsed.some(c => c.id === ic.id || c.title.toLowerCase() === ic.title.toLowerCase()));
+          if (missing.length > 0) {
+            const merged = [...parsed, ...missing];
+            localStorage.setItem('nexstudio_admin_creations', JSON.stringify(merged));
+            return merged;
+          }
+          return parsed;
+        }
+      }
+    } catch (e) {
+      console.error('Error cargando creaciones locales:', e);
+    }
+    return INITIAL_CREATIONS;
+  });
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('nexstudio_admin_creations', JSON.stringify(creations));
+    } catch (e) {
+      console.error('Error guardando creaciones en localStorage:', e);
+    }
+  }, [creations]);
+
   // Audit logs state
   const [auditLogs, setAuditLogs] = useState<AuditLogItem[]>(() => {
     try {
@@ -380,6 +434,34 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       },
       (err) => {
         console.warn('Proyectos sincronizados con almacenamiento local/resiliente:', err.message);
+      }
+    );
+
+    return () => unsubscribe();
+  }, []);
+
+  // Real-time synchronization with Firestore creations config
+  useEffect(() => {
+    const creationsRef = doc(db, 'settings', 'creations_config');
+    const unsubscribe = onSnapshot(
+      creationsRef,
+      (docSnap) => {
+        if (docSnap.exists()) {
+          const data = docSnap.data();
+          if (data && Array.isArray(data.items) && data.items.length > 0) {
+            const remoteItems = data.items as AdminCreation[];
+            const missing = INITIAL_CREATIONS.filter(ic => !remoteItems.some(c => c.id === ic.id || c.title.toLowerCase() === ic.title.toLowerCase()));
+            if (missing.length > 0) {
+              const merged = [...remoteItems, ...missing];
+              setCreations(merged);
+              return;
+            }
+            setCreations(remoteItems);
+          }
+        }
+      },
+      (err) => {
+        console.warn('Creaciones sincronizadas con almacenamiento local/resiliente:', err.message);
       }
     );
 
@@ -1103,6 +1185,65 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     await updateProject(updated);
   };
 
+  // Creations Management Functions
+  const saveCreationsToFirestore = async (newCreations: AdminCreation[]) => {
+    try {
+      const creationsRef = doc(db, 'settings', 'creations_config');
+      await setDoc(creationsRef, {
+        items: newCreations,
+        lastUpdated: new Date().toISOString(),
+        updatedBy: user?.email || 'admin'
+      }, { merge: true });
+    } catch (err) {
+      console.warn('No se pudo sincronizar creaciones en Firestore inmediatamente, guardado localmente:', err);
+    }
+  };
+
+  const updateCreation = async (updatedCreation: AdminCreation) => {
+    const updated = {
+      ...updatedCreation,
+      updatedAt: new Date().toISOString()
+    };
+    const newCreations = creations.map(c => c.id === updated.id ? updated : c);
+    setCreations(newCreations);
+    await saveCreationsToFirestore(newCreations);
+    logAdminAction(
+      'Edición de creación',
+      updated.title,
+      'proyectos',
+      `Actualizada creación: Visibilidad (${updated.isPublic ? 'Público' : 'Oculto'}), Enlace: ${updated.documentUrl}`
+    );
+  };
+
+  const addCreation = async (creationData: Omit<AdminCreation, 'id' | 'createdAt' | 'updatedAt'>) => {
+    const newId = `crea-${Date.now()}`;
+    const newCreation: AdminCreation = {
+      ...creationData,
+      id: newId,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    };
+    const newCreations = [...creations, newCreation];
+    setCreations(newCreations);
+    await saveCreationsToFirestore(newCreations);
+    logAdminAction('Creación oficial añadida', newCreation.title, 'proyectos', `Añadida nueva creación con ID ${newId}`);
+  };
+
+  const deleteCreation = async (creationId: string) => {
+    const itemToDelete = creations.find(c => c.id === creationId);
+    const newCreations = creations.filter(c => c.id !== creationId);
+    setCreations(newCreations);
+    await saveCreationsToFirestore(newCreations);
+    logAdminAction('Eliminación de creación', itemToDelete?.title || creationId, 'proyectos', `Eliminada creación con ID ${creationId}`);
+  };
+
+  const toggleCreationVisibility = async (creationId: string) => {
+    const target = creations.find(c => c.id === creationId);
+    if (!target) return;
+    const updated = { ...target, isPublic: !target.isPublic };
+    await updateCreation(updated);
+  };
+
   const serverStatus = {
     status: (siteSettings.maintenanceMode ? 'maintenance' : 'online') as 'online' | 'degraded' | 'maintenance',
     latencyMs: 24,
@@ -1149,6 +1290,11 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         deleteProject,
         toggleProjectVisibility,
         toggleProjectRestriction,
+        creations,
+        updateCreation,
+        addCreation,
+        deleteCreation,
+        toggleCreationVisibility,
         auditLogs,
         logAdminAction,
         isAdmin,

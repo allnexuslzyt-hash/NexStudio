@@ -25,10 +25,13 @@ import {
   Download,
   Clock,
   ShieldCheck,
-  Zap
+  Zap,
+  Gamepad2,
+  FileText
 } from 'lucide-react';
 import { DownloadModal } from './DownloadModal';
 import { ProjectDetailView } from './ProjectDetailView';
+import { CreationDetailView } from './CreationDetailView';
 import { useAdmin } from '../context/AdminContext';
 
 interface CatalogViewProps {
@@ -48,10 +51,11 @@ interface CardItem {
   linkUrl?: string;
   downloadUrl?: string;
   downloadSeconds?: number;
+  documentUrl?: string;
 }
 
 export const CatalogView: React.FC<CatalogViewProps> = ({ view, onBack }) => {
-  const { projects, isAdmin } = useAdmin();
+  const { projects, creations, isAdmin } = useAdmin();
 
   const getHeaderInfo = () => {
     switch (view) {
@@ -65,9 +69,9 @@ export const CatalogView: React.FC<CatalogViewProps> = ({ view, onBack }) => {
       case 'creaciones':
         return {
           title: 'Creaciones',
-          subtitle: 'Galería de experimentos visuales, interfaces y diseño interactivo.',
+          subtitle: 'Colecciones oficiales, videojuegos interactivos en HTML y proyectos visuales.',
           icon: <Palette className="w-6 h-6 text-violet-600" />,
-          badge: 'Diseño y Experiencias',
+          badge: 'Creaciones Oficiales',
         };
       case 'herramientas':
         return {
@@ -118,49 +122,21 @@ export const CatalogView: React.FC<CatalogViewProps> = ({ view, onBack }) => {
         });
       }
 
-      case 'creaciones':
-        return [
-          {
-            id: 'crea-1',
-            title: 'Lienzo Minimalista en Blanco',
-            category: 'Diseño de Interfaz',
-            description: 'Composición tipográfica en alto contraste con retícula matemática pura y equilibrio visual.',
-            tag: 'Diseño UI',
-            icon: <Palette className="w-5 h-5 text-violet-600" />,
-            accentColor: 'from-violet-500/10 to-fuchsia-500/10 border-violet-200',
-            linkText: 'Ver Muestra',
-          },
-          {
-            id: 'crea-2',
-            title: 'Microinteracciones Fluidas',
-            category: 'Animación Web',
-            description: 'Efectos cinéticos con curvas de bezier calibradas y zoom óptico suave para respuesta táctil y de ratón.',
-            tag: 'Motion',
-            icon: <Sparkles className="w-5 h-5 text-indigo-600" />,
-            accentColor: 'from-indigo-500/10 to-pink-500/10 border-indigo-200',
-            linkText: 'Interactuar',
-          },
-          {
-            id: 'crea-3',
-            title: 'Paleta Solar & Neutra',
-            category: 'Estética Visual',
-            description: 'Gradientes de baja saturación combinando tonos lavanda, ámbar y pizarra con contraste accesible WCAG AA.',
-            tag: 'Estilo',
-            icon: <Flame className="w-5 h-5 text-amber-600" />,
-            accentColor: 'from-amber-500/10 to-orange-500/10 border-amber-200',
-            linkText: 'Ver Guía',
-          },
-          {
-            id: 'crea-4',
-            title: 'Componentes de Navegación Dinámica',
-            category: 'UI Kit',
-            description: 'Menús emergentes inteligentes, selectores flotantes y paneles de consentimiento accesibles por teclado.',
-            tag: 'Componente',
-            icon: <Compass className="w-5 h-5 text-cyan-600" />,
-            accentColor: 'from-cyan-500/10 to-blue-500/10 border-cyan-200',
-            linkText: 'Inspeccionar',
-          },
-        ];
+      case 'creaciones': {
+        const visibleCreations = isAdmin ? creations : creations.filter(c => c.isPublic);
+        return visibleCreations.map((c) => ({
+          id: c.id,
+          title: c.title,
+          category: c.category || 'Creación Oficial',
+          description: c.description || '',
+          tag: c.tag || 'Juegos · HTML5',
+          icon: <Gamepad2 className="w-5 h-5 text-violet-600" />,
+          accentColor: 'from-violet-500/10 to-indigo-500/10 border-violet-200',
+          linkText: 'Abrir Documento',
+          linkUrl: c.documentUrl || c.linkUrl,
+          documentUrl: c.documentUrl
+        }));
+      }
 
       case 'herramientas':
         return [
@@ -281,6 +257,7 @@ export const CatalogView: React.FC<CatalogViewProps> = ({ view, onBack }) => {
   const header = getHeaderInfo();
   const cards = getCards();
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
+  const [selectedCreationId, setSelectedCreationId] = useState<string | null>(null);
 
   const [downloadTarget, setDownloadTarget] = useState<{
     isOpen: boolean;
@@ -298,6 +275,12 @@ export const CatalogView: React.FC<CatalogViewProps> = ({ view, onBack }) => {
   if (view === 'proyectos' && selectedProjectId) {
     const activeProject = projects.find(p => p.id === selectedProjectId) || projects[0];
     return <ProjectDetailView project={activeProject} onBack={() => setSelectedProjectId(null)} />;
+  }
+
+  // Si se selecciona una creación en la vista de creaciones, renderizar la página dedicada
+  if (view === 'creaciones' && selectedCreationId) {
+    const activeCreation = creations.find(c => c.id === selectedCreationId) || creations[0];
+    return <CreationDetailView creation={activeCreation} onBack={() => setSelectedCreationId(null)} />;
   }
 
   return (
@@ -406,7 +389,9 @@ export const CatalogView: React.FC<CatalogViewProps> = ({ view, onBack }) => {
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.35, delay: idx * 0.08, ease: [0.16, 1, 0.3, 1] }}
               onClick={() => {
-                if (card.downloadUrl) {
+                if (view === 'creaciones') {
+                  setSelectedCreationId(card.id);
+                } else if (card.downloadUrl) {
                   setDownloadTarget({
                     isOpen: true,
                     title: card.title,
@@ -429,7 +414,9 @@ export const CatalogView: React.FC<CatalogViewProps> = ({ view, onBack }) => {
                   </div>
                   {card.tag && (
                     <span className={`text-[11px] font-semibold px-2.5 py-1 rounded-full border transition-colors ${
-                      card.downloadUrl
+                      view === 'creaciones'
+                        ? 'bg-violet-50 text-violet-700 border-violet-200'
+                        : card.downloadUrl
                         ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
                         : 'bg-slate-100 group-hover:bg-indigo-50 text-slate-700 group-hover:text-indigo-700 border-slate-200 group-hover:border-indigo-200'
                     }`}>
@@ -450,7 +437,36 @@ export const CatalogView: React.FC<CatalogViewProps> = ({ view, onBack }) => {
               </div>
 
               {/* Bottom Action Footer */}
-              {card.downloadUrl ? (
+              {view === 'creaciones' ? (
+                <div className="relative z-10 mt-6 pt-4 border-t border-slate-100 group-hover:border-slate-200/80 flex flex-wrap items-center justify-between gap-2">
+                  <button
+                    type="button"
+                    id={`btn-view-details-${card.id}`}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setSelectedCreationId(card.id);
+                    }}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-600 hover:text-slate-900 bg-slate-50 hover:bg-slate-100 border border-slate-200 transition-colors cursor-pointer min-h-[36px]"
+                  >
+                    <span>Ver Detalles</span>
+                  </button>
+                  <button
+                    type="button"
+                    id={`btn-open-doc-${card.id}`}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (card.linkUrl) {
+                        window.open(card.linkUrl, '_blank', 'noopener,noreferrer');
+                      }
+                    }}
+                    className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-violet-600 hover:bg-violet-500 text-white text-xs font-bold shadow-sm shadow-violet-600/20 hover:shadow-md transition-all cursor-pointer min-h-[36px]"
+                  >
+                    <FileText className="w-3.5 h-3.5" />
+                    <span>Abrir Documento</span>
+                    <ExternalLink className="w-3 h-3" />
+                  </button>
+                </div>
+              ) : card.downloadUrl ? (
                 <div className="relative z-10 mt-6 pt-4 border-t border-slate-100 group-hover:border-slate-200/80 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
                   <div className="flex items-center gap-1.5 text-[11px] font-semibold text-emerald-700">
                     <Clock className="w-3.5 h-3.5 text-emerald-600" />

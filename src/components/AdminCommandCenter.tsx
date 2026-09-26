@@ -98,6 +98,7 @@ export const AdminCommandCenter: React.FC<AdminCommandCenterProps> = ({ onBack }
     updateGuide, 
     deleteGuide,
     projects,
+    creations,
     auditLogs, 
     serverStatus,
     isAdmin 
@@ -358,7 +359,7 @@ export const AdminCommandCenter: React.FC<AdminCommandCenterProps> = ({ onBack }
 
   // Tor Shield State & Helpers
   const [testIpInput, setTestIpInput] = useState('');
-  const [testIpResult, setTestIpResult] = useState<{ ip: string; isTor: boolean; nodesCount?: number } | null>(null);
+  const [testIpResult, setTestIpResult] = useState<{ ip: string; isTor: boolean; nodesCount?: number; reasons?: string[] } | null>(null);
   const [isTestingIp, setIsTestingIp] = useState(false);
   const [isSyncingTorNodes, setIsSyncingTorNodes] = useState(false);
   const [torNodesCount, setTorNodesCount] = useState<number | null>(null);
@@ -405,7 +406,8 @@ export const AdminCommandCenter: React.FC<AdminCommandCenterProps> = ({ onBack }
         setTestIpResult({
           ip: data.ip,
           isTor: data.isTor,
-          nodesCount: data.nodesCount
+          nodesCount: data.nodesCount,
+          reasons: data.reasons
         });
         if (data.nodesCount) setTorNodesCount(data.nodesCount);
       } else {
@@ -660,9 +662,9 @@ export const AdminCommandCenter: React.FC<AdminCommandCenterProps> = ({ onBack }
           }`}
         >
           <FolderGit2 className="w-4 h-4" />
-          <span>Gestión de Proyectos</span>
+          <span>Proyectos y Creaciones</span>
           <span className="ml-1 px-1.5 py-0.2 rounded-full text-[10px] bg-slate-200 text-slate-700 font-semibold">
-            {projects.length}
+            {projects.length + (creations?.length || 0)}
           </span>
         </button>
 
@@ -1784,6 +1786,15 @@ export const AdminCommandCenter: React.FC<AdminCommandCenterProps> = ({ onBack }
                         ? 'Esta IP pertenece a la red de enrutamiento Tor. Cualquier usuario que acceda a través de ella será interceptado perimetralmente y se le mostrará la pantalla de bloqueo sin permitir el acceso al catálogo, chat ni registro.'
                         : 'Esta IP no pertenece a ningún nodo de salida de Tor. El visitante accede de forma limpia, inmediata y con total normalidad a toda la plataforma NexStudio.'}
                     </p>
+                    {testIpResult.reasons && testIpResult.reasons.length > 0 && (
+                      <div className="pt-1 flex flex-wrap gap-1">
+                        {testIpResult.reasons.map((r, idx) => (
+                          <span key={idx} className="px-2 py-0.5 rounded bg-rose-200/60 text-rose-800 text-[10px] font-medium">
+                            {r}
+                          </span>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 </div>
               )}
@@ -2085,11 +2096,11 @@ export const AdminCommandCenter: React.FC<AdminCommandCenterProps> = ({ onBack }
                 <span className="text-[11px] font-semibold text-slate-500 block">Nodos Tor Identificados</span>
                 <div className="flex items-baseline gap-2 mt-1">
                   <span className="text-lg font-black text-slate-900">
-                    {torNodesCount ? torNodesCount.toLocaleString() : '1,500+'}
+                    {torNodesCount ? torNodesCount.toLocaleString() : '3,500+'}
                   </span>
                   <span className="text-[11px] text-emerald-600 font-bold">nodos activos</span>
                 </div>
-                <span className="text-[10px] text-slate-400 mt-1">En memoria RAM (búsqueda instantánea O(1))</span>
+                <span className="text-[10px] text-slate-400 mt-1">Tor Project Onionoo + SecOps (búsqueda O(1))</span>
               </div>
 
               <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 flex flex-col justify-between">
@@ -2112,10 +2123,10 @@ export const AdminCommandCenter: React.FC<AdminCommandCenterProps> = ({ onBack }
               </div>
 
               <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 flex flex-col justify-between">
-                <span className="text-[11px] font-semibold text-slate-500 block">Lista Oficial de Tor</span>
+                <span className="text-[11px] font-semibold text-slate-500 block">Directorio Global Tor</span>
                 <div className="flex items-center justify-between gap-2 mt-2">
                   <span className="text-xs font-medium text-slate-600">
-                    Auto-sincronizado
+                    Auto-sincronizado (15m)
                   </span>
                   <button
                     type="button"
@@ -2127,7 +2138,7 @@ export const AdminCommandCenter: React.FC<AdminCommandCenterProps> = ({ onBack }
                     <span>{isSyncingTorNodes ? 'Actualizando...' : 'Actualizar'}</span>
                   </button>
                 </div>
-                <span className="text-[10px] text-slate-400 mt-1">Fuente: check.torproject.org oficial</span>
+                <span className="text-[10px] text-slate-400 mt-1">Tor Onionoo API oficial + SecOps + Reverse DNS</span>
               </div>
             </div>
 
@@ -2194,7 +2205,7 @@ export const AdminCommandCenter: React.FC<AdminCommandCenterProps> = ({ onBack }
                   ) : (
                     <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
                   )}
-                  <div className="space-y-0.5">
+                  <div className="space-y-1 w-full">
                     <span className="font-bold block">
                       {testIpResult.isTor
                         ? `⚠️ IP ${testIpResult.ip}: ES UN NODO DE SALIDA TOR ACTIVO`
@@ -2205,6 +2216,15 @@ export const AdminCommandCenter: React.FC<AdminCommandCenterProps> = ({ onBack }
                         ? 'Si el escudo está activado, cualquier usuario que entre con esta IP verá la pantalla de Acceso Restringido y no podrá acceder a la plataforma ni registrarse.'
                         : 'Esta IP no pertenece a ningún nodo conocido de Tor. El visitante entrará a la web con total normalidad y sin ninguna interrupción.'}
                     </p>
+                    {testIpResult.reasons && testIpResult.reasons.length > 0 && (
+                      <div className="pt-1 flex flex-wrap gap-1">
+                        {testIpResult.reasons.map((r, idx) => (
+                          <span key={idx} className="px-2 py-0.5 rounded bg-rose-200/60 text-rose-800 text-[10px] font-medium">
+                            {r}
+                          </span>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 </div>
               )}

@@ -176,6 +176,20 @@ export interface AdminProject {
   updatedAt?: string;
 }
 
+export interface AdminCreation {
+  id: string;
+  title: string;
+  description: string;
+  category?: string;
+  tag?: string;
+  documentUrl: string;
+  linkUrl?: string;
+  isPublic: boolean;
+  status: 'active' | 'draft' | 'archived';
+  createdAt?: string;
+  updatedAt?: string;
+}
+
 export interface PostComment {
   id: string;
   postId: string;

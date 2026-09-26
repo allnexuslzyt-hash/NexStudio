@@ -35,7 +35,7 @@ const WorkspaceContent: React.FC = () => {
   const [activeView, setActiveView] = useState<string>('workspace');
   const [isTermsOpen, setIsTermsOpen] = useState<boolean>(false);
   const [visitorUnlockedLaunch, setVisitorUnlockedLaunch] = useState<boolean>(false);
-  const [torCheckResult, setTorCheckResult] = useState<{ isTor: boolean; clientIp: string } | null>(null);
+  const [torCheckResult, setTorCheckResult] = useState<{ isTor: boolean; clientIp: string; reasons?: string[] } | null>(null);
   const [isTorSimulated, setIsTorSimulated] = useState<boolean>(() => {
     return typeof window !== 'undefined' && sessionStorage.getItem('simulate_tor_block') === 'true';
   });
@@ -54,17 +54,18 @@ const WorkspaceContent: React.FC = () => {
 
   // Verificación perimetral de seguridad multi-capa (IP + Huella digital de Tor Browser)
   const checkTorSecurity = React.useCallback(async () => {
-    // 1. Análisis en el navegador inmediato de huella digital de Tor (letterboxing, timezone UTC, cores)
+    // 1. Análisis en el navegador inmediato de huella digital de Tor (RFP buildID, letterboxing, timezone UTC, cores, timer, canvas)
     const browserFingerprint = detectTorBrowserFingerprint();
     if (browserFingerprint.isTorDetected) {
       // Bloqueo instantáneo desde el cliente sin esperar a la red
       setTorCheckResult(prev => ({
         isTor: true,
-        clientIp: prev?.clientIp || 'Navegador Tor Detectado'
+        clientIp: prev?.clientIp || 'Navegador Tor Detectado',
+        reasons: browserFingerprint.reasons
       }));
     }
 
-    // 2. Consulta al servidor para comprobar IP en la lista de 1,400+ nodos de salida Tor
+    // 2. Consulta al servidor para comprobar IP en la lista de más de 3,000+ nodos de salida Tor oficiales
     try {
       const res = await fetch('/api/security/ip-check', {
         method: 'POST',
@@ -73,23 +74,37 @@ const WorkspaceContent: React.FC = () => {
       });
       if (res.ok) {
         const data = await res.json();
+        const combinedReasons = [
+          ...(data.reasons || []),
+          ...(browserFingerprint.isTorDetected ? browserFingerprint.reasons : [])
+        ];
         setTorCheckResult({
           isTor: Boolean(data.isTor || browserFingerprint.isTorDetected),
-          clientIp: data.clientIp || ''
+          clientIp: data.clientIp || '',
+          reasons: combinedReasons
         });
       }
     } catch {
       // Si falla la red, confiar en el análisis de huella digital en cliente
       if (browserFingerprint.isTorDetected) {
-        setTorCheckResult({ isTor: true, clientIp: 'Navegador Tor Detectado' });
+        setTorCheckResult({ isTor: true, clientIp: 'Navegador Tor Detectado', reasons: browserFingerprint.reasons });
       } else {
-        setTorCheckResult({ isTor: false, clientIp: '' });
+        setTorCheckResult({ isTor: false, clientIp: '', reasons: [] });
       }
     }
   }, []);
 
   React.useEffect(() => {
     checkTorSecurity();
+    const handleFocus = () => {
+      checkTorSecurity();
+    };
+    window.addEventListener('focus', handleFocus);
+    document.addEventListener('visibilitychange', handleFocus);
+    return () => {
+      window.removeEventListener('focus', handleFocus);
+      document.removeEventListener('visibilitychange', handleFocus);
+    };
   }, [checkTorSecurity]);
 
   // Escuchar si se solicitó la página de soporte desde cualquier botón o acción
@@ -100,8 +115,8 @@ const WorkspaceContent: React.FC = () => {
     }
   }, [supportPageRequested, clearSupportPageRequest]);
 
-  // Vistas de página blanca requeridas por el usuario hasta que defina contenido (creaciones y herramientas pendientes)
-  const isBlankView = ['creaciones', 'herramientas'].includes(activeView);
+  // Vistas de página blanca requeridas por el usuario hasta que defina contenido (herramientas pendientes)
+  const isBlankView = ['herramientas'].includes(activeView);
 
   // Si el usuario está navegando a través de la Red Tor o activó el modo de prueba:
   const securityConfig = siteSettings.securityConfig;
@@ -206,7 +221,7 @@ const WorkspaceContent: React.FC = () => {
 
       {/* Main Content Area */}
       <main className={`w-full flex-1 flex flex-col relative bg-white ${
-        activeView === 'comunidad' || activeView === 'soporte' || activeView === 'ayuda' || activeView === 'proyectos' || activeView === 'admin' || activeView === 'noticias'
+        activeView === 'comunidad' || activeView === 'soporte' || activeView === 'ayuda' || activeView === 'proyectos' || activeView === 'creaciones' || activeView === 'admin' || activeView === 'noticias'
           ? 'p-0 items-stretch justify-start' 
           : 'items-center justify-center p-4 sm:p-8 overflow-x-hidden'
       }`}>
@@ -228,11 +243,17 @@ const WorkspaceContent: React.FC = () => {
             view="proyectos" 
             onBack={() => setActiveView('workspace')} 
           />
+        ) : activeView === 'creaciones' ? (
+          /* Catálogo oficial de Creaciones con Juegos En HTML */
+          <CatalogView 
+            view="creaciones" 
+            onBack={() => setActiveView('workspace')} 
+          />
         ) : activeView === 'comunidad' ? (
           /* Red Social de la Comunidad: feed interactivo estilo X para compartir proyectos, dar likes y comentar */
           <CommunityFeedView onBack={() => setActiveView('workspace')} />
         ) : isBlankView ? (
-          /* Página completamente blanca para Creaciones y Herramientas */
+          /* Página completamente blanca para Herramientas pendientes */
           <BlankPageView 
             view={activeView} 
             onBack={() => setActiveView('workspace')} 
