@@ -241,7 +241,8 @@ app.use(async (req: Request, res: Response, next) => {
   // Allow administrative IP testing and Tor sync API endpoints
   if (
     req.path.startsWith("/api/security/test-ip") ||
-    req.path.startsWith("/api/security/sync-tor")
+    req.path.startsWith("/api/security/sync-tor") ||
+    req.path.startsWith("/api/security/export-tor-rules")
   ) {
     return next();
   }
@@ -394,6 +395,44 @@ app.post("/api/security/sync-tor", async (_req: Request, res: Response) => {
     nodesCount: result.count,
     sources: result.sources,
     lastSync: lastTorSync
+  });
+});
+
+// Admin endpoint to export blocking rules for Cloudflare, Nginx, and Apache
+app.get("/api/security/export-tor-rules", (req: Request, res: Response) => {
+  const format = req.query.format as string || "all";
+  const ips = Array.from(torExitNodes);
+
+  const cloudflareRule = `(ip.geoip.country eq "T1")`;
+  const nginxRules = ips.map(ip => `deny ${ip};`).join("\n");
+  const apacheRules = `<RequireAll>\n  Require all granted\n` + ips.map(ip => `  Require not ip ${ip}`).join("\n") + `\n</RequireAll>`;
+
+  if (format === "nginx") {
+    res.setHeader("Content-Disposition", 'attachment; filename="tor-nginx-deny.conf"');
+    res.setHeader("Content-Type", "text/plain");
+    return res.send(nginxRules);
+  }
+  if (format === "apache") {
+    res.setHeader("Content-Disposition", 'attachment; filename="tor-htaccess-deny.conf"');
+    res.setHeader("Content-Type", "text/plain");
+    return res.send(apacheRules);
+  }
+  if (format === "ips") {
+    res.setHeader("Content-Disposition", 'attachment; filename="tor-exit-nodes.txt"');
+    res.setHeader("Content-Type", "text/plain");
+    return res.send(ips.join("\n"));
+  }
+
+  res.json({
+    success: true,
+    nodesCount: ips.length,
+    lastSync: lastTorSync,
+    cloudflare: {
+      expression: cloudflareRule,
+      description: "Regla WAF de Cloudflare: Bloquea todo el tráfico cuyo país geoIP sea Tor (código T1)."
+    },
+    sampleNginx: ips.slice(0, 8).map(ip => `deny ${ip};`).join("\n") + "\n# ... (" + ips.length + " IPs activas)",
+    sampleApache: `<RequireAll>\n  Require all granted\n` + ips.slice(0, 8).map(ip => `  Require not ip ${ip}`).join("\n") + `\n  # ... (${ips.length} IPs activas)\n</RequireAll>`
   });
 });
 

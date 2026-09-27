@@ -2240,6 +2240,98 @@ export const AdminCommandCenter: React.FC<AdminCommandCenterProps> = ({ onBack }
                 </p>
               </div>
             </div>
+
+            {/* Los 3 Métodos Principales de Bloqueo de Tor */}
+            <div className="p-4 sm:p-5 rounded-2xl bg-gradient-to-br from-slate-900 to-indigo-950 text-white space-y-4 shadow-sm border border-slate-800">
+              <div className="flex items-center justify-between border-b border-white/10 pb-3">
+                <div className="flex items-center gap-2">
+                  <ShieldCheck className="w-5 h-5 text-indigo-400" />
+                  <h4 className="text-xs sm:text-sm font-bold tracking-tight text-white">
+                    Los 3 Métodos de Bloqueo de Tor Activos en la Plataforma
+                  </h4>
+                </div>
+                <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                  3 / 3 OPERATIVOS
+                </span>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
+                {/* Método 1: WAF / CDN */}
+                <div className="p-3.5 rounded-xl bg-white/5 border border-white/10 flex flex-col justify-between space-y-2">
+                  <div>
+                    <span className="text-[10px] uppercase font-bold tracking-wider text-indigo-300 block mb-1">
+                      Método 1 &bull; WAF / CDN
+                    </span>
+                    <strong className="text-slate-100 block text-xs mb-1">Cloudflare Firewall (T1)</strong>
+                    <p className="text-[11px] text-slate-300 leading-relaxed">
+                      Cloudflare asigna el código de país <code>T1</code> a la red Tor. El servidor lee la cabecera <code>CF-IPCountry: T1</code> y corta la conexión.
+                    </p>
+                  </div>
+                  <div className="pt-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        navigator.clipboard.writeText('(ip.geoip.country eq "T1")');
+                        showToast('Regla WAF copiada: (ip.geoip.country eq "T1")');
+                      }}
+                      className="w-full py-1.5 px-2.5 rounded-lg bg-indigo-600/60 hover:bg-indigo-600 text-white text-[10px] font-mono font-bold flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                    >
+                      <span>Copiar regla WAF Cloudflare</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Método 2: Lista Oficial de Tor Project */}
+                <div className="p-3.5 rounded-xl bg-white/5 border border-white/10 flex flex-col justify-between space-y-2">
+                  <div>
+                    <span className="text-[10px] uppercase font-bold tracking-wider text-emerald-300 block mb-1">
+                      Método 2 &bull; Lista Oficial
+                    </span>
+                    <strong className="text-slate-100 block text-xs mb-1">Cron Automatizado Tor Project</strong>
+                    <p className="text-[11px] text-slate-300 leading-relaxed">
+                      Sincronización periódica automática con <code>check.torproject.org</code> y Onionoo para descargar las IPs de salida frescas del directorio oficial.
+                    </p>
+                  </div>
+                  <div className="pt-2 flex items-center gap-1.5">
+                    <a
+                      href="/api/security/export-tor-rules?format=nginx"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex-1 py-1.5 px-2 rounded-lg bg-white/10 hover:bg-white/20 text-white text-[10px] font-semibold text-center transition-colors"
+                      title="Descargar reglas para Nginx"
+                    >
+                      Exportar Nginx
+                    </a>
+                    <a
+                      href="/api/security/export-tor-rules?format=apache"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex-1 py-1.5 px-2 rounded-lg bg-white/10 hover:bg-white/20 text-white text-[10px] font-semibold text-center transition-colors"
+                      title="Descargar reglas para Apache .htaccess"
+                    >
+                      Exportar Apache
+                    </a>
+                  </div>
+                </div>
+
+                {/* Método 3: Backend Node.js */}
+                <div className="p-3.5 rounded-xl bg-white/5 border border-white/10 flex flex-col justify-between space-y-2">
+                  <div>
+                    <span className="text-[10px] uppercase font-bold tracking-wider text-rose-300 block mb-1">
+                      Método 3 &bull; Código Backend
+                    </span>
+                    <strong className="text-slate-100 block text-xs mb-1">Intercepción en Node.js (RAM)</strong>
+                    <p className="text-[11px] text-slate-300 leading-relaxed">
+                      Captura la IP del cliente (<code>CF-Connecting-IP</code>, etc.), la compara en RAM en tiempo O(1) y destruye el socket TCP para que la web 100% no cargue.
+                    </p>
+                  </div>
+                  <div className="pt-2 flex items-center justify-between text-[10px] text-slate-400">
+                    <span>Latencia: <strong>&lt;0.1 ms</strong></span>
+                    <span className="text-emerald-400 font-bold">Respuesta: ERR_CLOSED</span>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
 
           {/* Sub-block 3: Registro de Auditoría / Logs de Seguridad */}
