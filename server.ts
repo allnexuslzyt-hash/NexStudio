@@ -427,10 +427,7 @@ app.get("/api/security/export-tor-rules", (req: Request, res: Response) => {
     success: true,
     nodesCount: ips.length,
     lastSync: lastTorSync,
-    cloudflare: {
-      expression: cloudflareRule,
-      description: "Regla WAF de Cloudflare: Bloquea todo el tráfico cuyo país geoIP sea Tor (código T1)."
-    },
+    freeBlockingMethod: "Intercepción directa en memoria RAM de Node.js (Coste $0)",
     sampleNginx: ips.slice(0, 8).map(ip => `deny ${ip};`).join("\n") + "\n# ... (" + ips.length + " IPs activas)",
     sampleApache: `<RequireAll>\n  Require all granted\n` + ips.slice(0, 8).map(ip => `  Require not ip ${ip}`).join("\n") + `\n  # ... (${ips.length} IPs activas)\n</RequireAll>`
   });
