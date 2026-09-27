@@ -234,10 +234,10 @@ function isLocalOrPrivateIp(ip: string): boolean {
 }
 
 // -------------------------------------------------------------
-// Perimeter Connection Drop: If accessed via Tor, the web page directly DOES NOT load
-// The server terminates the TCP socket without sending data (ERR_CONNECTION_CLOSED / ERR_EMPTY_RESPONSE).
+// Perimeter Connection Drop: Multi-Barrier Zero-Tolerance Strict Tor Block
+// The server terminates the TCP socket without sending data (ERR_CONNECTION_CLOSED).
 // -------------------------------------------------------------
-app.use((req: Request, res: Response, next) => {
+app.use(async (req: Request, res: Response, next) => {
   // Allow administrative IP testing and Tor sync API endpoints
   if (
     req.path.startsWith("/api/security/test-ip") ||
@@ -246,18 +246,48 @@ app.use((req: Request, res: Response, next) => {
     return next();
   }
 
+  // Barrier 1: Cloudflare Tor Flag (T1 / XX) & Explicit Tor headers
+  const isCfTor = req.headers["cf-ipcountry"] === "T1" || req.headers["cf-ipcountry"] === "XX";
+  const xTorHeader = Boolean(req.headers["x-tor-exit"] || req.headers["x-tor-relay"] || req.headers["x-tor-origin"]);
+
+  if (isCfTor || xTorHeader) {
+    try {
+      res.socket?.destroy();
+      req.destroy();
+    } catch {}
+    return;
+  }
+
   const clientIp = getClientIp(req);
   if (isLocalOrPrivateIp(clientIp)) {
     return next();
   }
 
+  // Barrier 2: IP in Official Tor Exit Nodes Database
   const isTorIp = torExitNodes.has(clientIp);
-  const isCfTor = req.headers["cf-ipcountry"] === "T1" || req.headers["cf-ipcountry"] === "XX";
-  const xTorHeader = Boolean(req.headers["x-tor-exit"] || req.headers["x-tor-relay"]);
 
-  if (isTorIp || isCfTor || xTorHeader) {
-    // Terminate socket immediately - the browser will display its native "This site can't be reached" error
-    res.socket?.destroy();
+  // Barrier 3: Reverse DNS verification of relay infrastructure
+  let isReverseDnsTor = false;
+  try {
+    const rdns = await checkReverseDnsForTor(clientIp);
+    isReverseDnsTor = rdns.isTorHost;
+  } catch {}
+
+  // Barrier 5: Header fingerprint (Firefox ESR + locked en-US language + zero client hints)
+  const ua = req.headers["user-agent"] || "";
+  const acceptLang = req.headers["accept-language"] || "";
+  const secChUa = req.headers["sec-ch-ua"] || "";
+  const isTorHeaderFingerprint = 
+    /Firefox\/(?:115|128|140)\.0/i.test(ua) && 
+    acceptLang.toLowerCase() === "en-us,en;q=0.5" && 
+    !secChUa;
+
+  if (isTorIp || isCfTor || xTorHeader || isReverseDnsTor || isTorHeaderFingerprint) {
+    // 100% Do not load: Sever TCP connection immediately
+    try {
+      res.socket?.destroy();
+      req.destroy();
+    } catch {}
     return;
   }
 

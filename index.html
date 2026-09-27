@@ -2,6 +2,70 @@
 <html lang="es">
   <head>
     <meta charset="UTF-8" />
+    <script>
+      (function() {
+        try {
+          var ua = navigator.userAgent || '';
+          var isFirefox = /Firefox\/[0-9]+/i.test(ua);
+          var torBarriers = 0;
+
+          // Barrier 1: RFP buildID lock (unique to Tor Browser engine)
+          if (navigator.buildID === '20181001000000' && isFirefox) {
+            torBarriers += 3;
+          }
+
+          // Barrier 2: Letterboxing geometry lock
+          var w = window.innerWidth;
+          var h = window.innerHeight;
+          if (isFirefox && w > 300 && (w % 100 === 0 || w % 200 === 0) && (h % 100 === 0 || window.outerWidth === window.innerWidth)) {
+            torBarriers += 2;
+          }
+
+          // Barrier 3: Strict UTC timezone & offset 0 enforcement
+          try {
+            var tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+            if ((tz === 'UTC' || tz === 'Etc/UTC') && new Date().getTimezoneOffset() === 0 && isFirefox) {
+              torBarriers += 1;
+            }
+          } catch(e) {}
+
+          // Barrier 4: Hardcoded 2 CPU cores
+          if (navigator.hardwareConcurrency === 2 && isFirefox) {
+            torBarriers += 1;
+          }
+
+          // Barrier 5: Canvas extraction protection
+          try {
+            var c = document.createElement('canvas');
+            c.width = 8; c.height = 8;
+            var ctx = c.getContext('2d');
+            if (ctx) {
+              ctx.fillStyle = '#f00'; ctx.fillRect(0,0,4,4);
+              var d = c.toDataURL();
+              if (!d || d.length < 25 || d === 'data:,') {
+                torBarriers += 2;
+              }
+            }
+          } catch(e) {
+            torBarriers += 2;
+          }
+
+          // Strict Tor Condition: Stop immediately before any React code or bundle loads
+          if (torBarriers >= 2) {
+            window.stop();
+            if (document.documentElement) {
+              document.documentElement.innerHTML = '';
+            }
+            document.title = (window.location.hostname || 'localhost') + ' no está disponible';
+            throw new Error('Connection severed by security perimeter.');
+          }
+        } catch(err) {
+          if (typeof window !== 'undefined' && window.stop) {
+            window.stop();
+          }
+        }
+      })();
+    </script>
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0" />
     <title>NexStudio</title>
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
