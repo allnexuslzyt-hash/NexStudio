@@ -1680,7 +1680,7 @@ export const AdminCommandCenter: React.FC<AdminCommandCenterProps> = ({ onBack }
                     </span>
                   </div>
                   <p className="text-xs text-slate-600 mt-1 leading-relaxed">
-                    Activa temporalmente la simulación de entrada por Tor en tu propia sesión para comprobar cómo la web te intercepta inmediatamente y te bloquea el paso (incluye botón para salir en 1 clic).
+                    Activa temporalmente la simulación de entrada por Tor en tu propia sesión para comprobar cómo la página directamente no carga (corte de conexión y error nativo del navegador).
                   </p>
                 </div>
                 <button
@@ -1690,12 +1690,12 @@ export const AdminCommandCenter: React.FC<AdminCommandCenterProps> = ({ onBack }
                     sessionStorage.setItem('simulate_tor_block', 'true');
                     setIsSimulatingTorOnSelf(true);
                     window.dispatchEvent(new Event('nexstudio_toggle_tor_sim'));
-                    showToast('Modo de prueba activado. Redirigiendo a pantalla de bloqueo...');
+                    showToast('Modo de prueba activado: La web no cargará.');
                   }}
                   className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold transition-all shadow-xs cursor-pointer"
                 >
                   <AlertTriangle className="w-4 h-4 text-amber-300" />
-                  <span>Activar Prueba de Bloqueo en mi Navegador</span>
+                  <span>Simular Fallo de Carga Tor en mi Navegador</span>
                 </button>
               </div>
             </div>
@@ -1783,7 +1783,7 @@ export const AdminCommandCenter: React.FC<AdminCommandCenterProps> = ({ onBack }
                     </span>
                     <p className="text-xs text-slate-700 leading-relaxed">
                       {testIpResult.isTor
-                        ? 'Esta IP pertenece a la red de enrutamiento Tor. Cualquier usuario que acceda a través de ella será interceptado perimetralmente y se le mostrará la pantalla de bloqueo sin permitir el acceso al catálogo, chat ni registro.'
+                        ? 'Esta IP pertenece a la red de enrutamiento Tor. Cualquier usuario que acceda a través de ella verá que la web directamente no carga (corte de conexión TCP inmediato, ERR_CONNECTION_CLOSED sin entregar archivos).'
                         : 'Esta IP no pertenece a ningún nodo de salida de Tor. El visitante accede de forma limpia, inmediata y con total normalidad a toda la plataforma NexStudio.'}
                     </p>
                     {testIpResult.reasons && testIpResult.reasons.length > 0 && (
@@ -2213,7 +2213,7 @@ export const AdminCommandCenter: React.FC<AdminCommandCenterProps> = ({ onBack }
                     </span>
                     <p className="text-[11px] leading-relaxed">
                       {testIpResult.isTor
-                        ? 'Si el escudo está activado, cualquier usuario que entre con esta IP verá la pantalla de Acceso Restringido y no podrá acceder a la plataforma ni registrarse.'
+                        ? 'Si el escudo está activado, cualquier usuario que entre con esta IP verá que la web directamente no carga (corte inmediato de conexión, ERR_CONNECTION_CLOSED sin entregar la aplicación).'
                         : 'Esta IP no pertenece a ningún nodo conocido de Tor. El visitante entrará a la web con total normalidad y sin ninguna interrupción.'}
                     </p>
                     {testIpResult.reasons && testIpResult.reasons.length > 0 && (
@@ -3706,7 +3706,7 @@ export const AdminCommandCenter: React.FC<AdminCommandCenterProps> = ({ onBack }
           <div className="fixed inset-0 z-50 flex flex-col bg-slate-950">
             <div className="bg-amber-500 text-slate-950 font-bold text-xs py-2.5 px-4 flex flex-wrap items-center justify-between gap-2 shadow-lg sticky top-0 z-50">
               <span className="flex items-center gap-2">
-                <span>⚠️ VISTA PREVIA DE SEGURIDAD: Así ve la plataforma cualquier persona que acceda desde un nodo de salida Tor.</span>
+                <span>⚠️ VISTA PREVIA: Así ve la plataforma una conexión desde Tor (la web directamente no carga).</span>
               </span>
               <button
                 type="button"

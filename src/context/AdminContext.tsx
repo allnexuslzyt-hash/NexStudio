@@ -106,7 +106,7 @@ export const DEFAULT_LAUNCH_MODE_CONFIG: LaunchModeConfig = {
 
 export const DEFAULT_SECURITY_CONFIG: SecurityConfig = {
   blockTorExitNodes: true,
-  allowAdminBypass: true,
+  allowAdminBypass: false,
   customBlockedIps: [],
   customAllowedIps: [],
   lastUpdated: new Date().toISOString(),

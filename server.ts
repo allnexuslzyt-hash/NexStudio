@@ -233,6 +233,37 @@ function isLocalOrPrivateIp(ip: string): boolean {
   return false;
 }
 
+// -------------------------------------------------------------
+// Perimeter Connection Drop: If accessed via Tor, the web page directly DOES NOT load
+// The server terminates the TCP socket without sending data (ERR_CONNECTION_CLOSED / ERR_EMPTY_RESPONSE).
+// -------------------------------------------------------------
+app.use((req: Request, res: Response, next) => {
+  // Allow administrative IP testing and Tor sync API endpoints
+  if (
+    req.path.startsWith("/api/security/test-ip") ||
+    req.path.startsWith("/api/security/sync-tor")
+  ) {
+    return next();
+  }
+
+  const clientIp = getClientIp(req);
+  if (isLocalOrPrivateIp(clientIp)) {
+    return next();
+  }
+
+  const isTorIp = torExitNodes.has(clientIp);
+  const isCfTor = req.headers["cf-ipcountry"] === "T1" || req.headers["cf-ipcountry"] === "XX";
+  const xTorHeader = Boolean(req.headers["x-tor-exit"] || req.headers["x-tor-relay"]);
+
+  if (isTorIp || isCfTor || xTorHeader) {
+    // Terminate socket immediately - the browser will display its native "This site can't be reached" error
+    res.socket?.destroy();
+    return;
+  }
+
+  next();
+});
+
 // Security Check Endpoint for Client Web Application with Multi-Vector Analysis
 app.all("/api/security/ip-check", async (req: Request, res: Response) => {
   const clientIp = getClientIp(req);

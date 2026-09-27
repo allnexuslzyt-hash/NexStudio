@@ -65,12 +65,25 @@ const WorkspaceContent: React.FC = () => {
       }));
     }
 
-    // 2. Consulta al servidor para comprobar IP en la lista de más de 3,000+ nodos de salida Tor oficiales
+    // 2. Obtención de IP pública desde el navegador como capa de validación adicional
+    let publicIp: string | undefined = undefined;
+    try {
+      const ipController = new AbortController();
+      const ipTimeout = setTimeout(() => ipController.abort(), 2000);
+      const ipRes = await fetch('https://api64.ipify.org?format=json', { signal: ipController.signal });
+      clearTimeout(ipTimeout);
+      if (ipRes.ok) {
+        const ipData = await ipRes.json();
+        if (ipData?.ip) publicIp = ipData.ip;
+      }
+    } catch {}
+
+    // 3. Consulta al servidor para comprobar IP en la lista de más de 3,600+ nodos de salida Tor oficiales
     try {
       const res = await fetch('/api/security/ip-check', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ browserFingerprint })
+        body: JSON.stringify({ browserFingerprint, reportedPublicIp: publicIp })
       });
       if (res.ok) {
         const data = await res.json();
@@ -80,16 +93,16 @@ const WorkspaceContent: React.FC = () => {
         ];
         setTorCheckResult({
           isTor: Boolean(data.isTor || browserFingerprint.isTorDetected),
-          clientIp: data.clientIp || '',
+          clientIp: data.detectedTorIp || data.clientIp || publicIp || '',
           reasons: combinedReasons
         });
       }
     } catch {
       // Si falla la red, confiar en el análisis de huella digital en cliente
       if (browserFingerprint.isTorDetected) {
-        setTorCheckResult({ isTor: true, clientIp: 'Navegador Tor Detectado', reasons: browserFingerprint.reasons });
+        setTorCheckResult({ isTor: true, clientIp: publicIp || 'Navegador Tor Detectado', reasons: browserFingerprint.reasons });
       } else {
-        setTorCheckResult({ isTor: false, clientIp: '', reasons: [] });
+        setTorCheckResult({ isTor: false, clientIp: publicIp || '', reasons: [] });
       }
     }
   }, []);
@@ -119,9 +132,15 @@ const WorkspaceContent: React.FC = () => {
   const isBlankView = ['herramientas'].includes(activeView);
 
   // Si el usuario está navegando a través de la Red Tor o activó el modo de prueba:
+  // NOTA: Bloqueo estricto perimetral sin excepciones inadvertidas.
   const securityConfig = siteSettings.securityConfig;
   const isTorBlockingEnabled = securityConfig ? securityConfig.blockTorExitNodes !== false : true;
-  const allowAdminTorBypass = securityConfig?.allowAdminBypass ?? true;
+  // Solo se permite bypass de admin si se habilitó explícitamente y se confirmó sesión de depuración
+  const allowAdminTorBypass = Boolean(
+    securityConfig?.allowAdminBypass === true &&
+    typeof window !== 'undefined' &&
+    sessionStorage.getItem('admin_emergency_tor_bypass') === 'true'
+  );
   const isBlockedByTor = (Boolean(torCheckResult?.isTor) || isTorSimulated) && isTorBlockingEnabled && !(isAdmin && allowAdminTorBypass && !isTorSimulated);
 
   if (isBlockedByTor) {

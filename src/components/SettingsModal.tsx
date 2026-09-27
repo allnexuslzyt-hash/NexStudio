@@ -1325,7 +1325,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onOpenAdminCommand
                           </span>
                         </h4>
                         <p className="text-xs text-slate-600 dark:text-slate-400">
-                          Bloquea automáticamente el acceso desde la red Tor mediante detección de IP + huella digital de navegador.
+                          Corta la conexión automáticamente para la red Tor de modo que la página web directamente no cargue.
                         </p>
                       </div>
                     </div>
