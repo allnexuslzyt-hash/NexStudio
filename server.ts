@@ -198,39 +198,111 @@ syncTorExitNodes();
 setInterval(syncTorExitNodes, 15 * 60 * 1000);
 
 // Helper to extract sanitized client IP address
-function getClientIp(req: Request): string {
+function getAllClientIps(req: Request): string[] {
+  const ips: string[] = [];
   const cfConnectingIp = req.headers["cf-connecting-ip"];
   if (typeof cfConnectingIp === "string" && cfConnectingIp.trim()) {
-    return cfConnectingIp.trim().replace(/^::ffff:/, "");
+    ips.push(cfConnectingIp.trim().replace(/^::ffff:/, ""));
   }
   const trueClientIp = req.headers["true-client-ip"];
   if (typeof trueClientIp === "string" && trueClientIp.trim()) {
-    return trueClientIp.trim().replace(/^::ffff:/, "");
+    ips.push(trueClientIp.trim().replace(/^::ffff:/, ""));
+  }
+  const xRealIp = req.headers["x-real-ip"];
+  if (typeof xRealIp === "string" && xRealIp.trim()) {
+    ips.push(xRealIp.trim().replace(/^::ffff:/, ""));
   }
   const xForwardedFor = req.headers["x-forwarded-for"];
-  let rawIp = "";
   if (typeof xForwardedFor === "string") {
-    rawIp = xForwardedFor.split(",")[0].trim();
-  } else if (Array.isArray(xForwardedFor) && xForwardedFor.length > 0) {
-    rawIp = xForwardedFor[0].trim();
-  } else if (typeof req.headers["x-real-ip"] === "string") {
-    rawIp = (req.headers["x-real-ip"] as string).trim();
-  } else {
-    rawIp = req.ip || req.socket.remoteAddress || "127.0.0.1";
+    xForwardedFor.split(",").forEach((item) => {
+      const clean = item.trim().replace(/^::ffff:/, "");
+      if (clean) ips.push(clean);
+    });
+  } else if (Array.isArray(xForwardedFor)) {
+    xForwardedFor.forEach((item) => {
+      const clean = item.trim().replace(/^::ffff:/, "");
+      if (clean) ips.push(clean);
+    });
   }
+  const remote = req.socket?.remoteAddress;
+  if (remote) {
+    ips.push(remote.replace(/^::ffff:/, ""));
+  }
+  return Array.from(new Set(ips));
+}
 
-  if (rawIp.startsWith("::ffff:")) {
-    rawIp = rawIp.replace("::ffff:", "");
+function getClientIp(req: Request): string {
+  const all = getAllClientIps(req);
+  for (const ip of all) {
+    if (!isLocalOrPrivateIp(ip)) {
+      return ip;
+    }
   }
-  return rawIp;
+  return all[0] || req.ip || "127.0.0.1";
 }
 
 // Check if IP is local/private loopback
 function isLocalOrPrivateIp(ip: string): boolean {
+  if (!ip) return true;
   if (ip === "127.0.0.1" || ip === "::1" || ip === "localhost") return true;
   if (ip.startsWith("10.") || ip.startsWith("192.168.")) return true;
   if (/^172\.(1[6-9]|2[0-9]|3[0-1])\./.test(ip)) return true;
+  if (ip.startsWith("169.254.")) return true;
   return false;
+}
+
+// -------------------------------------------------------------
+// Live Tor DNSEL (DNS Exit List) Lookup
+// Queries the official live authoritative DNS of Tor Project in real-time
+// -------------------------------------------------------------
+const torDnsCache = new Map<string, { isTor: boolean; source?: string; timestamp: number }>();
+const DNS_CACHE_TTL_MS = 5 * 60 * 1000; // 5-minute cache to balance freshness and speed
+
+async function checkTorViaDnsel(ip: string): Promise<{ isTor: boolean; source?: string }> {
+  if (isLocalOrPrivateIp(ip)) return { isTor: false };
+
+  const cached = torDnsCache.get(ip);
+  if (cached && Date.now() - cached.timestamp < DNS_CACHE_TTL_MS) {
+    return { isTor: cached.isTor, source: cached.source };
+  }
+
+  const parts = ip.split(".");
+  if (parts.length !== 4) return { isTor: false }; // Only IPv4 supported by standard DNSEL
+  const reversedIp = [...parts].reverse().join(".");
+
+  return new Promise((resolve) => {
+    let settled = false;
+    const timer = setTimeout(() => {
+      if (!settled) {
+        settled = true;
+        resolve({ isTor: false });
+      }
+    }, 1500);
+
+    // Primary: Official Tor Project DNS Exit List (dnsel.torproject.org)
+    dns.resolve4(`${reversedIp}.dnsel.torproject.org`, (err, addresses) => {
+      if (!settled && !err && addresses && addresses.includes("127.0.0.2")) {
+        settled = true;
+        clearTimeout(timer);
+        torDnsCache.set(ip, { isTor: true, source: "dnsel.torproject.org (Tor Project Oficial)", timestamp: Date.now() });
+        return resolve({ isTor: true, source: "dnsel.torproject.org (Tor Project Oficial)" });
+      }
+
+      // Secondary: Independent DNSBL (torexit.dan.me.uk)
+      dns.resolve4(`${reversedIp}.torexit.dan.me.uk`, (err2, addresses2) => {
+        if (!settled) {
+          settled = true;
+          clearTimeout(timer);
+          if (!err2 && addresses2 && addresses2.length > 0) {
+            torDnsCache.set(ip, { isTor: true, source: "torexit.dan.me.uk", timestamp: Date.now() });
+            return resolve({ isTor: true, source: "torexit.dan.me.uk" });
+          }
+          torDnsCache.set(ip, { isTor: false, timestamp: Date.now() });
+          return resolve({ isTor: false });
+        }
+      });
+    });
+  });
 }
 
 // -------------------------------------------------------------
@@ -253,21 +325,40 @@ app.use(async (req: Request, res: Response, next) => {
 
   if (isCfTor || xTorHeader) {
     try {
+      res.status(403).set({
+        "Content-Type": "text/plain",
+        "Content-Length": "0",
+        "Connection": "close",
+        "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0"
+      }).end();
       res.socket?.destroy();
       req.destroy();
     } catch {}
     return;
   }
 
+  const allClientIps = getAllClientIps(req);
   const clientIp = getClientIp(req);
+
   if (isLocalOrPrivateIp(clientIp)) {
     return next();
   }
 
-  // Barrier 2: IP in Official Tor Exit Nodes Database
-  const isTorIp = torExitNodes.has(clientIp);
+  // Barrier 2: IP in Official Tor Exit Nodes Database (any IP in the forwarded chain)
+  const isTorIp = allClientIps.some((ip) => !isLocalOrPrivateIp(ip) && torExitNodes.has(ip));
 
-  // Barrier 3: Reverse DNS verification of relay infrastructure
+  // Barrier 3: Live Tor Project DNSEL in Real Time
+  let isTorDnsel = false;
+  let dnselSource = "";
+  try {
+    const dnselResult = await checkTorViaDnsel(clientIp);
+    if (dnselResult.isTor) {
+      isTorDnsel = true;
+      dnselSource = dnselResult.source || "Tor DNSEL";
+    }
+  } catch {}
+
+  // Barrier 4: Reverse DNS verification of relay infrastructure
   let isReverseDnsTor = false;
   try {
     const rdns = await checkReverseDnsForTor(clientIp);
@@ -283,9 +374,18 @@ app.use(async (req: Request, res: Response, next) => {
     acceptLang.toLowerCase() === "en-us,en;q=0.5" && 
     !secChUa;
 
-  if (isTorIp || isCfTor || xTorHeader || isReverseDnsTor || isTorHeaderFingerprint) {
-    // 100% Do not load: Sever TCP connection immediately
+  if (isTorIp || isTorDnsel || isCfTor || xTorHeader || isReverseDnsTor || isTorHeaderFingerprint) {
+    // 100% Do not load: Send immediate 403 with zero bytes and close TCP socket
     try {
+      res.status(403).set({
+        "Content-Type": "text/plain",
+        "Content-Length": "0",
+        "Connection": "close",
+        "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
+        "Pragma": "no-cache",
+        "X-Tor-Blocked": "true",
+        "X-Tor-Reason": isTorDnsel ? dnselSource : isTorIp ? "Tor Exit DB" : "Perimeter Security"
+      }).end();
       res.socket?.destroy();
       req.destroy();
     } catch {}
@@ -322,14 +422,19 @@ app.all("/api/security/ip-check", async (req: Request, res: Response) => {
   const hasTorUserAgent = /Firefox\/1[0-9]{2}\.0/i.test(ua) && !secChUa;
   const isLanguageMasked = acceptLang.toLowerCase() === "en-us,en;q=0.5";
 
+  // Check Tor via Live DNSBL
+  const dnsel = await checkTorViaDnsel(clientIp);
+
   // Multi-Vector Composite Decision:
-  // 1. IP in verified Tor Exit Node database
-  // 2. Reverse DNS hostname points to a Tor exit/relay
-  // 3. Cloudflare Country Code T1
-  // 4. Explicit Tor header
-  // 5. High-confidence Client-Side Browser Fingerprint (RFP, Letterboxing, Timezone, 2 Cores)
-  // 6. Medium fingerprint score with anonymized headers
+  // 1. Live Tor Project DNSEL (Real-time authoritative DNS from Tor Project)
+  // 2. IP in verified Tor Exit Node database (RAM)
+  // 3. Reverse DNS hostname points to a Tor exit/relay
+  // 4. Cloudflare Country Code T1
+  // 5. Explicit Tor header
+  // 6. High-confidence Client-Side Browser Fingerprint (RFP, Letterboxing, Timezone, 2 Cores)
+  // 7. Medium fingerprint score with anonymized headers
   const reasons: string[] = [];
+  if (dnsel.isTor) reasons.push(`Verificación en TIEMPO REAL confirmada por ${dnsel.source || 'Tor DNSEL Oficial'}`);
   if (isTorIp) reasons.push("IP identificada en la base de datos de nodos de salida Tor oficiales");
   if (reverseDns.isTorHost) reasons.push(`Reverse DNS de IP coincide con nodo Tor (${reverseDns.hostnames.join(", ")})`);
   if (isCfTor) reasons.push("Cabecera Cloudflare T1 (Red Tor detectada por CDN perimetral)");
@@ -337,12 +442,14 @@ app.all("/api/security/ip-check", async (req: Request, res: Response) => {
   if (clientFingerprintTor) reasons.push("Huella digital de navegador Tor Browser confirmada por cliente");
   if (clientFingerprintScore >= 45 && hasTorUserAgent) reasons.push("Firma combinada de navegador anonimizado con score alto");
 
-  const isTor = isTorIp || reverseDns.isTorHost || isCfTor || xTorHeader || clientFingerprintTor || (clientFingerprintScore >= 45 && (hasTorUserAgent || isLanguageMasked));
+  const isTor = dnsel.isTor || isTorIp || reverseDns.isTorHost || isCfTor || xTorHeader || clientFingerprintTor || (clientFingerprintScore >= 45 && (hasTorUserAgent || isLanguageMasked));
 
   res.json({
     success: true,
     clientIp,
     isTor,
+    isTorDnsel: dnsel.isTor,
+    dnselSource: dnsel.source,
     isTorIp,
     isTorDns: reverseDns.isTorHost,
     isCfTor,
@@ -357,7 +464,7 @@ app.all("/api/security/ip-check", async (req: Request, res: Response) => {
   });
 });
 
-// Admin endpoint to test any given IP against Tor Exit Nodes database + reverse DNS
+// Admin endpoint to test any given IP against Tor Exit Nodes database + reverse DNS + Live DNSEL
 app.post("/api/security/test-ip", async (req: Request, res: Response) => {
   const { ip } = req.body;
   if (!ip || typeof ip !== "string") {
@@ -366,17 +473,21 @@ app.post("/api/security/test-ip", async (req: Request, res: Response) => {
   const cleanIp = ip.trim().replace(/^::ffff:/, "");
   const isLocal = isLocalOrPrivateIp(cleanIp);
   const isTorIp = !isLocal && torExitNodes.has(cleanIp);
+  const dnsel = await checkTorViaDnsel(cleanIp);
   const reverseDns = await checkReverseDnsForTor(cleanIp);
 
-  const isTor = isTorIp || reverseDns.isTorHost;
+  const isTor = dnsel.isTor || isTorIp || reverseDns.isTorHost;
   const reasons: string[] = [];
-  if (isTorIp) reasons.push("Coincide con nodo de salida en la lista activa");
+  if (dnsel.isTor) reasons.push(`Verificación en TIEMPO REAL confirmada por ${dnsel.source || 'Tor DNSEL Oficial'}`);
+  if (isTorIp) reasons.push("Coincide con nodo de salida en la lista activa de RAM");
   if (reverseDns.isTorHost) reasons.push(`Reverse DNS apunta a infraestructura Tor (${reverseDns.hostnames.join(", ")})`);
 
   res.json({
     success: true,
     ip: cleanIp,
     isTor,
+    isTorDnsel: dnsel.isTor,
+    dnselSource: dnsel.source,
     isTorIp,
     isTorDns: reverseDns.isTorHost,
     hostnames: reverseDns.hostnames,

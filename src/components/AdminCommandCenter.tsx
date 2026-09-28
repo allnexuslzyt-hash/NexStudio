@@ -359,7 +359,7 @@ export const AdminCommandCenter: React.FC<AdminCommandCenterProps> = ({ onBack }
 
   // Tor Shield State & Helpers
   const [testIpInput, setTestIpInput] = useState('');
-  const [testIpResult, setTestIpResult] = useState<{ ip: string; isTor: boolean; nodesCount?: number; reasons?: string[] } | null>(null);
+  const [testIpResult, setTestIpResult] = useState<{ ip: string; isTor: boolean; nodesCount?: number; reasons?: string[]; isTorDnsel?: boolean; dnselSource?: string } | null>(null);
   const [isTestingIp, setIsTestingIp] = useState(false);
   const [isSyncingTorNodes, setIsSyncingTorNodes] = useState(false);
   const [torNodesCount, setTorNodesCount] = useState<number | null>(null);
@@ -407,7 +407,9 @@ export const AdminCommandCenter: React.FC<AdminCommandCenterProps> = ({ onBack }
           ip: data.ip,
           isTor: data.isTor,
           nodesCount: data.nodesCount,
-          reasons: data.reasons
+          reasons: data.reasons,
+          isTorDnsel: data.isTorDnsel,
+          dnselSource: data.dnselSource
         });
         if (data.nodesCount) setTorNodesCount(data.nodesCount);
       } else {
@@ -2206,11 +2208,18 @@ export const AdminCommandCenter: React.FC<AdminCommandCenterProps> = ({ onBack }
                     <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
                   )}
                   <div className="space-y-1 w-full">
-                    <span className="font-bold block">
-                      {testIpResult.isTor
-                        ? `⚠️ IP ${testIpResult.ip}: ES UN NODO DE SALIDA TOR ACTIVO`
-                        : `✅ IP ${testIpResult.ip}: IP LIMPIA / CONEXIÓN ESTÁNDAR`}
-                    </span>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="font-bold block">
+                        {testIpResult.isTor
+                          ? `⚠️ IP ${testIpResult.ip}: ES UN NODO DE SALIDA TOR ACTIVO`
+                          : `✅ IP ${testIpResult.ip}: IP LIMPIA / CONEXIÓN ESTÁNDAR`}
+                      </span>
+                      {testIpResult.isTorDnsel && (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-amber-100 text-amber-900 border border-amber-300 text-[10px] font-bold">
+                          ⚡ Verificado en VIVO por Tor Project DNS
+                        </span>
+                      )}
+                    </div>
                     <p className="text-[11px] leading-relaxed">
                       {testIpResult.isTor
                         ? 'Si el escudo está activado, cualquier usuario que entre con esta IP verá que la web directamente no carga (corte inmediato de conexión, ERR_CONNECTION_CLOSED sin entregar la aplicación).'
