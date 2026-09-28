@@ -197,36 +197,46 @@ async function syncTorExitNodes(): Promise<{ success: boolean; count: number; so
 syncTorExitNodes();
 setInterval(syncTorExitNodes, 15 * 60 * 1000);
 
-// Helper to extract sanitized client IP address
+function cleanIpString(raw: string): string {
+  if (!raw) return "";
+  let s = raw.trim().replace(/^::ffff:/, "");
+  // Strip IPv4 port if present (e.g. 192.210.214.13:54321 -> 192.210.214.13)
+  if (/^(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}):\d+$/.test(s)) {
+    s = s.replace(/:\d+$/, "");
+  }
+  // Strip bracketed IPv6 port [::1]:8080
+  if (/^\[([a-fA-F0-9:]+)\]:\d+$/.test(s)) {
+    s = s.replace(/^\[/, "").replace(/\]:\d+$/, "");
+  }
+  return s;
+}
+
+// Helper to extract sanitized client IP address from all possible proxy layers
 function getAllClientIps(req: Request): string[] {
   const ips: string[] = [];
-  const cfConnectingIp = req.headers["cf-connecting-ip"];
-  if (typeof cfConnectingIp === "string" && cfConnectingIp.trim()) {
-    ips.push(cfConnectingIp.trim().replace(/^::ffff:/, ""));
+  const add = (val: unknown) => {
+    if (typeof val === "string" && val.trim()) {
+      val.split(",").forEach((item) => {
+        const clean = cleanIpString(item);
+        if (clean) ips.push(clean);
+      });
+    } else if (Array.isArray(val)) {
+      val.forEach((item) => add(item));
+    }
+  };
+
+  add(req.headers["cf-connecting-ip"]);
+  add(req.headers["true-client-ip"]);
+  add(req.headers["x-real-ip"]);
+  add(req.headers["x-forwarded-for"]);
+  add(req.headers["x-client-ip"]);
+  add(req.headers["fastly-client-ip"]);
+  add(req.headers["forwarded"]);
+  if (req.socket?.remoteAddress) {
+    add(req.socket.remoteAddress);
   }
-  const trueClientIp = req.headers["true-client-ip"];
-  if (typeof trueClientIp === "string" && trueClientIp.trim()) {
-    ips.push(trueClientIp.trim().replace(/^::ffff:/, ""));
-  }
-  const xRealIp = req.headers["x-real-ip"];
-  if (typeof xRealIp === "string" && xRealIp.trim()) {
-    ips.push(xRealIp.trim().replace(/^::ffff:/, ""));
-  }
-  const xForwardedFor = req.headers["x-forwarded-for"];
-  if (typeof xForwardedFor === "string") {
-    xForwardedFor.split(",").forEach((item) => {
-      const clean = item.trim().replace(/^::ffff:/, "");
-      if (clean) ips.push(clean);
-    });
-  } else if (Array.isArray(xForwardedFor)) {
-    xForwardedFor.forEach((item) => {
-      const clean = item.trim().replace(/^::ffff:/, "");
-      if (clean) ips.push(clean);
-    });
-  }
-  const remote = req.socket?.remoteAddress;
-  if (remote) {
-    ips.push(remote.replace(/^::ffff:/, ""));
+  if (req.ip) {
+    add(req.ip);
   }
   return Array.from(new Set(ips));
 }
