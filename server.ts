@@ -554,7 +554,72 @@ app.get("/api/security/export-tor-rules", (req: Request, res: Response) => {
   });
 });
 
-// Lazy-initialized Gemini AI client
+// -------------------------------------------------------------
+// Groq AI Integration with Multi-Key Rotation and Fallback
+// -------------------------------------------------------------
+function getGroqPool(): string[] {
+  const raw = process.env.GROQ_API_KEYS || "";
+  const fromEnv = raw
+    .split(/(?=gsk_)/)
+    .map(k => k.replace(/[,;\s"'`]/g, "").trim())
+    .filter(k => k.startsWith("gsk_") && k.length > 20);
+
+  return fromEnv;
+}
+
+let groqKeyIndex = 0;
+
+async function queryGroqChat(messages: Array<{ role: string; content: string }>): Promise<{ reply: string; model: string; keyUsed: string } | null> {
+  const pool = getGroqPool();
+  if (pool.length === 0) {
+    return null;
+  }
+  const modelsToTry = ["openai/gpt-oss-120b", "qwen/qwen3.8-27b"];
+
+  for (let attempt = 0; attempt < pool.length * modelsToTry.length; attempt++) {
+    const key = pool[(groqKeyIndex + attempt) % pool.length];
+    const model = modelsToTry[Math.floor(attempt / pool.length) % modelsToTry.length];
+
+    try {
+      const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${key}`,
+          "Content-Type": "application/json",
+          "User-Agent": "NexStudio-Jaime/1.0"
+        },
+        body: JSON.stringify({
+          model,
+          messages,
+          temperature: 0.7,
+          max_tokens: 800
+        })
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.warn(`Groq key rotation: Key ${key.slice(0, 10)}... status ${response.status} (${model}):`, errorText.slice(0, 100));
+        continue;
+      }
+
+      const data = await response.json();
+      const content = data.choices?.[0]?.message?.content?.trim();
+      if (content) {
+        groqKeyIndex = (groqKeyIndex + attempt + 1) % pool.length;
+        return {
+          reply: content,
+          model,
+          keyUsed: key.slice(0, 10) + "..."
+        };
+      }
+    } catch (err: any) {
+      console.warn(`Groq request error with key ${key.slice(0, 10)}...:`, err?.message || err);
+    }
+  }
+  return null;
+}
+
+// Lazy-initialized Gemini AI client (Fallback)
 let aiClient: GoogleGenAI | null = null;
 function getGenAI(): GoogleGenAI | null {
   const apiKey = process.env.GEMINI_API_KEY;
@@ -574,32 +639,40 @@ function getGenAI(): GoogleGenAI | null {
   return aiClient;
 }
 
-const JAIME_SYSTEM_INSTRUCTION = `Eres Jaime, el asistente virtual oficial e inteligente de la plataforma NexStudio (creada por Nexus / NexStudio Team).
-Tu objetivo es ayudar, guiar y resolver cualquier duda técnica o general a los usuarios sobre la plataforma y el ecosistema de NexStudio.
+const JAIME_SYSTEM_INSTRUCTION = `Eres Jaime, el asistente virtual oficial, dinámico e inteligente de la plataforma NexStudio (creada por Nexus / NexStudio Team).
+Tu objetivo es responder de manera personalizada, amable, fluida y precisa a cualquier duda, consulta o guía que el usuario tenga sobre TODA la web de NexStudio y su ecosistema.
 
-Datos y contexto clave que conoces a la perfección:
-1. Identidad: Eres Jaime, asistente virtual oficial de soporte de NexStudio. Tu trato es respetuoso, amable, empático, dinámico y resolutivo. Hablas en español con un tono cercano y profesional.
-2. Sobre NexStudio: Es la plataforma y espacio de trabajo digital definitivo para creadores, diseñadores y optimizadores. Cuenta con:
-   - Lienzo (Canvas) interactivo y herramientas creativas.
-   - Catálogo de Proyectos Oficiales con descarga directa:
-     * NexClean: Software ejecutable (.exe) oficial para Windows que realiza una limpieza profunda de archivos basura/temporales y optimiza el rendimiento general del PC.
-     * NexBoost: Software ejecutable (.exe) oficial para Windows especializado en optimización y liberación de memoria RAM en tiempo real, acelerando el sistema y los videojuegos.
-     * Asistente Web En HTML: Estructura modular construida en código nativo (HTML/CSS/JS) para asistentes virtuales.
-   - Secciones de Creaciones, Plantillas y Recursos para la comunidad.
-   - Comunidad interactiva: Red social en vivo donde publicar, comentar, dar likes y compartir proyectos.
-   - Centro de Soporte: Con dos opciones integradas: hablar contigo (Jaime) para asistencia inmediata con IA, o abrir un Ticket de Soporte si se necesita atención directa de un administrador humano (por ejemplo, para apelar un baneo o revisar problemas de cuenta).
-   - Centro de Mando: Panel administrativo exclusivo para administradores de NexStudio.
-3. Instrucciones de comportamiento:
-   - Responde siempre de forma clara, amigable y estructurada (utiliza viñetas o negritas cuando sea conveniente para facilitar la lectura).
-   - Si el usuario te pregunta por descargas de NexClean o NexBoost, explícale que están disponibles en la pestaña "Proyectos" del Catálogo en formato ejecutable (.exe) con descarga segura protegida por temporizador de 3 segundos.
-   - Si el usuario reporta una situación que requiera intervención administrativa (como una apelación de baneo o soporte humano personalizado), anímale con simpatía a abrir un ticket en la pestaña "Tickets de Soporte" de este mismo centro de ayuda.`;
+CONOCIMIENTO INTEGRAL DE LA WEB NEXSTUDIO:
+1. Lienzo Creativo (Canvas / Editor):
+   - Herramienta de diseño interactiva donde los creadores pueden dibujar, arrastrar elementos, usar formas geométricas, añadir textos con tipografías personalizadas y organizar capas.
+   - Cuenta con controles de zoom, paneo, deshacer/rehacer, paletas de colores y exportación de diseños en formatos PNG, SVG o JSON.
+2. Catálogo de Proyectos Oficiales:
+   - Proyectos oficiales listos para descarga segura (con temporizador de 3 segundos):
+     * NexClean: Software ejecutable (.exe) oficial para Windows que realiza una limpieza a fondo de temporales, cachés, logs y basura digital, liberando espacio y acelerando el PC.
+     * NexBoost: Software ejecutable (.exe) oficial para Windows enfocado en optimizar y liberar memoria RAM en tiempo real para eliminar lag en videojuegos y programas pesados.
+     * Asistente Web en HTML: Estructura modular construida con HTML5, CSS y JavaScript para asistentes virtuales.
+3. Comunidad y Red Social (Creaciones):
+   - Muro interactivo donde los usuarios pueden publicar sus creaciones hechas en el lienzo o en proyectos externos.
+   - Sistema de interacción social: dar me gusta, comentar, compartir, ver perfiles de otros creadores y clonar plantillas públicas.
+4. Centro de Soporte y Tickets:
+   - Sección dual: chatear contigo (Jaime) para soporte y preguntas en tiempo real, o abrir un Ticket de Soporte si se necesita atención directa de un administrador humano (por ejemplo, para apelar suspensiones, reportar bugs graves o consultas de cuenta).
+5. Centro de Mando (Admin Command Center):
+   - Panel exclusivo para administradores donde se gestionan usuarios, permisos, proyectos, tickets de soporte y métricas del sistema.
+6. Noticias y Actualizaciones:
+   - Novedades de la versión 1.0, mejoras de rendimiento, parches y anuncios oficiales.
+
+NORMAS DE RESPUESTA:
+- Habla en español, con un tono cercano, servicial, profesional y dinámico.
+- NUNCA repitas una plantilla rígida ni el mismo saludo una y otra vez. Responde DIRECTAMENTE a lo que el usuario pregunte.
+- Si te preguntan por el lienzo, explica cómo usarlo. Si te preguntan por NexClean o NexBoost, explica sus funciones y dónde descargarlos. Si te preguntan por soporte, indícales cómo abrir un ticket. Si te saludan o preguntan qué puedes hacer, dales la bienvenida con un resumen ameno.
+- Usa negritas y formato Markdown limpio cuando sea útil para que sea fácil de leer.`;
 
 // Health check endpoint
 app.get("/api/health", (_req: Request, res: Response) => {
   res.json({ status: "ok", service: "NexStudio Server" });
 });
 
-// Jaime Virtual Assistant Chat API
+// Jaime Virtual Assistant Chat API powered by Groq (Primary) + Gemini (Fallback)
 app.post("/api/support/jaime", async (req: Request, res: Response) => {
   try {
     const { message, history } = req.body;
@@ -609,8 +682,6 @@ app.post("/api/support/jaime", async (req: Request, res: Response) => {
         error: "El mensaje es obligatorio." 
       });
     }
-
-    const ai = getGenAI();
 
     // Helper function for intelligent simulated response
     const generateSmartFallback = (msg: string) => {
@@ -630,59 +701,84 @@ app.post("/api/support/jaime", async (req: Request, res: Response) => {
       return fallbackText;
     };
 
-    // If API key is not configured or in development placeholder, provide simulated intelligent response
-    if (!ai) {
-      return res.json({
-        reply: generateSmartFallback(message),
-        source: "fallback",
-        success: true
-      });
-    }
-
-    // Build conversation contents for @google/genai generateContent
-    const formattedContents: Array<{ role: "user" | "model"; parts: Array<{ text: string }> }> = [];
+    // 1. Prepare conversation history in OpenAI format for Groq
+    const groqMessages: Array<{ role: string; content: string }> = [
+      { role: "system", content: JAIME_SYSTEM_INSTRUCTION }
+    ];
 
     if (Array.isArray(history)) {
-      for (const item of history.slice(-10)) { // Keep last 10 messages for context
-        if (item && item.text && (item.role === "user" || item.role === "model")) {
-          formattedContents.push({
-            role: item.role,
-            parts: [{ text: String(item.text) }]
+      for (const item of history.slice(-10)) {
+        if (item && item.text && (item.role === "user" || item.role === "model" || item.role === "assistant")) {
+          groqMessages.push({
+            role: item.role === "model" ? "assistant" : item.role,
+            content: String(item.text)
           });
         }
       }
     }
 
-    // Add current user prompt
-    formattedContents.push({
+    groqMessages.push({
       role: "user",
-      parts: [{ text: message.trim() }]
+      content: message.trim()
     });
 
-    let reply = "";
-    try {
-      const response = await ai.models.generateContent({
-        model: "gemini-2.5-flash",
-        contents: formattedContents,
-        config: {
-          systemInstruction: JAIME_SYSTEM_INSTRUCTION,
-          temperature: 0.7,
-        }
+    // 2. Primary: Execute via Groq with high-speed key rotation
+    const groqResult = await queryGroqChat(groqMessages);
+    if (groqResult && groqResult.reply) {
+      return res.json({
+        reply: groqResult.reply,
+        source: `groq (${groqResult.model})`,
+        model: groqResult.model,
+        success: true
       });
-      reply = response.text || "";
-    } catch (modelError: any) {
-      console.warn("Aviso: Fallback activado para asistente Jaime tras respuesta del modelo:", modelError?.message || modelError);
-      // Fallback a respuesta inteligente inmediata si Gemini experimenta alta demanda temporal (503)
-      reply = generateSmartFallback(message);
     }
 
-    if (!reply) {
-      reply = generateSmartFallback(message);
+    // 3. Fallback: Gemini AI SDK
+    const ai = getGenAI();
+    if (ai) {
+      try {
+        const formattedContents: Array<{ role: "user" | "model"; parts: Array<{ text: string }> }> = [];
+        if (Array.isArray(history)) {
+          for (const item of history.slice(-10)) {
+            if (item && item.text && (item.role === "user" || item.role === "model")) {
+              formattedContents.push({
+                role: item.role,
+                parts: [{ text: String(item.text) }]
+              });
+            }
+          }
+        }
+        formattedContents.push({
+          role: "user",
+          parts: [{ text: message.trim() }]
+        });
+
+        const response = await ai.models.generateContent({
+          model: "gemini-2.5-flash",
+          contents: formattedContents,
+          config: {
+            systemInstruction: JAIME_SYSTEM_INSTRUCTION,
+            temperature: 0.7,
+          }
+        });
+
+        const reply = response.text || "";
+        if (reply) {
+          return res.json({
+            reply,
+            source: "gemini",
+            success: true
+          });
+        }
+      } catch (geminiError: any) {
+        console.warn("Fallback de Gemini falló:", geminiError?.message || geminiError);
+      }
     }
 
+    // 4. Final safety net: Smart rule-based fallback
     return res.json({
-      reply,
-      source: "gemini",
+      reply: generateSmartFallback(message),
+      source: "fallback",
       success: true
     });
   } catch (error: any) {
