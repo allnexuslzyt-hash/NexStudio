@@ -23,6 +23,8 @@ import { OnboardingModal } from './components/OnboardingModal';
 import { SupportPageView } from './components/SupportPageView';
 import { CommunityFeedView } from './components/CommunityFeedView';
 import { NewsPageView } from './components/NewsPageView';
+import { ToolsPageView } from './components/ToolsPageView';
+import { FileConverterView } from './components/FileConverterView';
 import { useSupport } from './context/SupportContext';
 import { motion } from 'motion/react';
 import { Boxes } from 'lucide-react';
@@ -128,8 +130,8 @@ const WorkspaceContent: React.FC = () => {
     }
   }, [supportPageRequested, clearSupportPageRequest]);
 
-  // Vistas de página blanca requeridas por el usuario hasta que defina contenido (herramientas pendientes)
-  const isBlankView = ['herramientas'].includes(activeView);
+  // Vistas de página blanca reservadas para secciones sin definir
+  const isBlankView = [].includes(activeView);
 
   // Si el usuario está navegando a través de la Red Tor o activó el modo de prueba:
   // NOTA: Bloqueo estricto perimetral sin excepciones inadvertidas.
@@ -271,8 +273,19 @@ const WorkspaceContent: React.FC = () => {
         ) : activeView === 'comunidad' ? (
           /* Red Social de la Comunidad: feed interactivo estilo X para compartir proyectos, dar likes y comentar */
           <CommunityFeedView onBack={() => setActiveView('workspace')} />
+        ) : activeView === 'herramientas' ? (
+          /* Colección Oficial de Herramientas & Utilidades con Convertidor de Archivos */
+          <ToolsPageView 
+            onBack={() => setActiveView('workspace')}
+            onOpenCanvas={() => setActiveView('workspace')}
+          />
+        ) : activeView === 'convertidor' ? (
+          /* Convertidor de Archivos (+500 formatos, límite 1.5 GB y memoria efímera) */
+          <FileConverterView 
+            onBack={() => setActiveView('herramientas')}
+          />
         ) : isBlankView ? (
-          /* Página completamente blanca para Herramientas pendientes */
+          /* Página completamente blanca para secciones pendientes */
           <BlankPageView 
             view={activeView} 
             onBack={() => setActiveView('workspace')} 

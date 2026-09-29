@@ -141,6 +141,16 @@ export const CatalogView: React.FC<CatalogViewProps> = ({ view, onBack }) => {
       case 'herramientas':
         return [
           {
+            id: 'tool-convertidor',
+            title: 'Convertidor de Archivos',
+            category: 'Herramienta Estrella',
+            description: 'Convierte entre más de 500 formatos (imágenes, documentos, audio, video, código y archivos) con límite de 1.5 GB y memoria efímera.',
+            tag: '+500 Formatos · 1.5 GB',
+            icon: <Sparkles className="w-5 h-5 text-indigo-600" />,
+            accentColor: 'from-indigo-500/10 to-violet-500/10 border-indigo-200',
+            linkText: 'Abrir Convertidor',
+          },
+          {
             id: 'tool-1',
             title: 'Generador de Identidad y Paletas',
             category: 'Utilidad Visual',

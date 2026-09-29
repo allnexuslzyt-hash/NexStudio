@@ -554,6 +554,72 @@ app.get("/api/security/export-tor-rules", (req: Request, res: Response) => {
   });
 });
 
+// File Converter Status & Zero-Waste Policy Endpoint
+app.get("/api/tools/converter-info", (_req: Request, res: Response) => {
+  res.json({
+    status: "active",
+    maxBatchSizeBytes: 1.5 * 1024 * 1024 * 1024,
+    maxBatchSizeFormatted: "1.5 GB",
+    storagePolicy: "ephemeral-in-memory (Zero-Waste, immediate auto-purge upon download or reset)",
+    formatsSupportedCount: "500+",
+    supportedCategories: [
+      "Imágenes",
+      "Documentos & Texto",
+      "Audio",
+      "Video",
+      "Archivos Comprimidos",
+      "Datos & Código",
+      "Fuentes"
+    ]
+  });
+});
+
+// -------------------------------------------------------------
+// Speedtest Endpoints for Precision Network Measurement
+// -------------------------------------------------------------
+app.get("/api/tools/speedtest/ping", (_req: Request, res: Response) => {
+  res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
+  res.json({ timestamp: Date.now() });
+});
+
+app.get("/api/tools/speedtest/download", (req: Request, res: Response) => {
+  const bytes = Math.min(25 * 1024 * 1024, Math.max(1024 * 1024, parseInt(String(req.query.bytes || "5242880"), 10)));
+  res.setHeader("Content-Type", "application/octet-stream");
+  res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
+  res.setHeader("Content-Length", bytes.toString());
+
+  const chunkSize = 64 * 1024;
+  const chunk = Buffer.alloc(chunkSize, 0x41);
+  let bytesWritten = 0;
+
+  function write() {
+    let ok = true;
+    while (bytesWritten < bytes && ok) {
+      const remaining = bytes - bytesWritten;
+      const toWrite = remaining > chunkSize ? chunk : chunk.subarray(0, remaining);
+      bytesWritten += toWrite.length;
+      ok = res.write(toWrite);
+    }
+    if (bytesWritten >= bytes) {
+      res.end();
+    } else {
+      res.once("drain", write);
+    }
+  }
+  write();
+});
+
+app.post("/api/tools/speedtest/upload", (req: Request, res: Response) => {
+  let receivedBytes = 0;
+  req.on("data", (chunk: Buffer) => {
+    receivedBytes += chunk.length;
+  });
+  req.on("end", () => {
+    res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate");
+    res.json({ receivedBytes, timestamp: Date.now() });
+  });
+});
+
 // -------------------------------------------------------------
 // Groq AI Integration with Multi-Key Rotation and Fallback
 // -------------------------------------------------------------
@@ -660,6 +726,10 @@ CONOCIMIENTO INTEGRAL DE LA WEB NEXSTUDIO:
    - Panel exclusivo para administradores donde se gestionan usuarios, permisos, proyectos, tickets de soporte y métricas del sistema.
 6. Noticias y Actualizaciones:
    - Novedades de la versión 1.0, mejoras de rendimiento, parches y anuncios oficiales.
+7. Sección de Herramientas y Convertidor Universal de Archivos:
+   - Convertidor de Archivos: Herramienta oficial integrada que soporta más de 500 formatos (imágenes como PNG/JPG/WebP, documentos como PDF/DOCX/TXT/HTML, audio como MP3/WAV/OGG, video como MP4/GIF, datos como JSON/CSV/YAML y archivos ZIP).
+   - Límite amplio de capacidad: Hasta 1.5 GB por lote de archivos.
+   - Gestión inteligente del espacio y privacidad efímera: Los archivos se procesan mediante flujos de memoria temporal del navegador sin almacenarse permanentemente en ningún disco del servidor. En cuanto se descargan o se limpian, los archivos se eliminan y el espacio se recupera al 100% de forma inmediata.
 
 NORMAS DE RESPUESTA:
 - Habla en español, con un tono cercano, servicial, profesional y dinámico.

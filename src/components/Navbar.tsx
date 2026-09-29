@@ -26,7 +26,8 @@ import {
   Users,
   Bot,
   Sparkles,
-  Newspaper
+  Newspaper,
+  RefreshCw
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useSettings } from '../context/SettingsContext';
