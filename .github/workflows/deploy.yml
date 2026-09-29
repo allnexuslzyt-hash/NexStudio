@@ -17,14 +17,18 @@ jobs:
       - name: Descargar repositorio
         uses: actions/checkout@v4
 
-      - name: Configurar Node.js (LTS)
+      - name: Configurar Node.js (LTS 22)
         uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: 'npm'
 
       - name: Instalar dependencias
-        run: npm ci
+        run: |
+          if [ -f package-lock.json ]; then
+            npm ci || npm install --include=dev
+          else
+            npm install --include=dev
+          fi
 
       - name: Compilar aplicación (Vite)
         run: npm run build
