@@ -583,7 +583,7 @@ app.get("/api/tools/speedtest/ping", (_req: Request, res: Response) => {
 });
 
 app.get("/api/tools/speedtest/download", (req: Request, res: Response) => {
-  const bytes = Math.min(25 * 1024 * 1024, Math.max(1024 * 1024, parseInt(String(req.query.bytes || "5242880"), 10)));
+  const bytes = Math.min(50 * 1024 * 1024, Math.max(1024 * 1024, parseInt(String(req.query.bytes || "10485760"), 10)));
   res.setHeader("Content-Type", "application/octet-stream");
   res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
   res.setHeader("Content-Length", bytes.toString());
