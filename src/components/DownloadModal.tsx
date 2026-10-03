@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Download, Clock, CheckCircle2, X, ExternalLink, ShieldCheck, FileCode2 } from 'lucide-react';
+import { useAdmin } from '../context/AdminContext';
 
 interface DownloadModalProps {
   isOpen: boolean;
@@ -8,6 +9,7 @@ interface DownloadModalProps {
   projectTitle: string;
   downloadUrl: string;
   waitTimeSeconds?: number;
+  projectId?: string;
 }
 
 export const DownloadModal: React.FC<DownloadModalProps> = ({
@@ -16,7 +18,9 @@ export const DownloadModal: React.FC<DownloadModalProps> = ({
   projectTitle,
   downloadUrl,
   waitTimeSeconds = 3,
+  projectId,
 }) => {
+  const { incrementProjectDownloads } = useAdmin();
   const [secondsLeft, setSecondsLeft] = useState<number>(waitTimeSeconds);
   const [hasStarted, setHasStarted] = useState<boolean>(false);
   const [hasTriggeredDownload, setHasTriggeredDownload] = useState<boolean>(false);
@@ -51,12 +55,18 @@ export const DownloadModal: React.FC<DownloadModalProps> = ({
   useEffect(() => {
     if (isOpen && hasStarted && secondsLeft === 0 && !hasTriggeredDownload) {
       setHasTriggeredDownload(true);
+      if (projectId) {
+        incrementProjectDownloads(projectId);
+      }
       window.open(downloadUrl, '_blank', 'noopener,noreferrer');
     }
-  }, [isOpen, hasStarted, secondsLeft, hasTriggeredDownload, downloadUrl]);
+  }, [isOpen, hasStarted, secondsLeft, hasTriggeredDownload, downloadUrl, projectId, incrementProjectDownloads]);
 
   const handleManualDownload = () => {
     if (secondsLeft > 0) return;
+    if (projectId) {
+      incrementProjectDownloads(projectId);
+    }
     window.open(downloadUrl, '_blank', 'noopener,noreferrer');
   };
 

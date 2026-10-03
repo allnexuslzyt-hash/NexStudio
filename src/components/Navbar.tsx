@@ -35,6 +35,8 @@ import { useAdmin } from '../context/AdminContext';
 import { useSupport } from '../context/SupportContext';
 import { DropdownMenu, DropdownMenuItem } from './DropdownMenu';
 import { RedesDropdown } from './RedesDropdown';
+import { NotificationDropdown } from './NotificationDropdown';
+import { ThemeToggle } from './ThemeToggle';
 
 interface NavbarProps {
   activeView?: string;
@@ -205,7 +207,13 @@ export const Navbar: React.FC<NavbarProps> = ({
           </div>
 
           {/* Right Action & Authentication Controls */}
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 sm:gap-3">
+            {/* Modo Oscuro */}
+            <ThemeToggle />
+
+            {/* Centro de Notificaciones: Exclusivo para usuarios autenticados */}
+            {user && <NotificationDropdown onSelectView={onSelectView} />}
+
             {loading ? (
               <div className="h-9 w-28 bg-slate-100 animate-pulse rounded-lg" />
             ) : user ? (

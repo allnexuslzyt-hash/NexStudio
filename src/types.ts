@@ -172,8 +172,22 @@ export interface AdminProject {
   isPublic: boolean; // Visibilidad (visible para visitantes o solo administradores)
   requireAuth: boolean; // Restricción (requiere registro previo para descargar)
   status: 'active' | 'draft' | 'archived';
+  downloadsCount?: number; // Contador de descargas oficiales en vivo
   createdAt?: string;
   updatedAt?: string;
+}
+
+export interface AppNotification {
+  id: string;
+  title: string;
+  message: string;
+  type: 'update' | 'community' | 'support' | 'system' | 'download';
+  timestamp: string;
+  isRead: boolean;
+  actionView?: string; // 'noticias' | 'comunidad' | 'soporte' | 'proyectos' | 'herramientas'
+  linkUrl?: string;
+  createdAt?: string;
+  createdBy?: string;
 }
 
 export interface AdminCreation {
@@ -265,6 +279,27 @@ export interface UserRepoProject {
   status?: 'active' | 'hidden' | 'flagged';
   moderationNotes?: string;
   createdAt: string;
+  updatedAt?: string;
+}
+
+export interface NewsChangelogCategory {
+  id?: string;
+  title: string;
+  iconName?: string;
+  items: string[];
+}
+
+export interface NewsItem {
+  id: string;
+  version: string;
+  title: string;
+  badge?: string;
+  subtitle?: string;
+  date?: string;
+  isPublished: boolean;
+  isCurrent?: boolean;
+  categories: NewsChangelogCategory[];
+  createdAt?: string;
   updatedAt?: string;
 }
 

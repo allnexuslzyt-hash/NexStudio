@@ -10,7 +10,9 @@ import {
   AdminProject,
   AdminCreation,
   LaunchModeConfig,
-  SecurityConfig
+  SecurityConfig,
+  NewsItem,
+  AppNotification
 } from '../types';
 import { useAuth, isSuperAdminEmail } from './AuthContext';
 import { FAQ_ITEMS, GUIDE_ARTICLES, FAQItem, GuideArticle } from '../data/helpData';
@@ -66,6 +68,8 @@ interface AdminContextType {
   deleteProject: (projectId: string) => Promise<void>;
   toggleProjectVisibility: (projectId: string) => Promise<void>;
   toggleProjectRestriction: (projectId: string) => Promise<void>;
+  incrementProjectDownloads: (projectId: string) => Promise<void>;
+  setProjectDownloads: (projectId: string, count: number) => Promise<void>;
   
   // Creations Manager
   creations: AdminCreation[];
@@ -73,7 +77,24 @@ interface AdminContextType {
   addCreation: (creation: Omit<AdminCreation, 'id' | 'createdAt' | 'updatedAt'>) => Promise<void>;
   deleteCreation: (creationId: string) => Promise<void>;
   toggleCreationVisibility: (creationId: string) => Promise<void>;
+
+  // News & Updates Manager
+  newsList: NewsItem[];
+  addNewsItem: (news: Omit<NewsItem, 'id' | 'createdAt' | 'updatedAt'>) => Promise<void>;
+  updateNewsItem: (news: NewsItem) => Promise<void>;
+  deleteNewsItem: (newsId: string) => Promise<void>;
+  toggleNewsPublish: (newsId: string) => Promise<void>;
+  setCurrentNews: (newsId: string) => Promise<void>;
+  resetNewsToDefault: () => Promise<void>;
   
+  // Global Notifications for All Users
+  globalNotifications: AppNotification[];
+  addGlobalNotification: (notif: Omit<AppNotification, 'id' | 'createdAt'>) => Promise<void>;
+  updateGlobalNotification: (notif: AppNotification) => Promise<void>;
+  deleteGlobalNotification: (id: string) => Promise<void>;
+  clearAllGlobalNotifications: () => Promise<void>;
+  resetGlobalNotificationsToDefault: () => Promise<void>;
+
   // Audit Logs
   auditLogs: AuditLogItem[];
   logAdminAction: (action: string, target: string, category: AuditLogItem['category'], details?: string) => void;
@@ -184,6 +205,7 @@ export const INITIAL_PROJECTS: AdminProject[] = [
     isPublic: true,
     requireAuth: true,
     status: 'active',
+    downloadsCount: 1845,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString()
   },
@@ -199,6 +221,7 @@ export const INITIAL_PROJECTS: AdminProject[] = [
     isPublic: true,
     requireAuth: true,
     status: 'active',
+    downloadsCount: 3482,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString()
   },
@@ -214,6 +237,7 @@ export const INITIAL_PROJECTS: AdminProject[] = [
     isPublic: true,
     requireAuth: true,
     status: 'active',
+    downloadsCount: 2915,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString()
   }
@@ -232,6 +256,132 @@ export const INITIAL_CREATIONS: AdminCreation[] = [
     status: 'active',
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString()
+  }
+];
+
+export const INITIAL_NEWS_LIST: NewsItem[] = [
+  {
+    id: 'news-actualizacion-1-0',
+    version: '1.0',
+    title: 'Actualización 1.0',
+    badge: 'Versión 1.0',
+    subtitle: 'Lanzamiento inicial de la plataforma',
+    date: 'Lanzamiento Oficial',
+    isPublished: true,
+    isCurrent: true,
+    categories: [
+      {
+        id: 'cat-plataforma',
+        title: 'Plataforma NexStudio',
+        iconName: 'Boxes',
+        items: [
+          'Lanzamiento oficial de la web con diseño moderno, rápido y adaptable a móviles y PC.',
+          'Navegación sencilla mediante menú desplegable y accesos rápidos.'
+        ]
+      },
+      {
+        id: 'cat-proyectos',
+        title: 'Proyectos y Recursos',
+        iconName: 'FolderKanban',
+        items: [
+          'Publicación de NexClean y NexBoost en ejecutables oficiales (.exe) y Asistente Web interactivo.',
+          'Visor de código integrado con copiado rápido y descarga directa.'
+        ]
+      },
+      {
+        id: 'cat-herramientas',
+        title: 'Herramientas de Procesamiento',
+        iconName: 'Wrench',
+        items: [
+          'Convertidor de archivos con soporte para +500 extensiones y 1.5 GB de límite.',
+          'Compresor de imágenes y miniaturas con ahorro de hasta el 85%.',
+          'Generador de códigos QR personalizados para enlaces, Wi-Fi y redes en PNG y SVG.',
+          'Medidor de velocidad y ping intensivo (10s descarga, 10s subida y 5s latencia).',
+          'Generador de contraseñas blindadas y tokens con criptografía WebCrypto.'
+        ]
+      },
+      {
+        id: 'cat-comunidad',
+        title: 'Comunidad',
+        iconName: 'Users',
+        items: [
+          'Muro social para compartir posts, proyectos, capturas y novedades.',
+          'Sistema de interacciones con Me gusta y comentarios entre usuarios.'
+        ]
+      },
+      {
+        id: 'cat-redes',
+        title: 'Redes',
+        iconName: 'Share2',
+        items: [
+          'Acceso directo a la red oficial de YouTube NexStudio.',
+          'Enlaces a todas las redes: YouTube, Twitch, TikTok, Twitter / X y Discord.'
+        ]
+      },
+      {
+        id: 'cat-cuentas',
+        title: 'Cuentas de Usuario',
+        iconName: 'UserCheck',
+        items: [
+          'Registro e inicio de sesión rápido con Google o correo electrónico.',
+          'Perfil personalizable con avatar, nombre de usuario y biografía.'
+        ]
+      },
+      {
+        id: 'cat-ayuda',
+        title: 'Ayuda y Soporte',
+        iconName: 'HelpCircle',
+        items: [
+          'Centro de ayuda con preguntas frecuentes y guías paso a paso.',
+          'Canal de soporte interactivo con Jaime y tickets de atención personalizada.'
+        ]
+      }
+    ],
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString()
+  }
+];
+
+export const INITIAL_GLOBAL_NOTIFICATIONS: AppNotification[] = [
+  {
+    id: 'notif-actualizacion-1-0',
+    title: '🚀 Actualización 1.0 Oficial',
+    message: '¡Ya está disponible el lanzamiento de NexStudio con nuevas herramientas y optimizaciones!',
+    type: 'update',
+    timestamp: 'Hace unos momentos',
+    isRead: false,
+    actionView: 'noticias',
+    createdAt: new Date().toISOString()
+  },
+  {
+    id: 'notif-speedtest-10s',
+    title: '⚡ Medidor de Ancho de Banda',
+    message: 'Prueba el medidor con 10s de descarga (Azul), 10s de subida (Morado) y 5s de latencia (Verde).',
+    type: 'system',
+    timestamp: 'Hoy',
+    isRead: false,
+    actionView: 'herramientas',
+    createdAt: new Date().toISOString()
+  },
+  {
+    id: 'notif-nexclean-boost',
+    title: '💾 NexClean & NexBoost (.exe)',
+    message: 'Descarga gratuita de las aplicaciones oficiales para limpiar y acelerar tu ordenador.',
+    type: 'download',
+    timestamp: 'Ayer',
+    isRead: true,
+    actionView: 'proyectos',
+    createdAt: new Date().toISOString()
+  },
+  {
+    id: 'notif-support-ready',
+    title: '🎧 Canal de Atención y Soporte',
+    message: 'Jaime y el equipo están disponibles para ayudarte con cualquier duda o sugerencia.',
+    type: 'support',
+    timestamp: 'Esta semana',
+    isRead: true,
+    actionView: 'soporte',
+    createdAt: new Date().toISOString()
   }
 ];
 
@@ -380,6 +530,100 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       console.error('Error guardando creaciones en localStorage:', e);
     }
   }, [creations]);
+
+  // News & Updates management state
+  const [newsList, setNewsList] = useState<NewsItem[]>(() => {
+    try {
+      const saved = localStorage.getItem('nexstudio_news_list');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          return parsed;
+        }
+      }
+    } catch (e) {
+      console.error('Error cargando noticias locales:', e);
+    }
+    return INITIAL_NEWS_LIST;
+  });
+
+  // Sync newsList to localStorage
+  useEffect(() => {
+    try {
+      localStorage.setItem('nexstudio_news_list', JSON.stringify(newsList));
+    } catch (e) {
+      console.error('Error guardando noticias en localStorage:', e);
+    }
+  }, [newsList]);
+
+  // Real-time Firestore sync for News
+  useEffect(() => {
+    const newsDocRef = doc(db, 'settings', 'news_config');
+    const unsub = onSnapshot(
+      newsDocRef,
+      (snapshot) => {
+        if (snapshot.exists()) {
+          const data = snapshot.data();
+          if (Array.isArray(data?.newsList) && data.newsList.length > 0) {
+            setNewsList(data.newsList);
+            try {
+              localStorage.setItem('nexstudio_news_list', JSON.stringify(data.newsList));
+            } catch (e) {}
+          }
+        }
+      },
+      (error) => {
+        console.warn('Firestore news listener fallback to local state:', error);
+      }
+    );
+    return () => unsub();
+  }, []);
+
+  // Global System Notifications for all users
+  const [globalNotifications, setGlobalNotifications] = useState<AppNotification[]>(() => {
+    try {
+      const saved = localStorage.getItem('nexstudio_global_notifications');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch (e) {
+      console.error('Error cargando notificaciones globales locales:', e);
+    }
+    return INITIAL_GLOBAL_NOTIFICATIONS;
+  });
+
+  // Sync globalNotifications to localStorage
+  useEffect(() => {
+    try {
+      localStorage.setItem('nexstudio_global_notifications', JSON.stringify(globalNotifications));
+    } catch (e) {
+      console.error('Error guardando notificaciones globales en localStorage:', e);
+    }
+  }, [globalNotifications]);
+
+  // Real-time Firestore sync for global notifications
+  useEffect(() => {
+    const notifsDocRef = doc(db, 'settings', 'global_notifications');
+    const unsub = onSnapshot(
+      notifsDocRef,
+      (snapshot) => {
+        if (snapshot.exists()) {
+          const data = snapshot.data();
+          if (Array.isArray(data?.items)) {
+            setGlobalNotifications(data.items);
+            try {
+              localStorage.setItem('nexstudio_global_notifications', JSON.stringify(data.items));
+            } catch (e) {}
+          }
+        }
+      },
+      (error) => {
+        console.warn('Firestore global notifications listener fallback to local state:', error);
+      }
+    );
+    return () => unsub();
+  }, []);
 
   // Audit logs state
   const [auditLogs, setAuditLogs] = useState<AuditLogItem[]>(() => {
@@ -1185,6 +1429,43 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     await updateProject(updated);
   };
 
+  const incrementProjectDownloads = async (projectId: string) => {
+    const updated = projects.map(p => {
+      if (p.id === projectId) {
+        return {
+          ...p,
+          downloadsCount: (p.downloadsCount || 0) + 1,
+          updatedAt: new Date().toISOString()
+        };
+      }
+      return p;
+    });
+    setProjects(updated);
+    try {
+      localStorage.setItem('nexstudio_admin_projects', JSON.stringify(updated));
+      await saveProjectsToFirestore(updated);
+    } catch {}
+  };
+
+  const setProjectDownloads = async (projectId: string, count: number) => {
+    const updated = projects.map(p => {
+      if (p.id === projectId) {
+        return {
+          ...p,
+          downloadsCount: Math.max(0, count),
+          updatedAt: new Date().toISOString()
+        };
+      }
+      return p;
+    });
+    setProjects(updated);
+    try {
+      localStorage.setItem('nexstudio_admin_projects', JSON.stringify(updated));
+      await saveProjectsToFirestore(updated);
+      logAdminAction('Ajustó contador de descargas', projectId, 'proyectos', `Nuevo conteo: ${count}`);
+    } catch {}
+  };
+
   // Creations Management Functions
   const saveCreationsToFirestore = async (newCreations: AdminCreation[]) => {
     try {
@@ -1244,6 +1525,138 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     await updateCreation(updated);
   };
 
+  // Helper to persist news to Firestore & localStorage
+  const persistNews = async (updatedList: NewsItem[]) => {
+    setNewsList(updatedList);
+    try {
+      localStorage.setItem('nexstudio_news_list', JSON.stringify(updatedList));
+      await setDoc(doc(db, 'settings', 'news_config'), {
+        newsList: updatedList,
+        lastUpdated: new Date().toISOString(),
+        updatedBy: user?.email || 'allnexuslzyt@gmail.com'
+      }, { merge: true });
+    } catch (err) {
+      console.warn('Persistencia local de noticias completada');
+    }
+  };
+
+  const addNewsItem = async (news: Omit<NewsItem, 'id' | 'createdAt' | 'updatedAt'>) => {
+    const newId = `news-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
+    const newItem: NewsItem = {
+      ...news,
+      id: newId,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    };
+    let updatedList = [newItem, ...newsList];
+    if (newItem.isCurrent) {
+      updatedList = updatedList.map(n => n.id === newId ? n : { ...n, isCurrent: false });
+    }
+    await persistNews(updatedList);
+    logAdminAction('Creó Nueva Noticia/Actualización', newItem.title, 'ajustes', `Versión: ${newItem.version}`);
+  };
+
+  const updateNewsItem = async (updated: NewsItem) => {
+    let updatedList = newsList.map(n => n.id === updated.id ? { ...updated, updatedAt: new Date().toISOString() } : n);
+    if (updated.isCurrent) {
+      updatedList = updatedList.map(n => n.id === updated.id ? n : { ...n, isCurrent: false });
+    }
+    await persistNews(updatedList);
+    logAdminAction('Editó Noticia/Actualización', updated.title, 'ajustes', `Versión: ${updated.version}`);
+  };
+
+  const deleteNewsItem = async (newsId: string) => {
+    const target = newsList.find(n => n.id === newsId);
+    let updatedList = newsList.filter(n => n.id !== newsId);
+    if (updatedList.length > 0 && !updatedList.some(n => n.isCurrent)) {
+      updatedList[0].isCurrent = true;
+    }
+    await persistNews(updatedList);
+    if (target) {
+      logAdminAction('Eliminó Noticia/Actualización', target.title, 'ajustes');
+    }
+  };
+
+  const toggleNewsPublish = async (newsId: string) => {
+    const target = newsList.find(n => n.id === newsId);
+    if (!target) return;
+    const newPub = !target.isPublished;
+    const updatedList = newsList.map(n => n.id === newsId ? { ...n, isPublished: newPub, updatedAt: new Date().toISOString() } : n);
+    await persistNews(updatedList);
+    logAdminAction(newPub ? 'Publicó Noticia' : 'Ocultó Noticia (Borrador)', target.title, 'ajustes');
+  };
+
+  const setCurrentNews = async (newsId: string) => {
+    const target = newsList.find(n => n.id === newsId);
+    if (!target) return;
+    const updatedList = newsList.map(n => ({
+      ...n,
+      isCurrent: n.id === newsId,
+      updatedAt: n.id === newsId ? new Date().toISOString() : n.updatedAt
+    }));
+    await persistNews(updatedList);
+    logAdminAction('Marcó como Actualización Destacada', target.title, 'ajustes', `Versión ${target.version}`);
+  };
+
+  const resetNewsToDefault = async () => {
+    await persistNews(INITIAL_NEWS_LIST);
+    logAdminAction('Restableció Noticias por Defecto', 'Actualización 1.0 Oficial', 'ajustes');
+  };
+
+  const persistGlobalNotifications = async (items: AppNotification[]) => {
+    setGlobalNotifications(items);
+    try {
+      localStorage.setItem('nexstudio_global_notifications', JSON.stringify(items));
+    } catch {}
+    try {
+      const notifsRef = doc(db, 'settings', 'global_notifications');
+      await setDoc(notifsRef, {
+        items,
+        lastUpdated: new Date().toISOString(),
+        updatedBy: user?.email || 'allnexuslzyt@gmail.com'
+      }, { merge: true });
+    } catch (err) {
+      console.warn('Persistencia local de notificaciones globales completada:', err);
+    }
+  };
+
+  const addGlobalNotification = async (notif: Omit<AppNotification, 'id' | 'createdAt'>) => {
+    const newId = `notif-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
+    const newItem: AppNotification = {
+      ...notif,
+      id: newId,
+      createdAt: new Date().toISOString()
+    };
+    const updated = [newItem, ...globalNotifications];
+    await persistGlobalNotifications(updated);
+    logAdminAction('Publicó Notificación Global', newItem.title, 'ajustes', `Categoría: ${newItem.type}`);
+  };
+
+  const updateGlobalNotification = async (updated: AppNotification) => {
+    const updatedList = globalNotifications.map(n => n.id === updated.id ? updated : n);
+    await persistGlobalNotifications(updatedList);
+    logAdminAction('Editó Notificación Global', updated.title, 'ajustes');
+  };
+
+  const deleteGlobalNotification = async (id: string) => {
+    const target = globalNotifications.find(n => n.id === id);
+    const updated = globalNotifications.filter(n => n.id !== id);
+    await persistGlobalNotifications(updated);
+    if (target) {
+      logAdminAction('Eliminó Notificación Global', target.title, 'ajustes', 'Eliminada para todos los usuarios');
+    }
+  };
+
+  const clearAllGlobalNotifications = async () => {
+    await persistGlobalNotifications([]);
+    logAdminAction('Vació Notificaciones Globales', 'Todas las notificaciones', 'ajustes', 'Vaciadas para todos los usuarios');
+  };
+
+  const resetGlobalNotificationsToDefault = async () => {
+    await persistGlobalNotifications(INITIAL_GLOBAL_NOTIFICATIONS);
+    logAdminAction('Restableció Notificaciones Globales', 'Notificaciones por Defecto', 'ajustes');
+  };
+
   const serverStatus = {
     status: (siteSettings.maintenanceMode ? 'maintenance' : 'online') as 'online' | 'degraded' | 'maintenance',
     latencyMs: 24,
@@ -1290,11 +1703,26 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         deleteProject,
         toggleProjectVisibility,
         toggleProjectRestriction,
+        incrementProjectDownloads,
+        setProjectDownloads,
         creations,
         updateCreation,
         addCreation,
         deleteCreation,
         toggleCreationVisibility,
+        newsList,
+        addNewsItem,
+        updateNewsItem,
+        deleteNewsItem,
+        toggleNewsPublish,
+        setCurrentNews,
+        resetNewsToDefault,
+        globalNotifications,
+        addGlobalNotification,
+        updateGlobalNotification,
+        deleteGlobalNotification,
+        clearAllGlobalNotifications,
+        resetGlobalNotificationsToDefault,
         auditLogs,
         logAdminAction,
         isAdmin,

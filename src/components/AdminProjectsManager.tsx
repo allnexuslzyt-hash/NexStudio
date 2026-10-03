@@ -87,6 +87,7 @@ export const AdminProjectsManager: React.FC<AdminProjectsManagerProps> = ({
   const [formIsPublic, setFormIsPublic] = useState(true);
   const [formRequireAuth, setFormRequireAuth] = useState(true);
   const [formStatus, setFormStatus] = useState<'active' | 'draft' | 'archived'>('active');
+  const [formDownloadsCount, setFormDownloadsCount] = useState<number>(0);
   const [formError, setFormError] = useState<string | null>(null);
 
   // Open modal for new project
@@ -102,6 +103,7 @@ export const AdminProjectsManager: React.FC<AdminProjectsManagerProps> = ({
     setFormIsPublic(true);
     setFormRequireAuth(true);
     setFormStatus('active');
+    setFormDownloadsCount(0);
     setFormError(null);
     setIsModalOpen(true);
   };
@@ -119,6 +121,7 @@ export const AdminProjectsManager: React.FC<AdminProjectsManagerProps> = ({
     setFormIsPublic(project.isPublic ?? true);
     setFormRequireAuth(project.requireAuth ?? true);
     setFormStatus(project.status || 'active');
+    setFormDownloadsCount(project.downloadsCount ?? 0);
     setFormError(null);
     setIsModalOpen(true);
   };
@@ -150,7 +153,8 @@ export const AdminProjectsManager: React.FC<AdminProjectsManagerProps> = ({
           waitTimeSeconds: Math.max(0, Number(formWaitTime) || 0),
           isPublic: formIsPublic,
           requireAuth: formRequireAuth,
-          status: formStatus
+          status: formStatus,
+          downloadsCount: Math.max(0, Number(formDownloadsCount) || 0)
         });
         onShowToast(`Proyecto "${formTitle.trim()}" actualizado correctamente`);
       } else {
@@ -165,7 +169,8 @@ export const AdminProjectsManager: React.FC<AdminProjectsManagerProps> = ({
           waitTimeSeconds: Math.max(0, Number(formWaitTime) || 0),
           isPublic: formIsPublic,
           requireAuth: formRequireAuth,
-          status: formStatus
+          status: formStatus,
+          downloadsCount: Math.max(0, Number(formDownloadsCount) || 0)
         });
         onShowToast(`Nuevo proyecto "${formTitle.trim()}" creado con éxito`);
       }
@@ -328,6 +333,7 @@ export const AdminProjectsManager: React.FC<AdminProjectsManagerProps> = ({
   const publicCount = projects.filter(p => p.isPublic).length;
   const restrictedCount = projects.filter(p => p.requireAuth).length;
   const openCount = projects.filter(p => !p.requireAuth).length;
+  const totalDownloads = projects.reduce((acc, p) => acc + (p.downloadsCount || 0), 0);
 
   const publicCreationsCount = creations.filter(c => c.isPublic).length;
   const hiddenCreationsCount = creations.filter(c => !c.isPublic).length;

@@ -52,6 +52,7 @@ interface CardItem {
   downloadUrl?: string;
   downloadSeconds?: number;
   documentUrl?: string;
+  downloadsCount?: number;
 }
 
 export const CatalogView: React.FC<CatalogViewProps> = ({ view, onBack }) => {
@@ -117,7 +118,8 @@ export const CatalogView: React.FC<CatalogViewProps> = ({ view, onBack }) => {
               : 'from-indigo-500/10 to-blue-500/10 border-indigo-200',
             linkText: 'Ver',
             downloadUrl: p.downloadUrl,
-            downloadSeconds: p.waitTimeSeconds ?? 3
+            downloadSeconds: p.waitTimeSeconds ?? 3,
+            downloadsCount: p.downloadsCount
           };
         });
       }
@@ -274,6 +276,7 @@ export const CatalogView: React.FC<CatalogViewProps> = ({ view, onBack }) => {
     title: string;
     url: string;
     waitTime: number;
+    projectId?: string;
   }>({
     isOpen: false,
     title: '',
@@ -351,7 +354,7 @@ export const CatalogView: React.FC<CatalogViewProps> = ({ view, onBack }) => {
                   {card.icon}
                 </div>
                 <div>
-                  <div className="flex items-center gap-2 mb-0.5">
+                  <div className="flex flex-wrap items-center gap-2 mb-0.5">
                     <h3 className="text-xl font-bold text-slate-900 group-hover:text-indigo-950 transition-colors">
                       {card.title}
                     </h3>
@@ -362,6 +365,12 @@ export const CatalogView: React.FC<CatalogViewProps> = ({ view, onBack }) => {
                     ) : (card.id === 'proj-nexclean' || card.title.toLowerCase().includes('clean') || card.tag?.toLowerCase().includes('.exe')) && (
                       <span className="px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-wide bg-emerald-100 text-emerald-800 rounded-full border border-emerald-200">
                         .EXE
+                      </span>
+                    )}
+                    {card.downloadsCount !== undefined && card.downloadsCount > 0 && (
+                      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 text-[10px] font-bold bg-slate-100 text-slate-700 rounded-full border border-slate-200">
+                        <Download className="w-3 h-3 text-indigo-500" />
+                        <span>{card.downloadsCount.toLocaleString()} descargas</span>
                       </span>
                     )}
                   </div>
@@ -407,6 +416,7 @@ export const CatalogView: React.FC<CatalogViewProps> = ({ view, onBack }) => {
                     title: card.title,
                     url: card.downloadUrl,
                     waitTime: card.downloadSeconds || 3,
+                    projectId: card.id,
                   });
                 } else if (card.linkUrl) {
                   window.open(card.linkUrl, '_blank', 'noopener,noreferrer');
@@ -518,6 +528,7 @@ export const CatalogView: React.FC<CatalogViewProps> = ({ view, onBack }) => {
         projectTitle={downloadTarget.title}
         downloadUrl={downloadTarget.url}
         waitTimeSeconds={downloadTarget.waitTime}
+        projectId={downloadTarget.projectId}
       />
     </div>
   );

@@ -22,6 +22,7 @@ import {
   Server, 
   Activity, 
   Bell, 
+  Megaphone,
   FileText, 
   HelpCircle, 
   Plus, 
@@ -56,6 +57,8 @@ import { FAQItem, GuideArticle } from '../data/helpData';
 import { useSupport } from '../context/SupportContext';
 import { validateUsername, validateDisplayName } from '../utils/usernameValidation';
 import { AdminProjectsManager } from './AdminProjectsManager';
+import { AdminNewsManager } from './AdminNewsManager';
+import { AdminNotificationsManager } from './AdminNotificationsManager';
 import { LaunchScreen } from './LaunchScreen';
 import { TorBlockedScreen } from './TorBlockedScreen';
 
@@ -63,7 +66,7 @@ interface AdminCommandCenterProps {
   onBack: () => void;
 }
 
-type AdminTab = 'dashboard' | 'users' | 'tickets' | 'projects' | 'moderation' | 'security' | 'settings' | 'launch';
+type AdminTab = 'dashboard' | 'users' | 'tickets' | 'projects' | 'news' | 'notifications' | 'moderation' | 'security' | 'settings' | 'launch';
 
 export const AdminCommandCenter: React.FC<AdminCommandCenterProps> = ({ onBack }) => {
   const { 
@@ -99,6 +102,8 @@ export const AdminCommandCenter: React.FC<AdminCommandCenterProps> = ({ onBack }
     deleteGuide,
     projects,
     creations,
+    newsList,
+    globalNotifications,
     auditLogs, 
     serverStatus,
     isAdmin 
@@ -667,6 +672,40 @@ export const AdminCommandCenter: React.FC<AdminCommandCenterProps> = ({ onBack }
           <span>Proyectos y Creaciones</span>
           <span className="ml-1 px-1.5 py-0.2 rounded-full text-[10px] bg-slate-200 text-slate-700 font-semibold">
             {projects.length + (creations?.length || 0)}
+          </span>
+        </button>
+
+        <button
+          type="button"
+          id="btn-admin-tab-news"
+          onClick={() => setActiveTab('news')}
+          className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-semibold transition-all cursor-pointer whitespace-nowrap ${
+            activeTab === 'news' 
+              ? 'bg-white text-slate-900 shadow-xs font-bold' 
+              : 'text-slate-600 hover:text-slate-900'
+          }`}
+        >
+          <Bell className="w-4 h-4 text-indigo-600" />
+          <span>Noticias y Actualizaciones</span>
+          <span className="ml-1 px-1.5 py-0.2 rounded-full text-[10px] bg-indigo-100 text-indigo-800 font-bold">
+            {newsList.length}
+          </span>
+        </button>
+
+        <button
+          type="button"
+          id="btn-admin-tab-notifications"
+          onClick={() => setActiveTab('notifications')}
+          className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-semibold transition-all cursor-pointer whitespace-nowrap ${
+            activeTab === 'notifications' 
+              ? 'bg-white text-slate-900 shadow-xs font-bold' 
+              : 'text-slate-600 hover:text-slate-900'
+          }`}
+        >
+          <Megaphone className="w-4 h-4 text-amber-500" />
+          <span>Notificaciones Globales</span>
+          <span className="ml-1 px-1.5 py-0.2 rounded-full text-[10px] bg-amber-100 text-amber-800 font-bold">
+            {(globalNotifications || []).length}
           </span>
         </button>
 
@@ -2926,6 +2965,11 @@ export const AdminCommandCenter: React.FC<AdminCommandCenterProps> = ({ onBack }
       {/* TAB PROYECTOS: GESTIÓN DE PROYECTOS, ENLACES, VISIBILIDAD Y RESTRICCIONES */}
       {activeTab === 'projects' && (
         <AdminProjectsManager onShowToast={showToast} />
+      )}
+
+      {/* TAB NOTICIAS: GESTIÓN DE NOTICIAS, CHANGELOG Y ACTUALIZACIONES */}
+      {activeTab === 'news' && (
+        <AdminNewsManager onShowToast={showToast} />
       )}
 
       {/* MODAL 1: Cambiar Rol */}

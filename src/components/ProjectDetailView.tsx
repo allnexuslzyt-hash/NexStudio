@@ -240,12 +240,12 @@ export const ProjectDetailView: React.FC<ProjectDetailViewProps> = ({ onBack, pr
             {projectDesc}
           </motion.p>
 
-          {/* Download Action Button */}
+          {/* Download Action Button and Live Downloads Stats */}
           <motion.div
             initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.22, duration: 0.4 }}
-            className="flex items-center"
+            className="flex flex-wrap items-center gap-4"
           >
             <div className="relative group">
               <div className="absolute -inset-0.5 bg-gradient-to-r from-emerald-500 to-teal-500 rounded-2xl blur-sm opacity-50 group-hover:opacity-100 transition duration-300 pointer-events-none" />
@@ -265,6 +265,13 @@ export const ProjectDetailView: React.FC<ProjectDetailViewProps> = ({ onBack, pr
                 <span>Descargar {projectTitle} {isExeProject && !projectTitle.includes('.exe') ? '(.exe)' : ''}</span>
               </motion.button>
             </div>
+
+            {project?.downloadsCount !== undefined && project.downloadsCount > 0 && (
+              <div className="flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-white/90 border border-slate-200/90 shadow-xs text-xs font-bold text-slate-700">
+                <Download className="w-4 h-4 text-emerald-600" />
+                <span>{project.downloadsCount.toLocaleString()} descargas realizadas</span>
+              </div>
+            )}
           </motion.div>
         </div>
       </motion.div>
@@ -303,6 +310,7 @@ export const ProjectDetailView: React.FC<ProjectDetailViewProps> = ({ onBack, pr
         projectTitle={projectTitle}
         downloadUrl={downloadUrl}
         waitTimeSeconds={waitTime}
+        projectId={project?.id}
       />
 
       {/* Registration Required Modal */}

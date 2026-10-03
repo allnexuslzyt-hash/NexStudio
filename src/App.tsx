@@ -25,6 +25,8 @@ import { CommunityFeedView } from './components/CommunityFeedView';
 import { NewsPageView } from './components/NewsPageView';
 import { ToolsPageView } from './components/ToolsPageView';
 import { FileConverterView } from './components/FileConverterView';
+import { ThemeProvider } from './context/ThemeContext';
+import { NotificationProvider } from './context/NotificationContext';
 import { useSupport } from './context/SupportContext';
 import { motion } from 'motion/react';
 import { Boxes } from 'lucide-react';
@@ -250,8 +252,11 @@ const WorkspaceContent: React.FC = () => {
           /* Centro de Mando de Administrador (Exclusivo allnexuslzyt@gmail.com / SuperAdmin) */
           <AdminCommandCenter onBack={() => setActiveView('workspace')} />
         ) : activeView === 'noticias' ? (
-          /* Página oficial de Noticias: Actualización 1.0 */
-          <NewsPageView onBack={() => setActiveView('workspace')} />
+          /* Página oficial de Noticias: Actualizaciones y Changelogs dinámicos */
+          <NewsPageView 
+            onBack={() => setActiveView('workspace')} 
+            onOpenAdminNews={() => setActiveView('admin')}
+          />
         ) : activeView === 'soporte' ? (
           /* Página completa de Soporte: Tickets normales prioritarios y Asistencia Rápida IA */
           <SupportPageView onBack={() => setActiveView('workspace')} />
@@ -378,15 +383,19 @@ const WorkspaceContent: React.FC = () => {
 
 export default function App() {
   return (
-    <AuthProvider>
-      <AdminProvider>
-        <SupportProvider>
-          <SettingsProvider>
-            <WorkspaceContent />
-          </SettingsProvider>
-        </SupportProvider>
-      </AdminProvider>
-    </AuthProvider>
+    <ThemeProvider>
+      <AuthProvider>
+        <AdminProvider>
+          <NotificationProvider>
+            <SupportProvider>
+              <SettingsProvider>
+                <WorkspaceContent />
+              </SettingsProvider>
+            </SupportProvider>
+          </NotificationProvider>
+        </AdminProvider>
+      </AuthProvider>
+    </ThemeProvider>
   );
 }
 
