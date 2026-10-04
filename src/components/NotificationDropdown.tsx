@@ -9,6 +9,7 @@ import {
   Headphones,
   Zap,
   Info,
+  Users,
   ExternalLink,
   X
 } from 'lucide-react';
@@ -70,6 +71,12 @@ export const NotificationDropdown: React.FC<NotificationDropdownProps> = ({ onSe
         return (
           <div className="w-8 h-8 rounded-xl bg-purple-50 dark:bg-purple-950/50 border border-purple-200 dark:border-purple-800 flex items-center justify-center text-purple-600 dark:text-purple-400 shrink-0">
             <Headphones className="w-4 h-4" />
+          </div>
+        );
+      case 'community':
+        return (
+          <div className="w-8 h-8 rounded-xl bg-sky-50 dark:bg-sky-950/50 border border-sky-200 dark:border-sky-800 flex items-center justify-center text-sky-600 dark:text-sky-400 shrink-0">
+            <Users className="w-4 h-4" />
           </div>
         );
       case 'system':

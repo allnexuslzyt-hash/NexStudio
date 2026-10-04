@@ -2972,6 +2972,11 @@ export const AdminCommandCenter: React.FC<AdminCommandCenterProps> = ({ onBack }
         <AdminNewsManager onShowToast={showToast} />
       )}
 
+      {/* TAB NOTIFICACIONES: GESTOR DE NOTIFICACIONES PARA TODOS LOS USUARIOS */}
+      {activeTab === 'notifications' && (
+        <AdminNotificationsManager onShowToast={showToast} />
+      )}
+
       {/* MODAL 1: Cambiar Rol */}
       <AnimatePresence>
         {selectedUserForRole && (

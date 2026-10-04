@@ -229,7 +229,7 @@ const WorkspaceContent: React.FC = () => {
   }
 
   return (
-    <div className="w-full min-h-screen flex flex-col bg-white text-slate-900 selection:bg-indigo-600 selection:text-white">
+    <div className="w-full min-h-screen flex flex-col bg-white dark:bg-[#090d16] text-slate-900 dark:text-slate-100 selection:bg-indigo-600 selection:text-white transition-colors duration-200">
       {/* Aviso / Banner Global en la parte superior del sitio */}
       <GlobalBanner />
 
@@ -243,7 +243,7 @@ const WorkspaceContent: React.FC = () => {
       <SignInPromptBanner />
 
       {/* Main Content Area */}
-      <main className={`w-full flex-1 flex flex-col relative bg-white ${
+      <main className={`w-full flex-1 flex flex-col relative bg-white dark:bg-[#090d16] ${
         activeView === 'comunidad' || activeView === 'soporte' || activeView === 'ayuda' || activeView === 'proyectos' || activeView === 'creaciones' || activeView === 'admin' || activeView === 'noticias'
           ? 'p-0 items-stretch justify-start' 
           : 'items-center justify-center p-4 sm:p-8 overflow-x-hidden'
@@ -305,8 +305,8 @@ const WorkspaceContent: React.FC = () => {
           <>
             {/* Subtle Ambient Background Gradients */}
             <div className="absolute inset-0 pointer-events-none overflow-hidden">
-              <div className="absolute -top-40 left-1/2 -translate-x-1/2 w-[600px] h-[600px] rounded-full bg-indigo-50/60 blur-[100px]" />
-              <div className="absolute -bottom-40 right-1/4 w-[500px] h-[500px] rounded-full bg-amber-50/50 blur-[120px]" />
+              <div className="absolute -top-40 left-1/2 -translate-x-1/2 w-[600px] h-[600px] rounded-full bg-indigo-50/60 dark:bg-indigo-950/20 blur-[100px]" />
+              <div className="absolute -bottom-40 right-1/4 w-[500px] h-[500px] rounded-full bg-amber-50/50 dark:bg-amber-950/15 blur-[120px]" />
             </div>
 
             {/* Main Hero / Title Container */}
@@ -321,13 +321,13 @@ const WorkspaceContent: React.FC = () => {
                 <div className="flex items-center justify-center w-10 h-10 sm:w-12 sm:h-12 rounded-2xl bg-gradient-to-tr from-indigo-600 via-violet-600 to-amber-500 shadow-md shadow-indigo-600/20 shrink-0">
                   <Boxes className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
                 </div>
-                <h1 className="text-3xl sm:text-5xl font-extrabold text-slate-900 tracking-tight">
+                <h1 className="text-3xl sm:text-5xl font-extrabold text-slate-900 dark:text-white tracking-tight">
                   NexStudio
                 </h1>
               </div>
 
               {/* Subtítulo exacto */}
-              <p className="text-base sm:text-lg text-slate-600 font-normal max-w-xl mx-auto leading-relaxed">
+              <p className="text-base sm:text-lg text-slate-600 dark:text-slate-400 font-normal max-w-xl mx-auto leading-relaxed">
                 Todos mis proyectos, funciones, archivos y mucho mas.
               </p>
             </motion.div>
