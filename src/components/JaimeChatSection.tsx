@@ -12,9 +12,11 @@ import {
   HelpCircle,
   Zap,
   HardDrive,
-  Headphones
+  Headphones,
+  Lock
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { useAdmin } from '../context/AdminContext';
 
 export interface JaimeMessage {
   id: string;
@@ -44,6 +46,9 @@ const SUGGESTED_QUESTIONS = [
 
 export const JaimeChatSection: React.FC<JaimeChatSectionProps> = ({ onSwitchToTickets }) => {
   const { user } = useAuth();
+  const { siteSettings } = useAdmin();
+  const isJaimeBlocked = Boolean(siteSettings.securityConfig?.blockJaimeAssistant);
+
   const [messages, setMessages] = useState<JaimeMessage[]>(() => {
     try {
       const saved = sessionStorage.getItem('nexstudio_jaime_chat');
@@ -86,6 +91,17 @@ export const JaimeChatSection: React.FC<JaimeChatSectionProps> = ({ onSwitchToTi
     const trimmed = textToSend.trim();
     if (!trimmed || isTyping) return;
 
+    if (isJaimeBlocked) {
+      const blockedMsg: JaimeMessage = {
+        id: `jaime-blocked-${Date.now()}`,
+        role: 'model',
+        text: '🔒 **Asistente Jaime Bloqueado**: El administrador ha deshabilitado temporalmente las respuestas automáticas de Jaime por motivos de seguridad o mantenimiento. Por favor, pulsa en el botón **Abrir Ticket de Soporte** para que un administrador te atienda directamente.',
+        timestamp: new Date().toISOString()
+      };
+      setMessages(prev => [...prev, blockedMsg]);
+      return;
+    }
+
     setErrorMessage(null);
     const userMsg: JaimeMessage = {
       id: `user-${Date.now()}`,
@@ -108,15 +124,12 @@ export const JaimeChatSection: React.FC<JaimeChatSectionProps> = ({ onSwitchToTi
           history: newHistory.slice(-10).map(m => ({
             role: m.role,
             text: m.text
-          }))
+          })),
+          isBlocked: isJaimeBlocked
         })
       });
 
       const data = await response.json();
-
-      if (!response.ok && !data.reply) {
-        throw new Error(data.error || 'Error al conectar con Jaime.');
-      }
 
       const modelReply = data.reply || 'Aquí estoy para ayudarte con cualquier consulta de NexStudio.';
       const jaimeMsg: JaimeMessage = {
@@ -129,12 +142,11 @@ export const JaimeChatSection: React.FC<JaimeChatSectionProps> = ({ onSwitchToTi
 
       setMessages(prev => [...prev, jaimeMsg]);
     } catch (err: any) {
-      console.error('Error comunicándose con Jaime:', err);
-      setErrorMessage('No se pudo obtener respuesta inmediata de Jaime. Puedes volver a intentarlo o abrir un ticket humano.');
+      console.warn('Fallo de conexión en Jaime, activando respuesta inteligente local:', err);
       const fallbackMsg: JaimeMessage = {
-        id: `jaime-error-${Date.now()}`,
+        id: `jaime-local-${Date.now()}`,
         role: 'model',
-        text: 'Disculpa, tuve un microcorte momentáneo. Si tu duda es sobre **NexClean** o **NexBoost**, puedes descargarlos gratis en la pestaña **Proyectos** del Catálogo. Y si requieres atención humana directa, pulsa abajo para abrir un ticket de soporte.',
+        text: '¡Hola! Aquí Jaime. Si deseas descargar nuestros programas ejecutables oficiales como **NexClean** (.exe) o **NexBoost** (.exe), los tienes disponibles en la sección **Proyectos** del Catálogo. Para consultas de tu cuenta o incidencias técnicas directas, pulsa abajo para **Abrir un Ticket de Soporte** con nuestro equipo.',
         timestamp: new Date().toISOString()
       };
       setMessages(prev => [...prev, fallbackMsg]);
@@ -207,9 +219,15 @@ export const JaimeChatSection: React.FC<JaimeChatSectionProps> = ({ onSwitchToTi
           <div>
             <div className="flex items-center gap-1.5">
               <span className="font-bold text-slate-900">Jaime</span>
-              <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200">
-                IA Oficial
-              </span>
+              {isJaimeBlocked ? (
+                <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-rose-100 text-rose-800 border border-rose-200">
+                  BLOQUEADO
+                </span>
+              ) : (
+                <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200">
+                  IA Oficial
+                </span>
+              )}
             </div>
             <p className="text-[10px] text-slate-500">Asistente virtual de NexStudio · Respuestas instantáneas</p>
           </div>
@@ -235,6 +253,23 @@ export const JaimeChatSection: React.FC<JaimeChatSectionProps> = ({ onSwitchToTi
           </button>
         </div>
       </div>
+
+      {/* Banner if Jaime is blocked */}
+      {isJaimeBlocked && (
+        <div className="p-3 bg-rose-50 border-b border-rose-200 text-rose-800 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2.5 text-xs">
+          <div className="flex items-center gap-2">
+            <Lock className="w-4 h-4 text-rose-600 shrink-0" />
+            <span className="font-semibold">El asistente Jaime está temporalmente deshabilitado por el administrador por seguridad.</span>
+          </div>
+          <button
+            type="button"
+            onClick={onSwitchToTickets}
+            className="px-2.5 py-1 rounded-lg bg-rose-600 hover:bg-rose-500 text-white font-bold text-[11px] shrink-0 cursor-pointer"
+          >
+            Abrir Ticket Humano
+          </button>
+        </div>
+      )}
 
       {/* Chat Messages */}
       <div className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-4">
@@ -366,17 +401,21 @@ export const JaimeChatSection: React.FC<JaimeChatSectionProps> = ({ onSwitchToTi
           type="text"
           value={inputPrompt}
           onChange={(e) => setInputPrompt(e.target.value)}
-          placeholder="Escribe tu duda a Jaime (ej. ¿Cómo funciona NexBoost?)..."
-          disabled={isTyping}
-          className="flex-1 px-4 py-2.5 rounded-xl border border-slate-200 text-xs focus:outline-none focus:border-indigo-600 bg-slate-50 focus:bg-white disabled:opacity-60"
+          placeholder={
+            isJaimeBlocked
+              ? 'El asistente Jaime está temporalmente bloqueado por el administrador...'
+              : 'Escribe tu duda a Jaime (ej. ¿Cómo funciona NexBoost?)...'
+          }
+          disabled={isTyping || isJaimeBlocked}
+          className="flex-1 px-4 py-2.5 rounded-xl border border-slate-200 text-xs focus:outline-none focus:border-indigo-600 bg-slate-50 focus:bg-white disabled:opacity-60 disabled:cursor-not-allowed"
         />
         <button
           type="submit"
-          disabled={!inputPrompt.trim() || isTyping}
-          className="p-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 disabled:bg-slate-200 text-white transition-colors cursor-pointer flex items-center justify-center shadow-xs"
-          title="Enviar mensaje a Jaime"
+          disabled={!inputPrompt.trim() || isTyping || isJaimeBlocked}
+          className="p-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 disabled:bg-slate-200 disabled:cursor-not-allowed text-white transition-colors cursor-pointer flex items-center justify-center shadow-xs"
+          title={isJaimeBlocked ? 'Jaime bloqueado' : 'Enviar mensaje a Jaime'}
         >
-          <Send className="w-4 h-4" />
+          {isJaimeBlocked ? <Lock className="w-4 h-4 text-slate-400" /> : <Send className="w-4 h-4" />}
         </button>
       </form>
     </div>

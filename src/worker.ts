@@ -103,9 +103,9 @@ export default {
 
         const rawKeys = env.GROQ_API_KEYS || "";
         const groqKeys = rawKeys
-          .split(/(?=gsk_)/)
-          .map((k) => k.replace(/[,;\s"'`]/g, "").trim())
-          .filter((k) => k.startsWith("gsk_") && k.length > 20);
+          .split(/[,;\s]+/)
+          .map((k) => k.replace(/["'`]/g, "").trim())
+          .filter((k) => k.length > 20);
 
         const systemPrompt = `Eres Jaime, el asistente virtual oficial, dinámico e inteligente de la plataforma NexStudio (creada por Nexus / NexStudio Team).
 Tu objetivo es responder de manera personalizada, amable, fluida y precisa a cualquier duda, consulta o guía que el usuario tenga sobre TODA la web de NexStudio y su ecosistema:

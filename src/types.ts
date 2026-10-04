@@ -131,6 +131,7 @@ export interface SecurityConfig {
   allowAdminBypass: boolean; // Si los administradores pueden ingresar incluso navegando en Tor
   customBlockedIps?: string[]; // Lista personalizada de IPs bloqueadas
   customAllowedIps?: string[]; // Lista blanca de IPs permitidas
+  blockJaimeAssistant?: boolean; // Bloqueo / Desbloqueo de seguridad del Asistente Jaime IA
   lastUpdated?: string;
   updatedBy?: string;
 }

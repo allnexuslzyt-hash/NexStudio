@@ -130,6 +130,7 @@ export const DEFAULT_SECURITY_CONFIG: SecurityConfig = {
   allowAdminBypass: false,
   customBlockedIps: [],
   customAllowedIps: [],
+  blockJaimeAssistant: false,
   lastUpdated: new Date().toISOString(),
   updatedBy: 'allnexuslzyt@gmail.com'
 };

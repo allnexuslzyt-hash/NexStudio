@@ -24,6 +24,7 @@ import {
 } from 'lucide-react';
 import { useSupport } from '../context/SupportContext';
 import { useAuth } from '../context/AuthContext';
+import { useAdmin } from '../context/AdminContext';
 import { TicketPriority, SupportTicket } from '../types';
 import { JaimeChatSection } from './JaimeChatSection';
 
@@ -54,6 +55,8 @@ export const SupportPageView: React.FC<SupportPageViewProps> = ({ onBack }) => {
   } = useSupport();
 
   const { user, signInWithGoogle } = useAuth();
+  const { siteSettings } = useAdmin();
+  const isJaimeBlocked = Boolean(siteSettings.securityConfig?.blockJaimeAssistant);
 
   // Primary navigation tab: 'tickets' (Human Support) vs 'jaime' (AI Assistant)
   const [activeTab, setActiveTab] = useState<'tickets' | 'jaime'>('tickets');
@@ -285,9 +288,15 @@ export const SupportPageView: React.FC<SupportPageViewProps> = ({ onBack }) => {
             >
               <Bot className="w-3.5 h-3.5 text-slate-600" />
               <span>Jaime IA</span>
-              <span className="px-1.5 py-0.2 rounded text-[9px] font-extrabold bg-indigo-50 text-indigo-700 border border-indigo-200/60">
-                24/7
-              </span>
+              {isJaimeBlocked ? (
+                <span className="px-1.5 py-0.2 rounded text-[9px] font-extrabold bg-rose-100 text-rose-700 border border-rose-200">
+                  BLOQUEADO
+                </span>
+              ) : (
+                <span className="px-1.5 py-0.2 rounded text-[9px] font-extrabold bg-indigo-50 text-indigo-700 border border-indigo-200/60">
+                  24/7
+                </span>
+              )}
             </button>
           </div>
         </div>

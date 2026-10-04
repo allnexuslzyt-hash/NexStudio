@@ -625,12 +625,12 @@ app.post("/api/tools/speedtest/upload", (req: Request, res: Response) => {
 // -------------------------------------------------------------
 function getGroqPool(): string[] {
   const raw = process.env.GROQ_API_KEYS || "";
-  const fromEnv = raw
-    .split(/(?=gsk_)/)
-    .map(k => k.replace(/[,;\s"'`]/g, "").trim())
-    .filter(k => k.startsWith("gsk_") && k.length > 20);
+  const pool = raw
+    .split(/[,;\s]+/)
+    .map(k => k.replace(/["'`]/g, "").trim())
+    .filter(k => k.length > 20);
 
-  return fromEnv;
+  return pool;
 }
 
 let groqKeyIndex = 0;
@@ -640,7 +640,7 @@ async function queryGroqChat(messages: Array<{ role: string; content: string }>)
   if (pool.length === 0) {
     return null;
   }
-  const modelsToTry = ["openai/gpt-oss-120b", "qwen/qwen3.8-27b"];
+  const modelsToTry = ["openai/gpt-oss-120b", "qwen/qwen3.8-27b", "openai/gpt-oss-20b"];
 
   for (let attempt = 0; attempt < pool.length * modelsToTry.length; attempt++) {
     const key = pool[(groqKeyIndex + attempt) % pool.length];
@@ -733,6 +733,7 @@ CONOCIMIENTO INTEGRAL DE LA WEB NEXSTUDIO:
 
 NORMAS DE RESPUESTA:
 - Habla en español, con un tono cercano, servicial, profesional y dinámico.
+- Estás impulsado por la tecnología de inferencia ultra-rápida de Groq con aceleración LPU para ofrecer respuestas inteligentes e instantáneas en tiempo real.
 - NUNCA repitas una plantilla rígida ni el mismo saludo una y otra vez. Responde DIRECTAMENTE a lo que el usuario pregunte.
 - Si te preguntan por el lienzo, explica cómo usarlo. Si te preguntan por NexClean o NexBoost, explica sus funciones y dónde descargarlos. Si te preguntan por soporte, indícales cómo abrir un ticket. Si te saludan o preguntan qué puedes hacer, dales la bienvenida con un resumen ameno.
 - Usa negritas y formato Markdown limpio cuando sea útil para que sea fácil de leer.`;
@@ -742,10 +743,18 @@ app.get("/api/health", (_req: Request, res: Response) => {
   res.json({ status: "ok", service: "NexStudio Server" });
 });
 
-// Jaime Virtual Assistant Chat API powered by Groq (Primary) + Gemini (Fallback)
+// Jaime Virtual Assistant Chat API powered by Gemini (Primary) + Groq (Secondary) + Smart Fallback
 app.post("/api/support/jaime", async (req: Request, res: Response) => {
   try {
-    const { message, history } = req.body;
+    const { message, history, isBlocked } = req.body;
+
+    if (isBlocked) {
+      return res.status(403).json({
+        reply: "🔒 El asistente virtual Jaime ha sido temporalmente bloqueado por motivos de seguridad o mantenimiento por el administrador. Por favor, utiliza los Tickets de Soporte para atención humana directa.",
+        blocked: true,
+        success: false
+      });
+    }
 
     if (!message || typeof message !== "string" || !message.trim()) {
       return res.status(400).json({ 
@@ -756,28 +765,32 @@ app.post("/api/support/jaime", async (req: Request, res: Response) => {
     // Helper function for intelligent simulated response
     const generateSmartFallback = (msg: string) => {
       const lower = msg.toLowerCase();
-      let fallbackText = "¡Hola! Soy Jaime, tu asistente virtual de NexStudio. ";
-      if (lower.includes("nexclean") || lower.includes("limpieza")) {
-        fallbackText += "**NexClean** es nuestro software oficial para Windows (.exe) que elimina archivos basura, optimiza la memoria y deja tu ordenador rápido y limpio. Puedes descargarlo directamente en la pestaña **Proyectos** del Catálogo con 3 segundos de espera segura.";
-      } else if (lower.includes("nexboost") || lower.includes("boost") || lower.includes("ram")) {
-        fallbackText += "**NexBoost** es nuestro software ejecutable (.exe) diseñado para optimizar y liberar memoria RAM en tiempo real, acelerando la respuesta del sistema y de tus juegos. Lo tienes disponible en la sección **Proyectos** del Catálogo.";
-      } else if (lower.includes("humano") || lower.includes("admin") || lower.includes("ticket") || lower.includes("ban") || lower.includes("cuenta")) {
+      let fallbackText = "¡Hola! Soy Jaime, tu asistente virtual oficial de NexStudio. ";
+      if (lower.includes("nexclean") || lower.includes("limpieza") || lower.includes("temporales")) {
+        fallbackText += "**NexClean** es nuestro software oficial para Windows (.exe) que elimina archivos temporales, cachés y optimiza el rendimiento del PC. Puedes descargarlo gratis directamente en la pestaña **Proyectos** del Catálogo con 3 segundos de verificación segura.";
+      } else if (lower.includes("nexboost") || lower.includes("boost") || lower.includes("ram") || lower.includes("juegos") || lower.includes("lag")) {
+        fallbackText += "**NexBoost** es nuestro software ejecutable (.exe) oficial para Windows diseñado para optimizar y liberar memoria RAM en tiempo real, acelerando la respuesta del sistema y evitando tirones en juegos. Lo tienes disponible en la sección **Proyectos** del Catálogo.";
+      } else if (lower.includes("humano") || lower.includes("admin") || lower.includes("ticket") || lower.includes("ban") || lower.includes("cuenta") || lower.includes("soporte")) {
         fallbackText += "Para consultas que requieran atención directa de un administrador de NexStudio (como apelaciones de cuenta o revisiones técnicas), puedes cambiar a la pestaña **Tickets de Soporte** en este mismo panel y abrir una solicitud personalizada.";
       } else if (lower.includes("noticias") || lower.includes("actualizacion") || lower.includes("version")) {
-        fallbackText += "Puedes ver todas las novedades y características de la **Actualización 1.0** en la nueva pestaña **Noticias** ubicada en el menú superior.";
+        fallbackText += "Puedes ver todas las novedades, mejoras de seguridad y características de la **Versión 1.0** en la pestaña **Noticias** ubicada en el menú superior.";
+      } else if (lower.includes("oscuro") || lower.includes("claro") || lower.includes("tema")) {
+        fallbackText += "Puedes cambiar entre Modo Oscuro y Modo Claro usando el interruptor de sol/luna ubicado en la barra superior al lado de las notificaciones.";
+      } else if (lower.includes("herramientas") || lower.includes("convertidor") || lower.includes("velocidad")) {
+        fallbackText += "En la pestaña **Herramientas** dispones del Convertidor de Archivos universal (+500 formatos), Medidor de Ancho de Banda y Generador de Contraseñas de alta seguridad.";
       } else {
-        fallbackText += "Estoy aquí para resolver cualquier duda sobre la plataforma NexStudio, nuestros proyectos ejecutables como **NexClean** y **NexBoost**, o ayudarte a contactar con nuestro equipo de soporte humano. ¿En qué más puedo ayudarte hoy?";
+        fallbackText += "Estoy a tu completa disposición para guiarte en todo el ecosistema de NexStudio, nuestros proyectos descargables como **NexClean** y **NexBoost**, o ayudarte a abrir un ticket con nuestros administradores. ¿En qué más puedo orientarte?";
       }
       return fallbackText;
     };
 
-    // 1. Prepare conversation history in OpenAI format for Groq
+    // 1. PRIMARY: Groq API with multi-key rotation and openai/gpt-oss-120b / qwen3.8-27b
     const groqMessages: Array<{ role: string; content: string }> = [
       { role: "system", content: JAIME_SYSTEM_INSTRUCTION }
     ];
 
     if (Array.isArray(history)) {
-      for (const item of history.slice(-10)) {
+      for (const item of history.slice(-8)) {
         if (item && item.text && (item.role === "user" || item.role === "model" || item.role === "assistant")) {
           groqMessages.push({
             role: item.role === "model" ? "assistant" : item.role,
@@ -792,69 +805,74 @@ app.post("/api/support/jaime", async (req: Request, res: Response) => {
       content: message.trim()
     });
 
-    // 2. Primary: Execute via Groq with high-speed key rotation
     const groqResult = await queryGroqChat(groqMessages);
     if (groqResult && groqResult.reply) {
       return res.json({
         reply: groqResult.reply,
-        source: `groq (${groqResult.model})`,
+        source: `Groq (${groqResult.model})`,
         model: groqResult.model,
+        keyUsed: groqResult.keyUsed,
         success: true
       });
     }
 
-    // 3. Fallback: Gemini AI SDK
+    // 2. SECONDARY FALLBACK: Gemini AI SDK with fast models
     const ai = getGenAI();
     if (ai) {
-      try {
-        const formattedContents: Array<{ role: "user" | "model"; parts: Array<{ text: string }> }> = [];
-        if (Array.isArray(history)) {
-          for (const item of history.slice(-10)) {
-            if (item && item.text && (item.role === "user" || item.role === "model")) {
-              formattedContents.push({
-                role: item.role,
-                parts: [{ text: String(item.text) }]
-              });
+      const geminiCandidateModels = ["gemini-flash-latest", "gemini-3.1-flash-lite", "gemini-3.8-flash"];
+      const formattedContents: Array<{ role: "user" | "model"; parts: Array<{ text: string }> }> = [];
+
+      if (Array.isArray(history)) {
+        for (const item of history.slice(-8)) {
+          if (item && item.text && (item.role === "user" || item.role === "model" || item.role === "assistant")) {
+            formattedContents.push({
+              role: item.role === "assistant" ? "model" : item.role,
+              parts: [{ text: String(item.text) }]
+            });
+          }
+        }
+      }
+
+      formattedContents.push({
+        role: "user",
+        parts: [{ text: message.trim() }]
+      });
+
+      for (const modelName of geminiCandidateModels) {
+        try {
+          const response = await ai.models.generateContent({
+            model: modelName,
+            contents: formattedContents,
+            config: {
+              systemInstruction: JAIME_SYSTEM_INSTRUCTION,
+              temperature: 0.7,
             }
-          }
-        }
-        formattedContents.push({
-          role: "user",
-          parts: [{ text: message.trim() }]
-        });
-
-        const response = await ai.models.generateContent({
-          model: "gemini-2.5-flash",
-          contents: formattedContents,
-          config: {
-            systemInstruction: JAIME_SYSTEM_INSTRUCTION,
-            temperature: 0.7,
-          }
-        });
-
-        const reply = response.text || "";
-        if (reply) {
-          return res.json({
-            reply,
-            source: "gemini",
-            success: true
           });
+
+          const reply = response.text?.trim();
+          if (reply) {
+            return res.json({
+              reply,
+              source: `gemini (${modelName})`,
+              success: true
+            });
+          }
+        } catch (geminiError: any) {
+          console.warn(`Gemini (${modelName}) intento falló:`, geminiError?.message || geminiError);
         }
-      } catch (geminiError: any) {
-        console.warn("Fallback de Gemini falló:", geminiError?.message || geminiError);
       }
     }
 
-    // 4. Final safety net: Smart rule-based fallback
+    // 3. TERTIARY: Smart high-context rule-based fallback
     return res.json({
       reply: generateSmartFallback(message),
-      source: "fallback",
+      source: "knowledge-base",
       success: true
     });
   } catch (error: any) {
     console.error("Error en el asistente Jaime:", error);
     return res.json({
-      reply: "¡Hola! Soy Jaime. NexStudio se encuentra activo. Si tu duda es sobre **NexClean** o **NexBoost**, puedes descargarlos gratis desde la pestaña **Proyectos** del Catálogo. También puedes abrir un ticket de soporte para que un administrador te atienda directamente.",
+      reply: "¡Hola! Soy Jaime. Puedo resolver tus dudas sobre NexStudio, ayudarte a descargar **NexClean** y **NexBoost** en la sección **Proyectos**, o si lo requieres, abrir un **Ticket de Soporte** para atención humana.",
       source: "fallback",
       success: true
     });
