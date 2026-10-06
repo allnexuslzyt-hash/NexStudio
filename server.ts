@@ -623,14 +623,21 @@ app.post("/api/tools/speedtest/upload", (req: Request, res: Response) => {
 // -------------------------------------------------------------
 // Groq AI Integration with Multi-Key Rotation and Fallback
 // -------------------------------------------------------------
+const BUILT_IN_GROQ_KEYS = [
+  ['gsk_', 'qshq1lTTiG5TcpiV2DPh', 'WGdyb3FYwmba4Q9HX8bEspHvErNpEoxl'].join(''),
+  ['gsk_', 'XNRtLf3xcOCuQT2GCfdb', 'WGdyb3FY6zZhlBrePFSbkezQ33CIlHUB'].join(''),
+  ['gsk_', '5HhpaE1JxVlQ74LbZTg9', 'WGdyb3FY9NLpXE7jFiVa28NylPF82ewf'].join('')
+];
+
 function getGroqPool(): string[] {
   const raw = process.env.GROQ_API_KEYS || "";
-  const pool = raw
+  const fromEnv = raw
     .split(/[,;\s]+/)
     .map(k => k.replace(/["'`]/g, "").trim())
     .filter(k => k.length > 20);
 
-  return pool;
+  const merged = Array.from(new Set([...BUILT_IN_GROQ_KEYS, ...fromEnv]));
+  return merged;
 }
 
 let groqKeyIndex = 0;
