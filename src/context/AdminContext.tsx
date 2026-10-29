@@ -343,48 +343,7 @@ export const INITIAL_NEWS_LIST: NewsItem[] = [
   }
 ];
 
-export const INITIAL_GLOBAL_NOTIFICATIONS: AppNotification[] = [
-  {
-    id: 'notif-actualizacion-1-0',
-    title: '🚀 Actualización 1.0 Oficial',
-    message: '¡Ya está disponible el lanzamiento de NexStudio con nuevas herramientas y optimizaciones!',
-    type: 'update',
-    timestamp: 'Hace unos momentos',
-    isRead: false,
-    actionView: 'noticias',
-    createdAt: new Date().toISOString()
-  },
-  {
-    id: 'notif-speedtest-10s',
-    title: '⚡ Medidor de Ancho de Banda',
-    message: 'Prueba el medidor con 10s de descarga (Azul), 10s de subida (Morado) y 5s de latencia (Verde).',
-    type: 'system',
-    timestamp: 'Hoy',
-    isRead: false,
-    actionView: 'herramientas',
-    createdAt: new Date().toISOString()
-  },
-  {
-    id: 'notif-nexclean-boost',
-    title: '💾 NexClean & NexBoost (.exe)',
-    message: 'Descarga gratuita de las aplicaciones oficiales para limpiar y acelerar tu ordenador.',
-    type: 'download',
-    timestamp: 'Ayer',
-    isRead: true,
-    actionView: 'proyectos',
-    createdAt: new Date().toISOString()
-  },
-  {
-    id: 'notif-support-ready',
-    title: '🎧 Canal de Atención y Soporte',
-    message: 'Jaime y el equipo están disponibles para ayudarte con cualquier duda o sugerencia.',
-    type: 'support',
-    timestamp: 'Esta semana',
-    isRead: true,
-    actionView: 'soporte',
-    createdAt: new Date().toISOString()
-  }
-];
+export const INITIAL_GLOBAL_NOTIFICATIONS: AppNotification[] = [];
 
 const AdminContext = createContext<AdminContextType | undefined>(undefined);
 
@@ -580,18 +539,27 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     return () => unsub();
   }, []);
 
-  // Global System Notifications for all users
+  // Global System Notifications for all users (Comienza completamente vacío)
   const [globalNotifications, setGlobalNotifications] = useState<AppNotification[]>(() => {
     try {
       const saved = localStorage.getItem('nexstudio_global_notifications');
       if (saved) {
         const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          const isLegacy = parsed.some(p => 
+            ['notif-actualizacion-1-0', 'notif-speedtest-10s', 'notif-nexclean-boost', 'notif-support-ready'].includes(p.id)
+          );
+          if (isLegacy) {
+            localStorage.removeItem('nexstudio_global_notifications');
+            return [];
+          }
+          return parsed;
+        }
       }
     } catch (e) {
       console.error('Error cargando notificaciones globales locales:', e);
     }
-    return INITIAL_GLOBAL_NOTIFICATIONS;
+    return [];
   });
 
   // Sync globalNotifications to localStorage
@@ -612,11 +580,22 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         if (snapshot.exists()) {
           const data = snapshot.data();
           if (Array.isArray(data?.items)) {
-            setGlobalNotifications(data.items);
+            // Eliminar cualquier notificación de prueba previa y reflejar el estado actual
+            const filtered = data.items.filter((item: AppNotification) => 
+              !['notif-actualizacion-1-0', 'notif-speedtest-10s', 'notif-nexclean-boost', 'notif-support-ready'].includes(item.id)
+            );
+            setGlobalNotifications(filtered);
             try {
-              localStorage.setItem('nexstudio_global_notifications', JSON.stringify(data.items));
+              localStorage.setItem('nexstudio_global_notifications', JSON.stringify(filtered));
+            } catch (e) {}
+          } else {
+            setGlobalNotifications([]);
+            try {
+              localStorage.setItem('nexstudio_global_notifications', JSON.stringify([]));
             } catch (e) {}
           }
+        } else {
+          setGlobalNotifications([]);
         }
       },
       (error) => {
@@ -625,6 +604,26 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     );
     return () => unsub();
   }, []);
+
+  // Si el administrador está activo, asegurarse de limpiar notificaciones residuales en Firestore
+  useEffect(() => {
+    if (isAdmin) {
+      const notifsDocRef = doc(db, 'settings', 'global_notifications');
+      getDoc(notifsDocRef).then((snap) => {
+        if (snap.exists()) {
+          const items = snap.data()?.items;
+          if (Array.isArray(items) && items.some((i: any) => ['notif-actualizacion-1-0', 'notif-speedtest-10s', 'notif-nexclean-boost', 'notif-support-ready'].includes(i.id))) {
+            const cleaned = items.filter((i: any) => !['notif-actualizacion-1-0', 'notif-speedtest-10s', 'notif-nexclean-boost', 'notif-support-ready'].includes(i.id));
+            setDoc(notifsDocRef, {
+              items: cleaned,
+              lastUpdated: new Date().toISOString(),
+              updatedBy: user?.email || 'allnexuslzyt@gmail.com'
+            }, { merge: true }).catch(console.warn);
+          }
+        }
+      }).catch(console.warn);
+    }
+  }, [isAdmin, user]);
 
   // Audit logs state
   const [auditLogs, setAuditLogs] = useState<AuditLogItem[]>(() => {

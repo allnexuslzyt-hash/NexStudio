@@ -335,8 +335,11 @@ const WorkspaceContent: React.FC = () => {
         )}
       </main>
 
-      {/* Full-width Footer with Términos y Condiciones */}
-      <Footer onOpenTerms={() => setIsTermsOpen(true)} />
+      {/* Full-width Footer with Términos y Condiciones y Acceso a Ayuda */}
+      <Footer 
+        onOpenTerms={() => setIsTermsOpen(true)} 
+        onOpenHelp={() => setActiveView('ayuda')}
+      />
 
       {/* Modal de Configuración y Personalización */}
       <SettingsModal onOpenAdminCommandCenter={() => setActiveView('admin')} />

@@ -9,6 +9,7 @@ interface NotificationContextType {
   markAllAsRead: () => void;
   deleteNotification: (id: string) => Promise<void>;
   clearAllNotifications: () => Promise<void>;
+  restoreAllNotifications: () => void;
   addNotification: (notif: Omit<AppNotification, 'id' | 'timestamp' | 'isRead'>) => Promise<void>;
 }
 
@@ -17,15 +18,27 @@ const NotificationContext = createContext<NotificationContextType | undefined>(u
 export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const {
     globalNotifications,
-    addGlobalNotification,
-    deleteGlobalNotification,
-    clearAllGlobalNotifications
+    addGlobalNotification
   } = useAdmin();
 
   // Local storage of read notification IDs for this user
   const [readIds, setReadIds] = useState<string[]>(() => {
     try {
       const saved = localStorage.getItem('nexstudio_read_notif_ids');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) return parsed;
+      }
+    } catch {
+      // Ignore
+    }
+    return [];
+  });
+
+  // Local storage of dismissed notification IDs for this user
+  const [dismissedIds, setDismissedIds] = useState<string[]>(() => {
+    try {
+      const saved = localStorage.getItem('nexstudio_dismissed_notif_ids');
       if (saved) {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed)) return parsed;
@@ -44,13 +57,23 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
     }
   }, [readIds]);
 
-  // Combine global notifications with user's read state
+  useEffect(() => {
+    try {
+      localStorage.setItem('nexstudio_dismissed_notif_ids', JSON.stringify(dismissedIds));
+    } catch {
+      // Ignore
+    }
+  }, [dismissedIds]);
+
+  // Combine global notifications with user's read & dismissed state
   const notifications: AppNotification[] = useMemo(() => {
-    return (globalNotifications || []).map((n) => ({
-      ...n,
-      isRead: readIds.includes(n.id) || Boolean(n.isRead)
-    }));
-  }, [globalNotifications, readIds]);
+    return (globalNotifications || [])
+      .filter((n) => !dismissedIds.includes(n.id))
+      .map((n) => ({
+        ...n,
+        isRead: readIds.includes(n.id) || Boolean(n.isRead)
+      }));
+  }, [globalNotifications, readIds, dismissedIds]);
 
   const unreadCount = notifications.filter((n) => !n.isRead).length;
 
@@ -63,12 +86,21 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
     setReadIds(allIds);
   };
 
+  // User deletes a notification from their dropdown: only dismisses locally for this user
   const deleteNotification = async (id: string) => {
-    await deleteGlobalNotification(id);
+    setDismissedIds((prev) => (prev.includes(id) ? prev : [...prev, id]));
+    setReadIds((prev) => (prev.includes(id) ? prev : [...prev, id]));
   };
 
+  // User clears all notifications from their dropdown: only dismisses locally for this user
   const clearAllNotifications = async () => {
-    await clearAllGlobalNotifications();
+    const allIds = (globalNotifications || []).map((n) => n.id);
+    setDismissedIds((prev) => Array.from(new Set([...prev, ...allIds])));
+    setReadIds((prev) => Array.from(new Set([...prev, ...allIds])));
+  };
+
+  const restoreAllNotifications = () => {
+    setDismissedIds([]);
   };
 
   const addNotification = async (notif: Omit<AppNotification, 'id' | 'timestamp' | 'isRead'>) => {
@@ -88,6 +120,7 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
         markAllAsRead,
         deleteNotification,
         clearAllNotifications,
+        restoreAllNotifications,
         addNotification
       }}
     >

@@ -27,7 +27,8 @@ export const NotificationDropdown: React.FC<NotificationDropdownProps> = ({ onSe
     markAsRead,
     markAllAsRead,
     deleteNotification,
-    clearAllNotifications
+    clearAllNotifications,
+    restoreAllNotifications
   } = useNotifications();
 
   const [isOpen, setIsOpen] = useState(false);
@@ -245,7 +246,7 @@ export const NotificationDropdown: React.FC<NotificationDropdownProps> = ({ onSe
                   onClick={clearAllNotifications}
                   className="text-[11px] font-semibold text-slate-500 hover:text-rose-600 dark:hover:text-rose-400 transition-colors cursor-pointer"
                 >
-                  Limpiar todo el historial
+                  Ocultar mis notificaciones
                 </button>
               </div>
             )}
