@@ -501,10 +501,10 @@ export const AdminCommandCenter: React.FC<AdminCommandCenterProps> = ({ onBack }
       <AnimatePresence>
         {notificationToast && (
           <motion.div
-            initial={{ opacity: 0, y: -20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -20 }}
-            className="fixed top-20 right-6 z-50 px-4 py-3 rounded-xl bg-slate-900 text-white text-xs font-medium border border-slate-700 shadow-xl flex items-center gap-2.5"
+            initial={{ opacity: 0, y: -20, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -20, scale: 0.95 }}
+            className="fixed top-20 right-6 z-50 px-4 py-3 rounded-2xl bg-slate-900/95 dark:bg-slate-800/95 text-white text-xs font-semibold border border-slate-700/60 dark:border-slate-600/60 shadow-2xl backdrop-blur-md flex items-center gap-2.5"
           >
             <CheckCircle2 className="w-4 h-4 text-emerald-400" />
             <span>{notificationToast}</span>
@@ -513,45 +513,45 @@ export const AdminCommandCenter: React.FC<AdminCommandCenterProps> = ({ onBack }
       </AnimatePresence>
 
       {/* Header Bar with Back and Global Status Indicator */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-200">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-200 dark:border-slate-800">
         <div className="flex items-center gap-3">
           <button
             type="button"
             onClick={onBack}
-            className="p-2 rounded-xl border border-slate-200 hover:bg-slate-100 text-slate-600 transition-colors cursor-pointer"
+            className="p-2.5 rounded-xl border border-slate-200 dark:border-slate-700/80 bg-white dark:bg-slate-800/70 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 transition-all cursor-pointer shadow-xs active:scale-95"
             title="Volver al espacio de trabajo"
           >
             <ArrowLeft className="w-4 h-4" />
           </button>
           <div>
-            <div className="flex items-center gap-2.5">
-              <div className="w-8 h-8 rounded-lg bg-indigo-600 flex items-center justify-center text-white shadow-xs">
+            <div className="flex items-center gap-2.5 flex-wrap">
+              <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-indigo-600 via-indigo-600 to-violet-600 flex items-center justify-center text-white shadow-md shadow-indigo-600/25">
                 <Sliders className="w-4 h-4" />
               </div>
-              <h1 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">
+              <h1 className="text-xl sm:text-2xl font-extrabold text-slate-900 dark:text-white tracking-tight">
                 Centro de Mando
               </h1>
-              <span className="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-indigo-50 text-indigo-700 border border-indigo-200">
+              <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800/80">
                 SuperAdmin
               </span>
             </div>
-            <p className="text-xs text-slate-500 mt-0.5">
-              Administración centralizada de NexStudio &bull; Conectado como <strong className="text-slate-700">{user?.email || 'allnexuslzyt@gmail.com'}</strong>
+            <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+              Administración centralizada de NexStudio &bull; Conectado como <strong className="text-slate-700 dark:text-slate-200 font-semibold">{user?.email || 'allnexuslzyt@gmail.com'}</strong>
             </p>
           </div>
         </div>
 
         {/* Global Web State Indicator & Kill Switch Shortcut */}
-        <div className="flex flex-wrap items-center gap-2.5">
+        <div className="flex flex-wrap items-center gap-2 sm:gap-2.5">
           {/* Launch Mode status badge */}
           {siteSettings.launchMode?.enabled && (
             <button
               type="button"
               onClick={() => setActiveTab('launch')}
-              className="px-3 py-1.5 rounded-xl border border-amber-300 bg-amber-50 hover:bg-amber-100 text-amber-800 flex items-center gap-2 text-xs font-bold transition-all cursor-pointer shadow-xs"
+              className="px-3 py-1.5 rounded-xl border border-amber-300/80 dark:border-amber-600/50 bg-amber-50 dark:bg-amber-950/40 hover:bg-amber-100 dark:hover:bg-amber-900/50 text-amber-800 dark:text-amber-300 flex items-center gap-2 text-xs font-bold transition-all cursor-pointer shadow-xs"
             >
-              <Rocket className="w-3.5 h-3.5 text-amber-600 animate-bounce" />
-              <span>EN LANZAMIENTO (BLOQUEADA)</span>
+              <Rocket className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400 animate-bounce" />
+              <span>EN LANZAMIENTO</span>
             </button>
           )}
 
@@ -562,19 +562,19 @@ export const AdminCommandCenter: React.FC<AdminCommandCenterProps> = ({ onBack }
             onClick={() => setActiveTab('security')}
             className={`px-3 py-1.5 rounded-xl border flex items-center gap-1.5 text-xs font-bold transition-all cursor-pointer shadow-xs ${
               (siteSettings.securityConfig?.blockTorExitNodes !== false)
-                ? 'bg-rose-50 border-rose-200 text-rose-700 hover:bg-rose-100'
-                : 'bg-slate-100 border-slate-200 text-slate-600 hover:bg-slate-200'
+                ? 'bg-rose-50 dark:bg-rose-950/40 border-rose-200 dark:border-rose-800/80 text-rose-700 dark:text-rose-300 hover:bg-rose-100 dark:hover:bg-rose-900/50'
+                : 'bg-slate-100 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700/80'
             }`}
             title="Ver y configurar el Escudo de Seguridad Tor"
           >
-            <ShieldAlert className="w-3.5 h-3.5 text-rose-600" />
+            <ShieldAlert className="w-3.5 h-3.5 text-rose-600 dark:text-rose-400" />
             <span>ESCUDO TOR: {(siteSettings.securityConfig?.blockTorExitNodes !== false) ? 'ACTIVO' : 'INACTIVO'}</span>
           </button>
 
-          <div className={`px-3 py-1.5 rounded-xl border flex items-center gap-2 text-xs font-semibold ${
+          <div className={`px-3 py-1.5 rounded-xl border flex items-center gap-2 text-xs font-bold ${
             siteSettings.maintenanceMode 
-              ? 'bg-rose-50 border-rose-200 text-rose-700' 
-              : 'bg-emerald-50 border-emerald-200 text-emerald-700'
+              ? 'bg-rose-50 dark:bg-rose-950/40 border-rose-200 dark:border-rose-800/80 text-rose-700 dark:text-rose-300' 
+              : 'bg-emerald-50 dark:bg-emerald-950/40 border-emerald-200 dark:border-emerald-800/80 text-emerald-700 dark:text-emerald-300'
           }`}>
             <span className="relative flex h-2 w-2">
               <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${
@@ -584,7 +584,7 @@ export const AdminCommandCenter: React.FC<AdminCommandCenterProps> = ({ onBack }
                 siteSettings.maintenanceMode ? 'bg-rose-600' : 'bg-emerald-600'
               }`}></span>
             </span>
-            <span>{siteSettings.maintenanceMode ? 'CERRADA AL PÚBLICO' : 'PÚBLICA (EN LÍNEA)'}</span>
+            <span>{siteSettings.maintenanceMode ? 'CERRADA AL PÚBLICO' : 'EN LÍNEA (PÚBLICA)'}</span>
           </div>
 
           <button
@@ -599,10 +599,10 @@ export const AdminCommandCenter: React.FC<AdminCommandCenterProps> = ({ onBack }
               );
               showToast(siteSettings.maintenanceMode ? 'Sitio reabierto al público' : 'Sitio cerrado al público');
             }}
-            className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all shadow-xs flex items-center gap-1.5 cursor-pointer ${
+            className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all shadow-sm flex items-center gap-1.5 cursor-pointer active:scale-95 ${
               siteSettings.maintenanceMode
-                ? 'bg-emerald-600 hover:bg-emerald-500 text-white'
-                : 'bg-rose-600 hover:bg-rose-500 text-white'
+                ? 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-emerald-600/20'
+                : 'bg-rose-600 hover:bg-rose-500 text-white shadow-rose-600/20'
             }`}
           >
             <Power className="w-3.5 h-3.5" />
@@ -612,14 +612,14 @@ export const AdminCommandCenter: React.FC<AdminCommandCenterProps> = ({ onBack }
       </div>
 
       {/* Main Tabs Navigation */}
-      <div className="flex items-center gap-1.5 p-1 bg-slate-100 rounded-xl max-w-fit overflow-x-auto">
+      <div className="flex items-center gap-1.5 p-1.5 bg-slate-100 dark:bg-slate-900/80 border border-slate-200/80 dark:border-slate-800 rounded-2xl max-w-full overflow-x-auto shadow-xs">
         <button
           type="button"
           onClick={() => setActiveTab('dashboard')}
-          className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-semibold transition-all cursor-pointer whitespace-nowrap ${
+          className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap active:scale-95 ${
             activeTab === 'dashboard' 
-              ? 'bg-white text-slate-900 shadow-xs' 
-              : 'text-slate-600 hover:text-slate-900'
+              ? 'bg-white dark:bg-slate-800 text-indigo-600 dark:text-indigo-400 shadow-sm border border-slate-200/80 dark:border-slate-700/80' 
+              : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-white/50 dark:hover:bg-slate-800/50'
           }`}
         >
           <BarChart3 className="w-4 h-4" />
@@ -629,15 +629,15 @@ export const AdminCommandCenter: React.FC<AdminCommandCenterProps> = ({ onBack }
         <button
           type="button"
           onClick={() => setActiveTab('users')}
-          className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-semibold transition-all cursor-pointer whitespace-nowrap ${
+          className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap active:scale-95 ${
             activeTab === 'users' 
-              ? 'bg-white text-slate-900 shadow-xs' 
-              : 'text-slate-600 hover:text-slate-900'
+              ? 'bg-white dark:bg-slate-800 text-indigo-600 dark:text-indigo-400 shadow-sm border border-slate-200/80 dark:border-slate-700/80' 
+              : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-white/50 dark:hover:bg-slate-800/50'
           }`}
         >
           <Users className="w-4 h-4" />
           <span>Gestión de Usuarios</span>
-          <span className="ml-1 px-1.5 py-0.2 rounded-full text-[10px] bg-slate-200 text-slate-700">
+          <span className="ml-0.5 px-2 py-0.5 rounded-full text-[10px] bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300 font-extrabold">
             {users.length}
           </span>
         </button>
@@ -645,16 +645,16 @@ export const AdminCommandCenter: React.FC<AdminCommandCenterProps> = ({ onBack }
         <button
           type="button"
           onClick={() => setActiveTab('tickets')}
-          className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-semibold transition-all cursor-pointer whitespace-nowrap ${
+          className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap active:scale-95 ${
             activeTab === 'tickets' 
-              ? 'bg-white text-slate-900 shadow-xs' 
-              : 'text-slate-600 hover:text-slate-900'
+              ? 'bg-white dark:bg-slate-800 text-indigo-600 dark:text-indigo-400 shadow-sm border border-slate-200/80 dark:border-slate-700/80' 
+              : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-white/50 dark:hover:bg-slate-800/50'
           }`}
         >
           <Headphones className="w-4 h-4" />
           <span>Tickets de Soporte</span>
           {tickets.filter(t => t.status === 'abierto').length > 0 && (
-            <span className="ml-1 px-1.5 py-0.2 rounded-full text-[10px] bg-rose-500 text-white font-bold animate-pulse">
+            <span className="ml-0.5 px-2 py-0.5 rounded-full text-[10px] bg-rose-500 text-white font-extrabold animate-pulse shadow-xs">
               {tickets.filter(t => t.status === 'abierto').length}
             </span>
           )}
@@ -664,15 +664,15 @@ export const AdminCommandCenter: React.FC<AdminCommandCenterProps> = ({ onBack }
           type="button"
           id="btn-admin-tab-projects"
           onClick={() => setActiveTab('projects')}
-          className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-semibold transition-all cursor-pointer whitespace-nowrap ${
+          className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap active:scale-95 ${
             activeTab === 'projects' 
-              ? 'bg-white text-slate-900 shadow-xs' 
-              : 'text-slate-600 hover:text-slate-900'
+              ? 'bg-white dark:bg-slate-800 text-indigo-600 dark:text-indigo-400 shadow-sm border border-slate-200/80 dark:border-slate-700/80' 
+              : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-white/50 dark:hover:bg-slate-800/50'
           }`}
         >
           <FolderGit2 className="w-4 h-4" />
           <span>Proyectos y Creaciones</span>
-          <span className="ml-1 px-1.5 py-0.2 rounded-full text-[10px] bg-slate-200 text-slate-700 font-semibold">
+          <span className="ml-0.5 px-2 py-0.5 rounded-full text-[10px] bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300 font-extrabold">
             {projects.length + (creations?.length || 0)}
           </span>
         </button>
@@ -681,15 +681,15 @@ export const AdminCommandCenter: React.FC<AdminCommandCenterProps> = ({ onBack }
           type="button"
           id="btn-admin-tab-news"
           onClick={() => setActiveTab('news')}
-          className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-semibold transition-all cursor-pointer whitespace-nowrap ${
+          className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap active:scale-95 ${
             activeTab === 'news' 
-              ? 'bg-white text-slate-900 shadow-xs font-bold' 
-              : 'text-slate-600 hover:text-slate-900'
+              ? 'bg-white dark:bg-slate-800 text-indigo-600 dark:text-indigo-400 shadow-sm border border-slate-200/80 dark:border-slate-700/80' 
+              : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-white/50 dark:hover:bg-slate-800/50'
           }`}
         >
-          <Bell className="w-4 h-4 text-indigo-600" />
+          <Bell className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
           <span>Noticias y Actualizaciones</span>
-          <span className="ml-1 px-1.5 py-0.2 rounded-full text-[10px] bg-indigo-100 text-indigo-800 font-bold">
+          <span className="ml-0.5 px-2 py-0.5 rounded-full text-[10px] bg-indigo-100 dark:bg-indigo-900/60 text-indigo-800 dark:text-indigo-300 font-extrabold">
             {newsList.length}
           </span>
         </button>
@@ -698,15 +698,15 @@ export const AdminCommandCenter: React.FC<AdminCommandCenterProps> = ({ onBack }
           type="button"
           id="btn-admin-tab-notifications"
           onClick={() => setActiveTab('notifications')}
-          className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-semibold transition-all cursor-pointer whitespace-nowrap ${
+          className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap active:scale-95 ${
             activeTab === 'notifications' 
-              ? 'bg-white text-slate-900 shadow-xs font-bold' 
-              : 'text-slate-600 hover:text-slate-900'
+              ? 'bg-white dark:bg-slate-800 text-indigo-600 dark:text-indigo-400 shadow-sm border border-slate-200/80 dark:border-slate-700/80' 
+              : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-white/50 dark:hover:bg-slate-800/50'
           }`}
         >
           <Megaphone className="w-4 h-4 text-amber-500" />
           <span>Notificaciones Globales</span>
-          <span className="ml-1 px-1.5 py-0.2 rounded-full text-[10px] bg-amber-100 text-amber-800 font-bold">
+          <span className="ml-0.5 px-2 py-0.5 rounded-full text-[10px] bg-amber-100 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300 font-extrabold">
             {(globalNotifications || []).length}
           </span>
         </button>
@@ -714,16 +714,16 @@ export const AdminCommandCenter: React.FC<AdminCommandCenterProps> = ({ onBack }
         <button
           type="button"
           onClick={() => setActiveTab('moderation')}
-          className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-semibold transition-all cursor-pointer whitespace-nowrap ${
+          className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap active:scale-95 ${
             activeTab === 'moderation' 
-              ? 'bg-white text-slate-900 shadow-xs' 
-              : 'text-slate-600 hover:text-slate-900'
+              ? 'bg-white dark:bg-slate-800 text-indigo-600 dark:text-indigo-400 shadow-sm border border-slate-200/80 dark:border-slate-700/80' 
+              : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-white/50 dark:hover:bg-slate-800/50'
           }`}
         >
           <ShieldAlert className="w-4 h-4" />
-          <span>Moderación y Contenido</span>
+          <span>Moderación</span>
           {stats.pendingReports > 0 && (
-            <span className="ml-1 px-1.5 py-0.2 rounded-full text-[10px] bg-amber-500 text-white font-bold">
+            <span className="ml-0.5 px-2 py-0.5 rounded-full text-[10px] bg-amber-500 text-white font-extrabold animate-pulse">
               {stats.pendingReports}
             </span>
           )}
@@ -733,16 +733,16 @@ export const AdminCommandCenter: React.FC<AdminCommandCenterProps> = ({ onBack }
           type="button"
           id="btn-admin-tab-security"
           onClick={() => setActiveTab('security')}
-          className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-semibold transition-all cursor-pointer whitespace-nowrap ${
+          className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap active:scale-95 ${
             activeTab === 'security' 
-              ? 'bg-rose-600 text-white shadow-xs font-bold' 
-              : 'text-slate-600 hover:text-slate-900'
+              ? 'bg-rose-600 text-white shadow-md shadow-rose-600/30' 
+              : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-white/50 dark:hover:bg-slate-800/50'
           }`}
         >
-          <ShieldAlert className={`w-4 h-4 ${activeTab === 'security' ? 'text-white' : 'text-rose-600'}`} />
+          <ShieldAlert className={`w-4 h-4 ${activeTab === 'security' ? 'text-white' : 'text-rose-600 dark:text-rose-400'}`} />
           <span>Seguridad y Red Tor</span>
-          <span className={`ml-1 px-1.5 py-0.2 rounded-full text-[10px] font-extrabold ${
-            activeTab === 'security' ? 'bg-white/20 text-white' : 'bg-rose-100 text-rose-700'
+          <span className={`ml-0.5 px-2 py-0.5 rounded-full text-[10px] font-extrabold ${
+            activeTab === 'security' ? 'bg-white/20 text-white' : 'bg-rose-100 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300'
           }`}>
             {(siteSettings.securityConfig?.blockTorExitNodes !== false) ? 'ACTIVO' : 'INACTIVO'}
           </span>
@@ -751,10 +751,10 @@ export const AdminCommandCenter: React.FC<AdminCommandCenterProps> = ({ onBack }
         <button
           type="button"
           onClick={() => setActiveTab('settings')}
-          className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-semibold transition-all cursor-pointer whitespace-nowrap ${
+          className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap active:scale-95 ${
             activeTab === 'settings' 
-              ? 'bg-white text-slate-900 shadow-xs' 
-              : 'text-slate-600 hover:text-slate-900'
+              ? 'bg-white dark:bg-slate-800 text-indigo-600 dark:text-indigo-400 shadow-sm border border-slate-200/80 dark:border-slate-700/80' 
+              : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-white/50 dark:hover:bg-slate-800/50'
           }`}
         >
           <Settings className="w-4 h-4" />
@@ -765,16 +765,16 @@ export const AdminCommandCenter: React.FC<AdminCommandCenterProps> = ({ onBack }
           type="button"
           id="btn-admin-tab-launch"
           onClick={() => setActiveTab('launch')}
-          className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-semibold transition-all cursor-pointer whitespace-nowrap ${
+          className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap active:scale-95 ${
             activeTab === 'launch' 
-              ? 'bg-gradient-to-r from-amber-500 via-indigo-600 to-indigo-700 text-white shadow-xs font-bold' 
-              : 'text-slate-600 hover:text-slate-900'
+              ? 'bg-gradient-to-r from-amber-500 via-indigo-600 to-indigo-700 text-white shadow-md shadow-indigo-600/30' 
+              : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-white/50 dark:hover:bg-slate-800/50'
           }`}
         >
           <Rocket className={`w-4 h-4 ${activeTab === 'launch' ? 'text-amber-200' : 'text-amber-500'}`} />
           <span>Modo En Lanzamiento</span>
           {siteSettings.launchMode?.enabled && (
-            <span className="ml-1 px-1.5 py-0.2 rounded-full text-[10px] bg-amber-400 text-slate-950 font-extrabold animate-pulse">
+            <span className="ml-0.5 px-2 py-0.5 rounded-full text-[10px] bg-amber-400 text-slate-950 font-extrabold animate-pulse">
               ACTIVO
             </span>
           )}
@@ -787,81 +787,81 @@ export const AdminCommandCenter: React.FC<AdminCommandCenterProps> = ({ onBack }
           {/* Quick Metric Cards */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             {/* Metric 1 */}
-            <div className="p-4 rounded-2xl bg-white border border-slate-200 shadow-xs flex items-center justify-between">
+            <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-xs flex items-center justify-between">
               <div>
-                <span className="text-xs font-medium text-slate-500">Usuarios Registrados</span>
-                <p className="text-2xl font-extrabold text-slate-900 mt-1">{stats.totalUsers}</p>
-                <span className="text-[11px] text-emerald-600 flex items-center gap-1 mt-0.5 font-medium">
+                <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">Usuarios Registrados</span>
+                <p className="text-2xl font-black text-slate-900 dark:text-white mt-1 tracking-tight">{stats.totalUsers}</p>
+                <span className="text-[11px] text-emerald-600 dark:text-emerald-400 flex items-center gap-1 mt-0.5 font-bold">
                   <TrendingUp className="w-3 h-3" /> +14% este mes
                 </span>
               </div>
-              <div className="w-12 h-12 rounded-xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600">
+              <div className="w-12 h-12 rounded-2xl bg-indigo-50 dark:bg-indigo-950/50 border border-indigo-100 dark:border-indigo-800/80 flex items-center justify-center text-indigo-600 dark:text-indigo-400 shadow-xs">
                 <Users className="w-6 h-6" />
               </div>
             </div>
 
             {/* Metric 2 */}
-            <div className="p-4 rounded-2xl bg-white border border-slate-200 shadow-xs flex items-center justify-between">
+            <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-xs flex items-center justify-between">
               <div>
-                <span className="text-xs font-medium text-slate-500">Usuarios Activos Hoy</span>
-                <p className="text-2xl font-extrabold text-slate-900 mt-1">{stats.activeToday}</p>
-                <span className="text-[11px] text-slate-500 block mt-0.5">85% del censo total</span>
+                <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">Usuarios Activos Hoy</span>
+                <p className="text-2xl font-black text-slate-900 dark:text-white mt-1 tracking-tight">{stats.activeToday}</p>
+                <span className="text-[11px] text-slate-500 dark:text-slate-400 block mt-0.5 font-medium">85% del censo total</span>
               </div>
-              <div className="w-12 h-12 rounded-xl bg-emerald-50 border border-emerald-100 flex items-center justify-center text-emerald-600">
+              <div className="w-12 h-12 rounded-2xl bg-emerald-50 dark:bg-emerald-950/50 border border-emerald-100 dark:border-emerald-800/80 flex items-center justify-center text-emerald-600 dark:text-emerald-400 shadow-xs">
                 <Activity className="w-6 h-6" />
               </div>
             </div>
 
             {/* Metric 3 */}
-            <div className="p-4 rounded-2xl bg-white border border-slate-200 shadow-xs flex items-center justify-between">
+            <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-xs flex items-center justify-between">
               <div>
-                <span className="text-xs font-medium text-slate-500">Reportes Pendientes</span>
-                <p className="text-2xl font-extrabold text-amber-600 mt-1">{stats.pendingReports}</p>
-                <span className="text-[11px] text-slate-500 block mt-0.5">Requieren revisión</span>
+                <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">Reportes Pendientes</span>
+                <p className="text-2xl font-black text-amber-600 dark:text-amber-400 mt-1 tracking-tight">{stats.pendingReports}</p>
+                <span className="text-[11px] text-slate-500 dark:text-slate-400 block mt-0.5 font-medium">Requieren revisión</span>
               </div>
-              <div className="w-12 h-12 rounded-xl bg-amber-50 border border-amber-100 flex items-center justify-center text-amber-600">
+              <div className="w-12 h-12 rounded-2xl bg-amber-50 dark:bg-amber-950/50 border border-amber-100 dark:border-amber-800/80 flex items-center justify-center text-amber-600 dark:text-amber-400 shadow-xs">
                 <ShieldAlert className="w-6 h-6" />
               </div>
             </div>
 
             {/* Metric 4 */}
-            <div className="p-4 rounded-2xl bg-white border border-slate-200 shadow-xs flex items-center justify-between">
+            <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-xs flex items-center justify-between">
               <div>
-                <span className="text-xs font-medium text-slate-500">Estado del Servidor</span>
+                <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">Estado del Servidor</span>
                 <div className="flex items-center gap-1.5 mt-1">
                   <span className="relative flex h-2.5 w-2.5">
                     <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
                     <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
                   </span>
-                  <p className="text-lg font-extrabold text-slate-900">En Línea</p>
+                  <p className="text-lg font-black text-slate-900 dark:text-white">En Línea</p>
                 </div>
-                <span className="text-[11px] text-slate-500 block mt-0.5">Latencia: ~24ms &bull; 99.98%</span>
+                <span className="text-[11px] text-slate-500 dark:text-slate-400 block mt-0.5 font-medium">Latencia: ~24ms &bull; 99.98%</span>
               </div>
-              <div className="w-12 h-12 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-center text-slate-700">
+              <div className="w-12 h-12 rounded-2xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 flex items-center justify-center text-slate-700 dark:text-slate-300 shadow-xs">
                 <Server className="w-6 h-6" />
               </div>
             </div>
           </div>
 
           {/* Kill Switch Big Banner Card */}
-          <div className={`p-6 rounded-2xl border transition-all ${
+          <div className={`p-6 rounded-2xl border transition-all shadow-xs ${
             siteSettings.maintenanceMode
-              ? 'bg-rose-50/70 border-rose-200'
-              : 'bg-white border-slate-200'
+              ? 'bg-rose-50/80 dark:bg-rose-950/30 border-rose-200 dark:border-rose-900/60'
+              : 'bg-white dark:bg-slate-900 border-slate-200/80 dark:border-slate-800'
           }`}>
             <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6">
               <div className="space-y-1.5 max-w-xl">
                 <div className="flex items-center gap-2">
-                  <Power className={`w-5 h-5 ${siteSettings.maintenanceMode ? 'text-rose-600' : 'text-slate-700'}`} />
-                  <h2 className="text-base font-bold text-slate-900">
+                  <Power className={`w-5 h-5 ${siteSettings.maintenanceMode ? 'text-rose-600 dark:text-rose-400' : 'text-slate-700 dark:text-slate-300'}`} />
+                  <h2 className="text-base font-bold text-slate-900 dark:text-white">
                     Interruptor de Cierre Global (Kill Switch)
                   </h2>
                 </div>
-                <p className="text-xs text-slate-600 leading-relaxed">
+                <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
                   Permite bloquear de forma inmediata todo el acceso a la plataforma para los visitantes normales en caso de mantenimiento técnico o emergencia. Los administradores mantienen acceso exclusivo en todo momento.
                 </p>
                 <div className="pt-1 flex items-center gap-3 text-xs">
-                  <span className="text-slate-500 font-medium">Estado actual:</span>
+                  <span className="text-slate-500 dark:text-slate-400 font-medium">Estado actual:</span>
                   <span className={`font-bold px-2.5 py-0.5 rounded-md ${
                     siteSettings.maintenanceMode 
                       ? 'bg-rose-600 text-white' 
@@ -879,10 +879,10 @@ export const AdminCommandCenter: React.FC<AdminCommandCenterProps> = ({ onBack }
                     toggleMaintenanceMode(!siteSettings.maintenanceMode);
                     showToast(siteSettings.maintenanceMode ? 'Sitio reabierto al público' : 'Sitio cerrado');
                   }}
-                  className={`px-5 py-3 rounded-xl text-xs font-bold transition-all shadow-md flex items-center justify-center gap-2 cursor-pointer ${
+                  className={`px-5 py-3 rounded-xl text-xs font-bold transition-all shadow-md flex items-center justify-center gap-2 cursor-pointer active:scale-95 ${
                     siteSettings.maintenanceMode
-                      ? 'bg-emerald-600 hover:bg-emerald-500 text-white'
-                      : 'bg-rose-600 hover:bg-rose-500 text-white'
+                      ? 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-emerald-600/25'
+                      : 'bg-rose-600 hover:bg-rose-500 text-white shadow-rose-600/25'
                   }`}
                 >
                   <Power className="w-4 h-4" />
